@@ -1,0 +1,170 @@
+---
+const hasSession = Astro.cookies.has("session");
+---
+
+<div id="mobile-drawer" class="drawer-root" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+  <!-- Backdrop dimmer -->
+  <div class="drawer-backdrop"></div>
+
+  <!-- Swipe-dismiss scroller container -->
+  <div class="drawer-scroller" id="drawer-scroller">
+    <div class="drawer-contents">
+      <!-- Offscreen spacer (width: 100vw - 280px) to control snap position -->
+      <div class="drawer-spacer"></div>
+
+      <!-- Drawer Sheet (width: 280px) -->
+      <div class="drawer-sheet" id="drawer-sheet" tabindex="-1">
+        <div class="drawer-header">
+          <span id="drawer-title" class="logo" style="font-size: 14px;">
+            Text<span class="logo-accent">Share</span>
+          </span>
+          <button id="drawer-close" class="btn btn-icon" aria-label="Close menu">
+            <svg class="icon-svg" viewBox="0 0 24 24">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <nav class="drawer-nav" aria-label="Mobile Navigation">
+          <a href="/" class="drawer-nav-link">
+            <svg class="icon-svg" viewBox="0 0 24 24">
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            Home
+          </a>
+          {hasSession ? (
+            <a href="/dashboard" class="drawer-nav-link">
+              <svg class="icon-svg" viewBox="0 0 24 24">
+                <rect width="7" height="9" x="3" y="3" rx="1"></rect>
+                <rect width="7" height="5" x="14" y="3" rx="1"></rect>
+                <rect width="7" height="9" x="14" y="12" rx="1"></rect>
+                <rect width="7" height="5" x="3" y="15" rx="1"></rect>
+              </svg>
+              Dashboard
+            </a>
+            <form action="/api/logout" method="POST" style="margin:0;">
+              <button type="submit" class="drawer-nav-link" style="background:none; border:none; width:100%; text-align:left; cursor:pointer;">
+                <svg class="icon-svg" viewBox="0 0 24 24">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                Sign Out
+              </button>
+            </form>
+          ) : (
+            <a href="/login" class="drawer-nav-link">
+              <svg class="icon-svg" viewBox="0 0 24 24">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+                <polyline points="10 17 15 12 10 7"></polyline>
+                <line x1="15" y1="12" x2="3" y2="12"></line>
+              </svg>
+              Sign In
+            </a>
+          )}
+          <a href="#" class="drawer-nav-link premium-hook-btn" style="color:var(--color-accent);">
+            <svg class="icon-svg" viewBox="0 0 24 24" stroke="currentColor">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+            </svg>
+            Go Pro (Premium)
+          </a>
+        </nav>
+
+        <div class="drawer-footer">
+          <p>TextShare Mobile Menu</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const drawer = document.getElementById("mobile-drawer");
+  const scroller = document.getElementById("drawer-scroller");
+  const sheet = document.getElementById("drawer-sheet");
+  const openBtn = document.getElementById("hamburger-menu");
+  const closeBtn = document.getElementById("drawer-close");
+  const backdrop = drawer?.querySelector(".drawer-backdrop") as HTMLElement;
+
+  if (drawer && scroller && sheet && openBtn && closeBtn && backdrop) {
+    let isOpen = false;
+
+    function openDrawer() {
+      isOpen = true;
+      drawer?.classList.add("open");
+      // Initially, scroll to 0 (which snaps the sheet on screen)
+      scroller?.scrollTo({ left: scroller.offsetWidth, behavior: 'instant' });
+      
+      // Request frame to execute animation scroll
+      requestAnimationFrame(() => {
+        scroller?.scrollTo({ left: 0, behavior: 'smooth' });
+      });
+    }
+
+    function closeDrawer() {
+      isOpen = false;
+      scroller?.scrollTo({ left: scroller.offsetWidth, behavior: 'smooth' });
+    }
+
+    function onDrawerOpened() {
+      const main = document.querySelector('main');
+      if (main) main.inert = true;
+      openBtn?.setAttribute('aria-expanded', 'true');
+      sheet?.focus();
+    }
+
+    function onDrawerClosed() {
+      drawer?.classList.remove("open");
+      const main = document.querySelector('main');
+      if (main) main.inert = false;
+      openBtn?.setAttribute('aria-expanded', 'false');
+    }
+
+    // Set scroll handler for backdrop opacity fade
+    scroller.addEventListener('scroll', () => {
+      const sheetWidth = sheet.offsetWidth;
+      const scrollLeft = scroller.scrollLeft;
+      // Calculate opacity: 1 when scrolled to 0 (fully open), 0 when scrolled to sheetWidth (closed)
+      const ratio = Math.max(0, Math.min(1, 1 - (scrollLeft / sheetWidth)));
+      drawer.style.setProperty('--drawer-backdrop', ratio.toString());
+    });
+
+    // IntersectionObserver to watch sheet state
+    const visibleThreshold = 1 / window.innerWidth;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries.at(-1);
+        if (!entry) return;
+        
+        if (entry.intersectionRatio < visibleThreshold) {
+          if (!isOpen) onDrawerClosed();
+        }
+        if (entry.intersectionRatio >= 0.95) {
+          onDrawerOpened();
+        }
+      },
+      { root: scroller, threshold: [visibleThreshold, 0.95] }
+    );
+    observer.observe(sheet);
+
+    // Open/Close bindings
+    openBtn.addEventListener('click', openDrawer);
+    closeBtn.addEventListener('click', closeDrawer);
+
+    // Click outside sheet closes it
+    drawer.addEventListener('click', (event) => {
+      if (event.target === scroller || event.target === backdrop || event.target === drawer) {
+        closeDrawer();
+      }
+    });
+
+    // Escape key
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && drawer.classList.contains("open")) {
+        closeDrawer();
+      }
+    });
+  }
+</script>

@@ -1,0 +1,518 @@
+---
+import Layout from '../layouts/Layout.astro';
+import QRCode from 'qrcode';
+
+// SSR Check Authentication & Guest Limit
+const isLoggedIn = Astro.cookies.has("session");
+const hasActiveGuestShare = Astro.cookies.has("guest_share_active");
+
+// Form Handling
+let errors: Record<string, string> = {};
+let result: {
+  url: string;
+  qrCode: string;
+  expiryTime: string;
+  isImage: boolean;
+} | null = null;
+
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const contentType = formData.get("contentType")?.toString() || "text";
+    const textContent = formData.get("textContent")?.toString() || "";
+    const expiry = formData.get("expiry")?.toString() || "24h";
+    const language = formData.get("language")?.toString() || "plaintext";
+    const password = formData.get("password")?.toString() || "";
+    const customSlug = formData.get("customSlug")?.toString()?.trim() || "";
+    const urlFormat = formData.get("urlFormat")?.toString() || "string";
+    const imageFile = formData.get("imageFile") as File | null;
+
+    // Validation
+    if (!isLoggedIn) {
+      // Guest checks
+      if (hasActiveGuestShare) {
+        errors.limit = "You already have an active guest share. Please sign in to create more, or wait 24 hours.";
+      }
+      if (expiry !== "24h") {
+        errors.expiry = "Guests can only create shares that expire in 24 hours.";
+      }
+      if (customSlug) {
+        errors.customSlug = "Only registered users can set custom vanity URLs.";
+      }
+      if (password) {
+        errors.password = "Only registered users can password-protect shares.";
+      }
+      if (contentType === "image") {
+        errors.contentType = "Only registered users can upload images.";
+      }
+    }
+
+    if (contentType === "text" && !textContent.trim()) {
+      errors.textContent = "Please enter some text or code content.";
+    }
+
+    if (contentType === "image" && (!imageFile || imageFile.size === 0)) {
+      errors.imageFile = "Please select an image file to upload.";
+    } else if (contentType === "image" && imageFile && imageFile.size > 5 * 1024 * 1024) {
+      errors.imageFile = "File size must not exceed 5MB.";
+    }
+
+    if (customSlug) {
+      const slugRegex = /^[a-zA-Z0-9-_]{3,20}$/;
+      if (!slugRegex.test(customSlug)) {
+        errors.customSlug = "Slug must be 3-20 characters, containing only letters, numbers, hyphens, and underscores.";
+      }
+      // Simple mock check for taken slugs (for demo purposes)
+      if (customSlug.toLowerCase() === "admin" || customSlug.toLowerCase() === "dashboard") {
+        errors.customSlug = "This custom link is already taken or reserved.";
+      }
+    }
+
+    // Process share if no validation errors
+    if (Object.keys(errors).length === 0) {
+      let slug = "";
+      
+      if (isLoggedIn && customSlug) {
+        slug = customSlug;
+      } else {
+        // Auto-generate slug
+        if (urlFormat === "number") {
+          slug = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit number
+        } else {
+          // 8 char random string
+          const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+          for (let i = 0; i < 8; i++) {
+            slug += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+        }
+      }
+
+      // Calculate Expiry Date
+      const now = new Date();
+      let expiryDate = new Date();
+      if (expiry === "1h") expiryDate.setHours(now.getHours() + 1);
+      else if (expiry === "24h") expiryDate.setDate(now.getDate() + 1);
+      else if (expiry === "1w") expiryDate.setDate(now.getDate() + 7);
+      else if (expiry === "1m") expiryDate.setMonth(now.getMonth() + 1);
+      else if (expiry === "1y") expiryDate.setFullYear(now.getFullYear() + 1);
+      else if (expiry === "burn") expiryDate.setMinutes(now.getMinutes() + 5); // burn after reading gets a short window to read once
+
+      const shareUrl = `${Astro.url.origin}/${slug}`;
+      const qrCodeUrl = await QRCode.toDataURL(shareUrl, { width: 160, margin: 1 });
+
+      // If guest, set cookie to enforce 1 active share limit
+      if (!isLoggedIn) {
+        Astro.cookies.set("guest_share_active", slug, {
+          path: "/",
+          maxAge: 60 * 60 * 24, // 24 hours
+          httpOnly: true
+        });
+      }
+
+      result = {
+        url: shareUrl,
+        qrCode: qrCodeUrl,
+        expiryTime: expiryDate.toLocaleString(),
+        isImage: contentType === "image"
+      };
+    }
+  } catch (e) {
+    errors.server = "An unexpected error occurred. Please try again.";
+  }
+}
+---
+
+<Layout>
+  <div class="creator-container">
+    <div class="hero-section">
+      <h1>Share Text & Code Instantly</h1>
+      <p>Paste your content, set an expiry duration, and generate a secure link and QR code.</p>
+    </div>
+
+    <!-- Active Guest Share Rate-Limit Banner -->
+    {!isLoggedIn && hasActiveGuestShare && (
+      <div class="banner banner-warning">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div>
+          You already have an active guest share. 
+          <a href="/login" style="font-weight: 600; text-decoration: underline;">Sign in</a> to create unlimited shares, or wait until your guest share expires in 24 hours.
+        </div>
+      </div>
+    )}
+
+    {errors.server && (
+      <div class="banner banner-warning" style="background-color:rgba(239, 68, 68, 0.1); border-color:rgba(239, 68, 68, 0.2); color:var(--color-danger);">
+        {errors.server}
+      </div>
+    )}
+
+    {result ? (
+      /* Success View Component */
+      <div class="result-card">
+        <div class="result-header">
+          <h2 style="margin: 0; color: var(--color-accent);">Share Created Successfully!</h2>
+          <p style="color: var(--color-text-muted); font-size: 13px; margin-top: var(--space-2);">Your share is live and accessible at the link below.</p>
+        </div>
+        
+        <div class="result-body">
+          <div class="result-info">
+            <div class="input-label-pair">
+              <label>Share URL</label>
+              <div class="url-copy-box">
+                <div class="url-text" id="url-text-val">{result.url}</div>
+                <button id="copy-url-btn" class="btn btn-primary" title="Copy link">
+                  <svg class="icon-svg" viewBox="0 0 24 24" id="copy-icon">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span id="copy-btn-text">Copy</span>
+                </button>
+              </div>
+            </div>
+
+            <div style="font-size: 13px; margin-top: var(--space-2);">
+              <strong>Expires at:</strong> <span style="color: var(--color-text-muted);">{result.expiryTime}</span>
+            </div>
+
+            <div style="margin-top: var(--space-4);">
+              <a href="/" class="btn btn-secondary">Create Another Share</a>
+              {result.isImage && (
+                <span style="font-size: 12px; display: block; color: var(--color-text-muted); margin-top: var(--space-2);">
+                  (Note: In a live environment, image uploads are sent to server storage.)
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div class="qr-code-section">
+            <div class="qr-container">
+              <img src={result.qrCode} alt="QR Code Link" width="160" height="160" />
+            </div>
+            <a href={result.qrCode} download="textshare-qr.png" class="btn btn-secondary btn-sm" style="font-size:12px; padding:4px 8px;">
+              <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px;">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Download QR
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const copyBtn = document.getElementById("copy-url-btn");
+        const urlVal = document.getElementById("url-text-val")?.textContent;
+        const copyIcon = document.getElementById("copy-icon");
+        const copyText = document.getElementById("copy-btn-text");
+
+        copyBtn?.addEventListener("click", async () => {
+          if (urlVal) {
+            try {
+              await navigator.clipboard.writeText(urlVal);
+              if (copyText) copyText.textContent = "Copied!";
+              setTimeout(() => {
+                if (copyText) copyText.textContent = "Copy";
+              }, 2000);
+            } catch (err) {
+              console.error("Failed to copy text: ", err);
+            }
+          }
+        });
+      </script>
+
+    ) : (
+      /* Creator Form View */
+      <form class="share-form" method="POST" enctype="multipart/form-data">
+        
+        <!-- Toggle: Text vs Image (Logged In only) -->
+        {isLoggedIn && (
+          <div style="display: flex; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
+            <button type="button" id="tab-text" class="btn btn-secondary active" style="flex:1; border-radius:0; border:none; border-right:1px solid var(--color-border); padding: 12px; font-weight: 600;">Text / Code</button>
+            <button type="button" id="tab-image" class="btn btn-secondary" style="flex:1; border-radius:0; border:none; padding: 12px; font-weight: 600;">Image Upload</button>
+            <input type="hidden" name="contentType" id="content-type-input" value="text" />
+          </div>
+        )}
+
+        <!-- Main text content area -->
+        <div class="textarea-wrapper" id="text-input-section">
+          <textarea 
+            name="textContent" 
+            class="share-textarea" 
+            placeholder="Type or paste your text or code snippet here..."
+            aria-label="Text content"
+            disabled={!isLoggedIn && hasActiveGuestShare}
+          ></textarea>
+          {errors.textContent && (
+            <span style="color:var(--color-danger); font-size:12px; padding:0 var(--space-4) var(--space-2); display:block;">
+              {errors.textContent}
+            </span>
+          )}
+        </div>
+
+        <!-- Main image upload area (Hidden by default, Logged In only) -->
+        {isLoggedIn && (
+          <div id="image-input-section" style="display: none;">
+            <div class="image-upload-wrapper" id="image-drag-area">
+              <input type="file" name="imageFile" id="image-file-input" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+              <div class="image-preview-container" id="image-upload-placeholder">
+                <svg class="icon-svg icon-svg-lg" viewBox="0 0 24 24" style="width:48px; height:48px; color:var(--color-text-muted);">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <div style="font-weight: 500;">Click to select an image file (PNG, JPG, WEBP)</div>
+                <div style="color: var(--color-text-muted); font-size:12px;">Max file size: 5MB</div>
+              </div>
+              <div class="image-preview-container" id="image-uploaded-preview" style="display: none;">
+                <img id="preview-img" src="" alt="Selected Preview" />
+                <button type="button" id="remove-img-btn" class="btn btn-danger btn-sm" style="font-size:12px; padding:4px 8px;">Remove Image</button>
+              </div>
+            </div>
+            {errors.imageFile && (
+              <span style="color:var(--color-danger); font-size:12px; padding:var(--space-2) var(--space-4); display:block;">
+                {errors.imageFile}
+              </span>
+            )}
+          </div>
+        )}
+
+        <!-- Bottom Controls Bar -->
+        <div class="form-controls">
+          <div class="control-group-left">
+            <!-- Syntax highlighting toggle -->
+            <div id="syntax-highlight-toggle-wrapper" style="display: flex; align-items: center; gap: var(--space-2);">
+              <label class="checkbox-label">
+                <input type="checkbox" id="syntax-highlight-toggle" class="checkbox-input" />
+                <span>Syntax highlighting</span>
+              </label>
+              <select name="language" id="language-select" class="select-input" style="display: none;">
+                <option value="plaintext">Plain Text</option>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="python">Python</option>
+                <option value="json">JSON</option>
+                <option value="markdown">Markdown</option>
+              </select>
+            </div>
+
+            <!-- Expiry Dropdown -->
+            <div style="display: flex; align-items: center; gap: var(--space-2);">
+              <label for="expiry-select" style="font-size: 13px;">Expires in:</label>
+              <select name="expiry" id="expiry-select" class="select-input" disabled={!isLoggedIn && hasActiveGuestShare}>
+                {isLoggedIn ? (
+                  <option value="1h">1 hour</option>
+                  <option value="24h" selected>24 hours</option>
+                  <option value="1w">1 week</option>
+                  <option value="1m">1 month</option>
+                  <option value="1y">1 year</option>
+                  <option value="burn">Burn after reading</option>
+                ) : (
+                  <option value="24h" selected>24 hours (Guest limit)</option>
+                )}
+              </select>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button 
+            type="submit" 
+            class="btn btn-primary" 
+            disabled={!isLoggedIn && hasActiveGuestShare}
+            style="width: 100%; justify-content: center;"
+          >
+            <svg class="icon-svg" viewBox="0 0 24 24">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            Create Share
+          </button>
+        </div>
+
+        <!-- Logged-in premium settings accordion -->
+        {isLoggedIn && (
+          <div class="premium-options-panel">
+            <!-- Password protection option -->
+            <div class="input-label-pair">
+              <label class="checkbox-label" style="font-weight: 500; color: var(--color-text-base);">
+                <input type="checkbox" id="password-toggle" class="checkbox-input" />
+                <span>Password protect share</span>
+              </label>
+              <input 
+                type="password" 
+                name="password" 
+                id="password-input" 
+                class="text-input" 
+                placeholder="Enter access password" 
+                style="display: none;" 
+              />
+              {errors.password && <span style="color:var(--color-danger); font-size:12px;">{errors.password}</span>}
+            </div>
+
+            <!-- Vanity custom slug option -->
+            <div class="input-label-pair">
+              <label for="custom-slug-input">Custom Link (Vanity URL)</label>
+              <div style="position: relative; display: flex; align-items: center;">
+                <span style="font-size:13px; color:var(--color-text-muted); margin-right: 2px;">/</span>
+                <input 
+                  type="text" 
+                  name="customSlug" 
+                  id="custom-slug-input" 
+                  class="text-input" 
+                  placeholder="my-custom-slug"
+                  style="flex: 1;"
+                />
+              </div>
+              <span id="slug-availability-msg" style="font-size: 11px; display: none;"></span>
+              {errors.customSlug && <span style="color:var(--color-danger); font-size:12px;">{errors.customSlug}</span>}
+            </div>
+
+            <!-- Slug Generation Format Option -->
+            <div class="input-label-pair" id="format-select-wrapper">
+              <label for="format-select">Auto-generated link format</label>
+              <select name="urlFormat" id="format-select" class="select-input">
+                <option value="string">String (e.g. random letters)</option>
+                <option value="number">Number (e.g. numeric ID)</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </form>
+
+      <script>
+        // Interactive Client-side Scripting
+        
+        // Tab switching Text vs Image (Logged In only)
+        const tabText = document.getElementById("tab-text");
+        const tabImage = document.getElementById("tab-image");
+        const contentTypeInput = document.getElementById("content-type-input") as HTMLInputElement;
+        const textInputSection = document.getElementById("text-input-section");
+        const imageInputSection = document.getElementById("image-input-section");
+        const formatSelectWrapper = document.getElementById("format-select-wrapper");
+        const syntaxHighlightWrapper = document.getElementById("syntax-highlight-toggle-wrapper");
+
+        if (tabText && tabImage && contentTypeInput) {
+          tabText.addEventListener("click", () => {
+            tabText.classList.add("active");
+            tabText.style.backgroundColor = "var(--color-bg-surface)";
+            tabImage.classList.remove("active");
+            tabImage.style.backgroundColor = "transparent";
+            contentTypeInput.value = "text";
+            if (textInputSection) textInputSection.style.display = "block";
+            if (imageInputSection) imageInputSection.style.display = "none";
+            if (formatSelectWrapper) formatSelectWrapper.style.display = "flex";
+            if (syntaxHighlightWrapper) syntaxHighlightWrapper.style.display = "flex";
+          });
+
+          tabImage.addEventListener("click", () => {
+            tabImage.classList.add("active");
+            tabImage.style.backgroundColor = "var(--color-bg-surface)";
+            tabText.classList.remove("active");
+            tabText.style.backgroundColor = "transparent";
+            contentTypeInput.value = "image";
+            if (textInputSection) textInputSection.style.display = "none";
+            if (imageInputSection) imageInputSection.style.display = "block";
+            if (formatSelectWrapper) formatSelectWrapper.style.display = "none";
+            if (syntaxHighlightWrapper) syntaxHighlightWrapper.style.display = "none";
+          });
+        }
+
+        // Image Drag/Click upload logic
+        const imageDragArea = document.getElementById("image-drag-area");
+        const imageFileInput = document.getElementById("image-file-input") as HTMLInputElement;
+        const placeholderView = document.getElementById("image-upload-placeholder");
+        const previewView = document.getElementById("image-uploaded-preview");
+        const previewImg = document.getElementById("preview-img") as HTMLImageElement;
+        const removeImgBtn = document.getElementById("remove-img-btn");
+
+        if (imageDragArea && imageFileInput && placeholderView && previewView && previewImg && removeImgBtn) {
+          imageDragArea.addEventListener("click", (e) => {
+            if (e.target !== removeImgBtn) {
+              imageFileInput.click();
+            }
+          });
+
+          imageFileInput.addEventListener("change", () => {
+            const files = imageFileInput.files;
+            if (files && files[0]) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                if (e.target?.result && previewImg) {
+                  previewImg.src = e.target.result.toString();
+                  placeholderView.style.display = "none";
+                  previewView.style.display = "flex";
+                }
+              };
+              reader.readAsDataURL(files[0]);
+            }
+          });
+
+          removeImgBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            imageFileInput.value = "";
+            previewImg.src = "";
+            placeholderView.style.display = "flex";
+            previewView.style.display = "none";
+          });
+        }
+
+        // Syntax Highlighter Selector Toggle
+        const syntaxHighlightCheckbox = document.getElementById("syntax-highlight-toggle") as HTMLInputElement;
+        const languageSelect = document.getElementById("language-select") as HTMLSelectElement;
+
+        if (syntaxHighlightCheckbox && languageSelect) {
+          syntaxHighlightCheckbox.addEventListener("change", () => {
+            languageSelect.style.display = syntaxHighlightCheckbox.checked ? "inline-block" : "none";
+          });
+        }
+
+        // Password input field reveal (Logged In only)
+        const passwordCheckbox = document.getElementById("password-toggle") as HTMLInputElement;
+        const passwordInput = document.getElementById("password-input") as HTMLInputElement;
+
+        if (passwordCheckbox && passwordInput) {
+          passwordCheckbox.addEventListener("change", () => {
+            passwordInput.style.display = passwordCheckbox.checked ? "block" : "none";
+            if (passwordCheckbox.checked) passwordInput.focus();
+          });
+        }
+
+        // Vanity custom slug real-time mock uniqueness check (Logged In only)
+        const slugInput = document.getElementById("custom-slug-input") as HTMLInputElement;
+        const availabilityMsg = document.getElementById("slug-availability-msg");
+
+        if (slugInput && availabilityMsg) {
+          slugInput.addEventListener("input", () => {
+            const slug = slugInput.value.trim().toLowerCase();
+            if (!slug) {
+              availabilityMsg.style.display = "none";
+              return;
+            }
+
+            if (slug.length < 3) {
+              availabilityMsg.style.display = "block";
+              availabilityMsg.textContent = "Too short";
+              availabilityMsg.style.color = "var(--color-danger)";
+              return;
+            }
+
+            // Mock check
+            availabilityMsg.style.display = "block";
+            if (slug === "admin" || slug === "dashboard" || slug === "taken") {
+              availabilityMsg.textContent = "Already taken";
+              availabilityMsg.style.color = "var(--color-danger)";
+            } else {
+              availabilityMsg.textContent = "Link is available";
+              availabilityMsg.style.color = "green";
+            }
+          });
+        }
+      </script>
+    )}
+  </div>
+</Layout>

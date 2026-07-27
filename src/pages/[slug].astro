@@ -1,0 +1,232 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PasswordGate from '../components/PasswordGate.astro';
+import { Code } from 'astro:components';
+
+const { slug } = Astro.params;
+
+// Access global mock database
+if (!globalThis.textSharesStore) {
+  globalThis.textSharesStore = new Map();
+}
+const store = globalThis.textSharesStore as Map<string, any>;
+
+// Fetch share data
+let share = store.get(slug);
+
+// Mock presets for testing/demonstration
+if (!share) {
+  if (slug === "expired") {
+    share = {
+      contentType: "text",
+      textContent: "This content is expired.",
+      expiryDate: new Date(Date.now() - 1000 * 60), // 1 min ago
+      language: "plaintext",
+      password: null,
+    };
+  } else if (slug === "password") {
+    share = {
+      contentType: "text",
+      textContent: "const secret = 'Unlocks successfully!';\nconsole.log(secret);",
+      expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours later
+      language: "javascript",
+      password: "password",
+    };
+  } else if (slug === "image") {
+    share = {
+      contentType: "image",
+      textContent: "",
+      imageSrc: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop", // placeholder abstract premium image
+      expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24),
+      language: "plaintext",
+      password: null,
+    };
+  } else if (slug === "demo-code") {
+    share = {
+      contentType: "text",
+      textContent: `// TextShare Demo Snippet\nimport { defineConfig } from 'astro/config';\n\nexport default defineConfig({\n  output: 'server',\n  adapter: node({\n    mode: 'standalone',\n  }),\n});`,
+      expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24),
+      language: "javascript",
+      password: null,
+    };
+  }
+}
+
+// 404/Not Found
+if (!share) {
+  return Astro.redirect('/?error=not_found');
+}
+
+// Check if share is expired
+const isExpired = new Date() > new Date(share.expiryDate);
+
+// Password check state
+let isLocked = !!share.password;
+let passwordError = "";
+
+// Handle Password Validation POST Request
+if (Astro.request.method === "POST" && isLocked) {
+  try {
+    const formData = await Astro.request.formData();
+    const action = formData.get("action")?.toString();
+    
+    if (action === "verify_password") {
+      const enteredPassword = formData.get("sharePassword")?.toString();
+      if (enteredPassword === share.password) {
+        isLocked = false;
+        // Temporarily store unlocked permission in session cookie
+        Astro.cookies.set(`unlocked_${slug}`, "true", {
+          path: "/",
+          maxAge: 60 * 5, // 5 min session
+          httpOnly: true
+        });
+      } else {
+        passwordError = "Incorrect password. Please try again.";
+      }
+    }
+  } catch (err) {
+    passwordError = "An error occurred during verification.";
+  }
+}
+
+// Double check cookie session bypass for password locks
+if (isLocked && Astro.cookies.has(`unlocked_${slug}`)) {
+  isLocked = false;
+}
+---
+
+<Layout title={`View Share: ${slug} — TextShare`}>
+  {isExpired ? (
+    /* Expired Screen */
+    <div class="expired-card">
+      <svg class="icon-svg expired-icon" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <h2>This share has expired</h2>
+      <p>The owner configured this link to automatically self-destruct after its set duration.</p>
+      <a href="/" class="btn btn-primary">Create Your Own Share</a>
+    </div>
+  ) : isLocked ? (
+    /* Password Gate Component */
+    <PasswordGate error={passwordError} slug={slug} />
+  ) : (
+    /* Active Share Content View */
+    <div class="creator-container">
+      <div class="view-card">
+        <!-- Header details -->
+        <div class="view-header">
+          <div class="view-meta">
+            <span style="font-weight: 600; color: var(--color-accent);">/{slug}</span>
+            <span>•</span>
+            <span>Type: {share.contentType === "image" ? "Image" : `Code (${share.language})`}</span>
+            <span>•</span>
+            <span id="expiry-countdown-label">
+              Expires: {new Date(share.expiryDate).toLocaleTimeString()}
+            </span>
+          </div>
+
+          <div class="view-actions">
+            {share.contentType === "text" && (
+              <button id="copy-content-btn" class="btn btn-secondary btn-sm" style="font-size:12px; padding: 4px 8px;">
+                <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px;">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span id="copy-btn-label">Copy Code</span>
+              </button>
+            )}
+            
+            {share.contentType === "image" && (
+              <a 
+                href={share.imageSrc} 
+                download={`textshare-${slug}`} 
+                class="btn btn-primary btn-sm" 
+                style="font-size:12px; padding: 4px 8px;"
+              >
+                <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px;">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Download Image
+              </a>
+            )}
+          </div>
+        </div>
+
+        <!-- Render Content -->
+        <div class="content-display-wrapper">
+          {share.contentType === "text" ? (
+            share.language !== "plaintext" ? (
+              /* High-fidelity server-side Shiki syntax highlighter */
+              <Code code={share.textContent} lang={share.language} theme="github-dark" />
+            ) : (
+              /* Plain text fallback */
+              <pre class="content-display-text" id="plain-text-box">{share.textContent}</pre>
+            )
+          ) : (
+            /* Render uploaded image */
+            <div class="content-display-image">
+              <img src={share.imageSrc} alt={`Shared image ${slug}`} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div style="margin-top: var(--space-4); text-align: center;">
+        <a href="/" class="btn btn-secondary">Create a New Share</a>
+      </div>
+    </div>
+
+    /* Copy Script for Code contents */
+    {share.contentType === "text" && (
+      <script define:vars={{ text: share.textContent }}>
+        const copyBtn = document.getElementById("copy-content-btn");
+        const copyLabel = document.getElementById("copy-btn-label");
+
+        copyBtn?.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(text);
+            if (copyLabel) copyLabel.textContent = "Copied!";
+            setTimeout(() => {
+              if (copyLabel) copyLabel.textContent = "Copy Code";
+            }, 2000);
+          } catch (err) {
+            console.error("Failed to copy code: ", err);
+          }
+        });
+      </script>
+    )}
+
+    /* Countdown Timer Script */
+    <script define:vars={{ expiryMs: new Date(share.expiryDate).getTime() }}>
+      const countdownLabel = document.getElementById("expiry-countdown-label");
+
+      function updateCountdown() {
+        const now = Date.now();
+        const diff = expiryMs - now;
+
+        if (diff <= 0) {
+          if (countdownLabel) countdownLabel.textContent = "Expired";
+          window.location.reload(); // Refresh to trigger expired screen
+          return;
+        }
+
+        const hrs = Math.floor(diff / (1000 * 60 * 60));
+        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+        let label = "Expires in: ";
+        if (hrs > 0) label += `${hrs}h `;
+        if (mins > 0 || hrs > 0) label += `${mins}m `;
+        label += `${secs}s`;
+
+        if (countdownLabel) countdownLabel.textContent = label;
+      }
+
+      updateCountdown();
+      setInterval(updateCountdown, 1000);
+    </script>
+  )}
+</Layout>

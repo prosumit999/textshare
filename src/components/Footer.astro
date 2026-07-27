@@ -1,0 +1,67 @@
+---
+const currentYear = new Date().getFullYear();
+
+const recentPosts = [
+  { title: "Securing Text Sharing: Best Practices", date: "Jul 25, 2026", url: "#" },
+  { title: "How We Built a Faster Code Snippet Tool", date: "Jul 18, 2026", url: "#" },
+  { title: "Introducing Image Snippets for Pro Users", date: "Jun 30, 2026", url: "#" }
+];
+---
+
+<footer>
+  <div class="container">
+    <div class="footer-grid">
+      <!-- Column 1: About & Blog -->
+      <div class="footer-col">
+        <h3>About TextShare</h3>
+        <p>
+          TextShare is a minimal, blazing fast utility designed for developers and power users to instantly share code, text snippets, and images securely. No fluff, just speed.
+        </p>
+        <div style="margin-top: var(--space-4);">
+          <h3 style="margin-bottom: var(--space-2); font-size: 12px;">Recent Blog Posts</h3>
+          <div class="footer-blog-list">
+            {recentPosts.map((post) => (
+              <a href={post.url} class="footer-blog-item">
+                <span class="footer-blog-title">{post.title}</span>
+                <span class="footer-blog-date">{post.date}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <!-- Column 2: Chrome Extension CTA -->
+      <div class="footer-col">
+        <h3>Chrome Extension</h3>
+        <p>
+          Instantly share snippets directly from any web page. Highlight any text, right-click, and select "Share via TextShare" to get a shareable URL in seconds.
+        </p>
+        <div style="margin-top: var(--space-2);">
+          <a href="#" class="btn btn-primary" style="display: inline-flex;">
+            <svg class="icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <circle cx="12" cy="12" r="4"></circle>
+              <line x1="12" y1="2" x2="12" y2="8"></line>
+              <line x1="12" y1="16" x2="12" y2="22"></line>
+              <line x1="2" y1="12" x2="8" y2="12"></line>
+              <line x1="16" y1="12" x2="22" y2="12"></line>
+            </svg>
+            Download Chrome Extension
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom copyright / legal -->
+    <div class="footer-bottom">
+      <div>
+        &copy; {currentYear} TextShare. All rights reserved.
+      </div>
+      <div class="footer-links">
+        <a href="#">Privacy Policy</a>
+        <a href="#">Terms of Service</a>
+        <a href="#">Contact Us</a>
+      </div>
+    </div>
+  </div>
+</footer>

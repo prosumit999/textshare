@@ -1,0 +1,90 @@
+---
+const hasSession = Astro.cookies.has("session");
+---
+
+<header>
+  <div class="container header-container">
+    <a href="/" class="logo" aria-label="TextShare Home">
+      <svg class="icon-svg logo-accent icon-svg-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      <span>Text<span class="logo-accent">Share</span></span>
+    </a>
+
+    <div class="nav-actions">
+      <!-- Desktop Navigation -->
+      <nav class="nav-links-desktop" aria-label="Desktop Navigation">
+        <a href="/" class="btn btn-secondary">New Share</a>
+        {hasSession ? (
+          <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+          <form action="/api/logout" method="POST" style="display:inline;">
+            <button type="submit" class="btn btn-secondary">Sign Out</button>
+          </form>
+        ) : (
+          <a href="/login" class="btn btn-secondary">Sign In</a>
+        )}
+        <button class="btn btn-primary premium-hook-btn">
+          Go Pro <span class="badge-pro">PRO</span>
+        </button>
+      </nav>
+
+      <!-- Theme Switcher -->
+      <button id="theme-toggle" class="btn btn-icon" aria-label="Toggle theme" title="Toggle theme">
+        <!-- Sun Icon (visible in dark mode) -->
+        <svg id="theme-sun" class="icon-svg" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+        </svg>
+        <!-- Moon Icon (visible in light mode) -->
+        <svg id="theme-moon" class="icon-svg" viewBox="0 0 24 24" style="display: none;">
+          <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+        </svg>
+      </button>
+
+      <!-- Mobile Hamburger Button -->
+      <button id="hamburger-menu" class="btn btn-icon btn-hamburger" aria-expanded="false" aria-controls="mobile-drawer" aria-label="Open navigation menu">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <line x1="4" y1="12" x2="20" y2="12"></line>
+          <line x1="4" y1="6" x2="20" y2="6"></line>
+          <line x1="4" y1="18" x2="20" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+</header>
+
+<script>
+  const themeToggle = document.getElementById("theme-toggle");
+  const sunIcon = document.getElementById("theme-sun");
+  const moonIcon = document.getElementById("theme-moon");
+
+  function getTheme() {
+    return document.documentElement.getAttribute("data-theme") || "light";
+  }
+
+  function updateIcons(theme: string) {
+    if (theme === "dark") {
+      if (sunIcon) sunIcon.style.display = "block";
+      if (moonIcon) moonIcon.style.display = "none";
+    } else {
+      if (sunIcon) sunIcon.style.display = "none";
+      if (moonIcon) moonIcon.style.display = "block";
+    }
+  }
+
+  // Initialize icon state
+  const currentTheme = getTheme();
+  updateIcons(currentTheme);
+
+  themeToggle?.addEventListener("click", () => {
+    const nextTheme = getTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", nextTheme);
+    document.documentElement.style.colorScheme = nextTheme;
+    localStorage.setItem("color-scheme", nextTheme);
+    updateIcons(nextTheme);
+  });
+</script>
