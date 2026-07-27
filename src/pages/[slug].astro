@@ -178,55 +178,54 @@ if (isLocked && Astro.cookies.has(`unlocked_${slug}`)) {
         <a href="/" class="btn btn-secondary">Create a New Share</a>
       </div>
     </div>
-
-    /* Copy Script for Code contents */
-    {share.contentType === "text" && (
-      <script define:vars={{ text: share.textContent }}>
-        const copyBtn = document.getElementById("copy-content-btn");
-        const copyLabel = document.getElementById("copy-btn-label");
-
-        copyBtn?.addEventListener("click", async () => {
-          try {
-            await navigator.clipboard.writeText(text);
-            if (copyLabel) copyLabel.textContent = "Copied!";
-            setTimeout(() => {
-              if (copyLabel) copyLabel.textContent = "Copy Code";
-            }, 2000);
-          } catch (err) {
-            console.error("Failed to copy code: ", err);
-          }
-        });
-      </script>
-    )}
-
-    /* Countdown Timer Script */
-    <script define:vars={{ expiryMs: new Date(share.expiryDate).getTime() }}>
-      const countdownLabel = document.getElementById("expiry-countdown-label");
-
-      function updateCountdown() {
-        const now = Date.now();
-        const diff = expiryMs - now;
-
-        if (diff <= 0) {
-          if (countdownLabel) countdownLabel.textContent = "Expired";
-          window.location.reload(); // Refresh to trigger expired screen
-          return;
-        }
-
-        const hrs = Math.floor(diff / (1000 * 60 * 60));
-        const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-        const secs = Math.floor((diff % (1000 * 60)) / 1000);
-
-        let label = "Expires in: ";
-        if (hrs > 0) label += `${hrs}h `;
-        if (mins > 0 || hrs > 0) label += `${mins}m `;
-        label += `${secs}s`;
-
-        if (countdownLabel) countdownLabel.textContent = label;
-      }
-
-      updateCountdown();
-      setInterval(updateCountdown, 1000);
-    </script>
   )}
 </Layout>
+
+<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired }}>
+  // Copy script
+  if (isText && !isExpired) {
+    const copyBtn = document.getElementById("copy-content-btn");
+    const copyLabel = document.getElementById("copy-btn-label");
+
+    copyBtn?.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        if (copyLabel) copyLabel.textContent = "Copied!";
+        setTimeout(() => {
+          if (copyLabel) copyLabel.textContent = "Copy Code";
+        }, 2000);
+      } catch (err) {
+        console.error("Failed to copy code: ", err);
+      }
+    });
+  }
+
+  // Countdown timer script
+  const countdownLabel = document.getElementById("expiry-countdown-label");
+  if (countdownLabel && !isExpired) {
+    function updateCountdown() {
+      const now = Date.now();
+      const diff = expiryMs - now;
+
+      if (diff <= 0) {
+        countdownLabel.textContent = "Expired";
+        window.location.reload(); // Refresh to trigger expired screen
+        return;
+      }
+
+      const hrs = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      let label = "Expires in: ";
+      if (hrs > 0) label += `${hrs}h `;
+      if (mins > 0 || hrs > 0) label += `${mins}m `;
+      label += `${secs}s`;
+
+      countdownLabel.textContent = label;
+    }
+
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+  }
+</script>

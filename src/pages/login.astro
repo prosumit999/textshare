@@ -1,0 +1,84 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+let error = "";
+
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const email = formData.get("email")?.toString() || "";
+    const password = formData.get("password")?.toString() || "";
+
+    if (!email || !password) {
+      error = "Please fill in all fields.";
+    } else if (password.length < 6) {
+      error = "Password must be at least 6 characters.";
+    } else {
+      // Simulate successful login by setting session cookie
+      Astro.cookies.set("session", "user_session_token_123456", {
+        path: "/",
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      });
+      
+      // Clear any guest share locks
+      Astro.cookies.delete("guest_share_active", { path: "/" });
+
+      return Astro.redirect('/');
+    }
+  } catch (err) {
+    error = "An error occurred during sign in.";
+  }
+}
+---
+
+<Layout title="Sign In — TextShare">
+  <div class="auth-card">
+    <h2>Welcome Back</h2>
+    <p class="subtitle">Sign in to unlock password protection, vanity links, and image uploads.</p>
+
+    {error && (
+      <div class="banner banner-warning" style="background-color:rgba(239, 68, 68, 0.1); border-color:rgba(239, 68, 68, 0.2); color:var(--color-danger); margin-bottom:var(--space-4);">
+        {error}
+      </div>
+    )}
+
+    <form method="POST" class="auth-form">
+      <div class="input-label-pair">
+        <label for="email-input">Email Address</label>
+        <input 
+          type="email" 
+          name="email" 
+          id="email-input" 
+          class="text-input" 
+          placeholder="name@example.com" 
+          required 
+          autofocus
+        />
+      </div>
+
+      <div class="input-label-pair">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <label for="password-input">Password</label>
+          <a href="#" style="font-size:12px; color:var(--color-text-muted);">Forgot password?</a>
+        </div>
+        <input 
+          type="password" 
+          name="password" 
+          id="password-input" 
+          class="text-input" 
+          placeholder="••••••••" 
+          required 
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="margin-top:var(--space-2); justify-content:center;">
+        Sign In
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="/signup" style="font-weight:600;">Sign up</a>
+    </div>
+  </div>
+</Layout>

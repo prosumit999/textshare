@@ -100,6 +100,22 @@ if (Astro.request.method === "POST") {
       const shareUrl = `${Astro.url.origin}/${slug}`;
       const qrCodeUrl = await QRCode.toDataURL(shareUrl, { width: 160, margin: 1 });
 
+      // Save to global in-memory database for standalone execution
+      if (!globalThis.textSharesStore) {
+        globalThis.textSharesStore = new Map();
+      }
+      
+      const highlightEnabled = formData.get("syntaxHighlightEnabled") === "on";
+      
+      globalThis.textSharesStore.set(slug, {
+        contentType,
+        textContent,
+        imageSrc: contentType === "image" ? "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop" : null,
+        expiryDate,
+        language: highlightEnabled ? language : "plaintext",
+        password: password || null
+      });
+
       // If guest, set cookie to enforce 1 active share limit
       if (!isLoggedIn) {
         Astro.cookies.set("guest_share_active", slug, {
@@ -287,7 +303,7 @@ if (Astro.request.method === "POST") {
             <!-- Syntax highlighting toggle -->
             <div id="syntax-highlight-toggle-wrapper" style="display: flex; align-items: center; gap: var(--space-2);">
               <label class="checkbox-label">
-                <input type="checkbox" id="syntax-highlight-toggle" class="checkbox-input" />
+                <input type="checkbox" name="syntaxHighlightEnabled" id="syntax-highlight-toggle" class="checkbox-input" />
                 <span>Syntax highlighting</span>
               </label>
               <select name="language" id="language-select" class="select-input" style="display: none;">

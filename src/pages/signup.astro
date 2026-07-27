@@ -1,0 +1,109 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+let error = "";
+
+if (Astro.request.method === "POST") {
+  try {
+    const formData = await Astro.request.formData();
+    const name = formData.get("name")?.toString() || "";
+    const email = formData.get("email")?.toString() || "";
+    const password = formData.get("password")?.toString() || "";
+    const confirmPassword = formData.get("confirmPassword")?.toString() || "";
+
+    if (!name || !email || !password || !confirmPassword) {
+      error = "Please fill in all fields.";
+    } else if (password.length < 6) {
+      error = "Password must be at least 6 characters.";
+    } else if (password !== confirmPassword) {
+      error = "Passwords do not match.";
+    } else {
+      // Simulate successful signup by setting session cookie
+      Astro.cookies.set("session", "user_session_token_123456", {
+        path: "/",
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7 // 7 days
+      });
+      
+      // Clear any guest share locks
+      Astro.cookies.delete("guest_share_active", { path: "/" });
+
+      return Astro.redirect('/');
+    }
+  } catch (err) {
+    error = "An error occurred during signup.";
+  }
+}
+---
+
+<Layout title="Sign Up — TextShare">
+  <div class="auth-card">
+    <h2>Create an Account</h2>
+    <p class="subtitle">Join TextShare today to unlock vanity links, password protection, and custom expiries.</p>
+
+    {error && (
+      <div class="banner banner-warning" style="background-color:rgba(239, 68, 68, 0.1); border-color:rgba(239, 68, 68, 0.2); color:var(--color-danger); margin-bottom:var(--space-4);">
+        {error}
+      </div>
+    )}
+
+    <form method="POST" class="auth-form">
+      <div class="input-label-pair">
+        <label for="name-input">Full Name</label>
+        <input 
+          type="text" 
+          name="name" 
+          id="name-input" 
+          class="text-input" 
+          placeholder="John Doe" 
+          required 
+          autofocus
+        />
+      </div>
+
+      <div class="input-label-pair">
+        <label for="email-input">Email Address</label>
+        <input 
+          type="email" 
+          name="email" 
+          id="email-input" 
+          class="text-input" 
+          placeholder="name@example.com" 
+          required 
+        />
+      </div>
+
+      <div class="input-label-pair">
+        <label for="password-input">Password (min. 6 chars)</label>
+        <input 
+          type="password" 
+          name="password" 
+          id="password-input" 
+          class="text-input" 
+          placeholder="••••••••" 
+          required 
+        />
+      </div>
+
+      <div class="input-label-pair">
+        <label for="confirm-password-input">Confirm Password</label>
+        <input 
+          type="password" 
+          name="confirmPassword" 
+          id="confirm-password-input" 
+          class="text-input" 
+          placeholder="••••••••" 
+          required 
+        />
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="margin-top:var(--space-2); justify-content:center;">
+        Create Account
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Already have an account? <a href="/login" style="font-weight:600;">Sign in</a>
+    </div>
+  </div>
+</Layout>
