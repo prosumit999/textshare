@@ -1,5 +1,6 @@
 ---
 const hasSession = Astro.cookies.has("session");
+const isHome = Astro.url.pathname === "/";
 ---
 
 <header>
@@ -13,12 +14,20 @@ const hasSession = Astro.cookies.has("session");
         <polyline points="10 9 9 9 8 9"></polyline>
       </svg>
       <span>Text<span class="logo-accent">Share</span></span>
+      <span class="logo-tagline">Simple, secure sharing</span>
     </a>
 
     <div class="nav-actions">
       <!-- Desktop Navigation -->
       <nav class="nav-links-desktop" aria-label="Desktop Navigation">
-        <a href="/" class="btn btn-secondary">New Share</a>
+        {!isHome && (
+          <a href="/" class="btn btn-secondary nav-create-btn" aria-label="Create a new share" title="Create a new share">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </a>
+        )}
         {hasSession ? (
           <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
           <form action="/api/logout" method="POST" style="display:inline;">
@@ -27,9 +36,9 @@ const hasSession = Astro.cookies.has("session");
         ) : (
           <a href="/login" class="btn btn-secondary">Sign In</a>
         )}
-        <button class="btn btn-primary premium-hook-btn">
-          Go Pro <span class="badge-pro">PRO</span>
-        </button>
+        <a href="/pricing" class="btn btn-primary">
+          Upgrade <span class="badge-pro">PRO</span>
+        </a>
       </nav>
 
       <!-- Theme Switcher -->

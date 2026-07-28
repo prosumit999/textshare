@@ -5,6 +5,8 @@ import QRCode from 'qrcode';
 // SSR Check Authentication & Guest Limit
 const isLoggedIn = Astro.cookies.has("session");
 const hasActiveGuestShare = Astro.cookies.has("guest_share_active");
+const activeGuestSlug = Astro.cookies.get("guest_share_active")?.value;
+const activeGuestUrl = activeGuestSlug ? `${Astro.url.origin}/${activeGuestSlug}` : null;
 
 // Form Handling
 let errors: Record<string, string> = {};
@@ -141,8 +143,9 @@ if (Astro.request.method === "POST") {
 <Layout>
   <div class="creator-container">
     <div class="hero-section">
-      <h1>Share Text & Code Instantly</h1>
-      <p>Paste your content, set an expiry duration, and generate a secure link and QR code.</p>
+      <span class="eyebrow">Private by default · No account required</span>
+      <h1>Share text and code without the clutter.</h1>
+      <p>Paste anything, choose when it expires, and send one simple link.</p>
     </div>
 
     <!-- Active Guest Share Rate-Limit Banner -->
@@ -153,9 +156,18 @@ if (Astro.request.method === "POST") {
           <line x1="12" y1="8" x2="12" y2="12"></line>
           <line x1="12" y1="16" x2="12.01" y2="16"></line>
         </svg>
-        <div>
-          You already have an active guest share. 
-          <a href="/login" style="font-weight: 600; text-decoration: underline;">Sign in</a> to create unlimited shares, or wait until your guest share expires in 24 hours.
+        <div class="guest-share-recovery">
+          <div>
+            <strong>Your guest share is still available.</strong>
+            <span>Open or copy it below. You can create another after it expires, or <a href="/login">sign in</a>.</span>
+          </div>
+          {activeGuestUrl && (
+            <div class="guest-share-actions">
+              <code id="guest-share-url">{activeGuestUrl}</code>
+              <a href={activeGuestUrl} class="btn btn-primary">Open share</a>
+              <button type="button" class="btn btn-secondary" id="copy-guest-share" data-url={activeGuestUrl}>Copy link</button>
+            </div>
+          )}
         </div>
       </div>
     )}
@@ -195,7 +207,14 @@ if (Astro.request.method === "POST") {
             </div>
 
             <div style="margin-top: var(--space-4);">
-              <a href="/" class="btn btn-secondary">Create Another Share</a>
+              {isLoggedIn ? (
+                <a href="/" class="btn btn-secondary">Create Another Share</a>
+              ) : (
+                <div class="guest-result-note">
+                  <span>Guests can have one active share at a time.</span>
+                  <a href="/login" class="btn btn-secondary">Sign in to create more</a>
+                </div>
+              )}
               {result.isImage && (
                 <span style="font-size: 12px; display: block; color: var(--color-text-muted); margin-top: var(--space-2);">
                   (Note: In a live environment, image uploads are sent to server storage.)
@@ -244,12 +263,22 @@ if (Astro.request.method === "POST") {
     ) : (
       /* Creator Form View */
       <form class="share-form" method="POST" enctype="multipart/form-data">
+        <div class="editor-heading">
+          <div>
+            <span class="editor-label">New share</span>
+            <span class="editor-hint">Your content is ready when you are.</span>
+          </div>
+          <span class="privacy-note">
+            <svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Secure link
+          </span>
+        </div>
         
         <!-- Toggle: Text vs Image (Logged In only) -->
         {isLoggedIn && (
-          <div style="display: flex; border-bottom: 1px solid var(--color-border); background-color: var(--color-bg-base);">
-            <button type="button" id="tab-text" class="btn btn-secondary active" style="flex:1; border-radius:0; border:none; border-right:1px solid var(--color-border); padding: 12px; font-weight: 600;">Text / Code</button>
-            <button type="button" id="tab-image" class="btn btn-secondary" style="flex:1; border-radius:0; border:none; padding: 12px; font-weight: 600;">Image Upload</button>
+          <div class="content-tabs">
+            <button type="button" id="tab-text" class="content-tab active">Text / Code</button>
+            <button type="button" id="tab-image" class="content-tab">Image Upload</button>
             <input type="hidden" name="contentType" id="content-type-input" value="text" />
           </div>
         )}
@@ -339,9 +368,8 @@ if (Astro.request.method === "POST") {
           <!-- Submit Button -->
           <button 
             type="submit" 
-            class="btn btn-primary" 
+            class="btn btn-primary create-share-btn"
             disabled={!isLoggedIn && hasActiveGuestShare}
-            style="width: 100%; justify-content: center;"
           >
             <svg class="icon-svg" viewBox="0 0 24 24">
               <polyline points="20 6 9 17 4 12"></polyline>
@@ -352,7 +380,13 @@ if (Astro.request.method === "POST") {
 
         <!-- Logged-in premium settings accordion -->
         {isLoggedIn && (
-          <div class="premium-options-panel">
+          <details class="advanced-options">
+            <summary>
+              <span>Advanced options</span>
+              <span class="advanced-summary-hint">Password, custom URL and link format</span>
+              <svg class="icon-svg advanced-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="premium-options-panel">
             <!-- Password protection option -->
             <div class="input-label-pair">
               <label class="checkbox-label" style="font-weight: 500; color: var(--color-text-base);">
@@ -396,7 +430,8 @@ if (Astro.request.method === "POST") {
                 <option value="number">Number (e.g. numeric ID)</option>
               </select>
             </div>
-          </div>
+            </div>
+          </details>
         )}
       </form>
 
@@ -532,3 +567,28 @@ if (Astro.request.method === "POST") {
     )}
   </div>
 </Layout>
+
+{activeGuestUrl && (
+  <script>
+    const guestCopyButton = document.getElementById('copy-guest-share');
+    guestCopyButton?.addEventListener('click', async () => {
+      const url = guestCopyButton.getAttribute('data-url');
+      if (!url) return;
+
+      try {
+        await navigator.clipboard.writeText(url);
+        guestCopyButton.textContent = 'Copied!';
+        window.setTimeout(() => guestCopyButton.textContent = 'Copy link', 2000);
+      } catch {
+        const urlElement = document.getElementById('guest-share-url');
+        const selection = window.getSelection();
+        if (urlElement && selection) {
+          const range = document.createRange();
+          range.selectNodeContents(urlElement);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      }
+    });
+  </script>
+)}

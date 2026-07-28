@@ -1,0 +1,79 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+const plans = [
+  {
+    name: 'Free',
+    description: 'For quick, occasional sharing.',
+    price: '$0',
+    period: 'forever',
+    action: 'Start sharing',
+    href: '/',
+    featured: false,
+    features: [
+      'Text and code sharing',
+      '24-hour link expiry',
+      'Syntax highlighting',
+      'Shareable links and QR codes'
+    ]
+  },
+  {
+    name: 'Pro',
+    description: 'For developers and frequent sharers.',
+    price: '$6',
+    period: 'per month',
+    action: 'Upgrade to Pro',
+    href: '#',
+    featured: true,
+    features: [
+      'Everything in Free',
+      'Custom expiry times',
+      'Password-protected shares',
+      'Custom vanity URLs',
+      'Image uploads up to 5 MB',
+      'Unlimited active shares'
+    ]
+  }
+];
+---
+
+<Layout title="Pricing — TextShare" description="Simple TextShare plans for secure text, code, and image sharing.">
+  <section class="pricing-page">
+    <div class="pricing-hero">
+      <span class="eyebrow">Simple pricing</span>
+      <h1>Share freely. Upgrade when you need more.</h1>
+      <p>Start without an account. Move to Pro for advanced controls and unlimited sharing.</p>
+    </div>
+
+    <div class="pricing-grid">
+      {plans.map((plan) => (
+        <article class:list={["pricing-card", { featured: plan.featured }]}>
+          {plan.featured && <span class="pricing-badge">Most popular</span>}
+          <div class="pricing-card-header">
+            <h2>{plan.name}</h2>
+            <p>{plan.description}</p>
+          </div>
+          <div class="pricing-price">
+            <strong>{plan.price}</strong>
+            <span>{plan.period}</span>
+          </div>
+          <a href={plan.href} class:list={["btn", plan.featured ? "btn-primary" : "btn-secondary", "pricing-action"]}>
+            {plan.action}
+          </a>
+          <ul class="pricing-features">
+            {plan.features.map((feature) => (
+              <li>
+                <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>{feature}</span>
+              </li>
+            ))}
+          </ul>
+        </article>
+      ))}
+    </div>
+
+    <p class="pricing-note">No hidden fees. Cancel anytime.</p>
+  </section>
+</Layout>
