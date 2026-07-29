@@ -28,15 +28,19 @@ const isHome = Astro.url.pathname === "/";
             </svg>
           </a>
         )}
+        <a href="/join" class="btn btn-secondary">Join Room</a>
         {hasSession ? (
-          <a href="/dashboard" class="btn btn-secondary">Dashboard</a>
+          <a href="/dashboard" class="btn btn-secondary">All Shares</a>
           <form action="/api/logout" method="POST" style="display:inline;">
             <button type="submit" class="btn btn-secondary">Sign Out</button>
           </form>
         ) : (
-          <a href="/login" class="btn btn-secondary">Sign In</a>
+          <>
+            <a href="/dashboard" class="btn btn-secondary">All Shares</a>
+            <a href="/login" class="btn btn-secondary">Sign In</a>
+          </>
         )}
-        <a href="/pricing" class="btn btn-primary">
+        <a href="/pricing" class="btn btn-primary upgrade-btn">
           Upgrade <span class="badge-pro">PRO</span>
         </a>
       </nav>

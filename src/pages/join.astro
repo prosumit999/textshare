@@ -1,0 +1,72 @@
+---
+import Layout from '../layouts/Layout.astro';
+
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const rawValue = formData.get('roomCode')?.toString().trim() || '';
+  let code = rawValue;
+
+  try {
+    if (rawValue.includes('://')) {
+      const suppliedUrl = new URL(rawValue);
+      code = suppliedUrl.pathname.split('/').filter(Boolean).at(-1) || '';
+    }
+  } catch {
+    code = '';
+  }
+
+  code = code.replace(/^\/+|\/+$/g, '');
+
+  if (!code) {
+    error = 'Enter a valid room code or shared link.';
+  } else if (!/^[a-zA-Z0-9_-]{3,64}$/.test(code)) {
+    error = 'That code is not valid. Check it and try again.';
+  } else {
+    return Astro.redirect(`/${encodeURIComponent(code)}`);
+  }
+}
+---
+
+<Layout title="Join a Room — TextShare" description="Open a TextShare room or shared link with its code.">
+  <section class="join-page">
+    <div class="join-card">
+      <div class="join-icon" aria-hidden="true">
+        <svg class="icon-svg" viewBox="0 0 24 24">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <line x1="19" y1="8" x2="19" y2="14"></line>
+          <line x1="22" y1="11" x2="16" y2="11"></line>
+        </svg>
+      </div>
+      <div class="join-heading">
+        <h1>Join a room</h1>
+        <p>Paste the shared link or enter the code you received.</p>
+      </div>
+
+      {error && <div class="banner join-error" role="alert">{error}</div>}
+
+      <form method="POST" class="join-form">
+        <label for="room-code">Room code or link</label>
+        <input
+          id="room-code"
+          name="roomCode"
+          class="text-input"
+          type="text"
+          placeholder="e.g. a8K2mP9x"
+          autocomplete="off"
+          spellcheck="false"
+          autofocus
+          required
+        />
+        <button type="submit" class="btn btn-primary">Join room</button>
+      </form>
+
+      <div class="join-help">
+        <span>Want to share something instead?</span>
+        <a href="/">Create a share</a>
+      </div>
+    </div>
+  </section>
+</Layout>

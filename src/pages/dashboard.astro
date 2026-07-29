@@ -1,10 +1,16 @@
 ---
 import Layout from '../layouts/Layout.astro';
 
-// Check auth
 const isLoggedIn = Astro.cookies.has("session");
-if (!isLoggedIn) {
-  return Astro.redirect('/login');
+const guestSlug = Astro.cookies.get("guest_share_active")?.value;
+const storedPlan = Astro.cookies.get("plan")?.value;
+const userPlan = isLoggedIn && (storedPlan === "plus" || storedPlan === "pro") ? storedPlan : "free";
+const freeShareSlug = Astro.cookies.get("free_share_active")?.value;
+let accountSlugs: string[] = [];
+try {
+  accountSlugs = JSON.parse(Astro.cookies.get("account_share_slugs")?.value || "[]");
+} catch {
+  accountSlugs = [];
 }
 
 // Access store
@@ -12,32 +18,6 @@ if (!globalThis.textSharesStore) {
   globalThis.textSharesStore = new Map();
 }
 const store = globalThis.textSharesStore as Map<string, any>;
-
-// Add dummy data for visualization if empty
-if (store.size === 0) {
-  store.set("demo-code", {
-    contentType: "text",
-    textContent: `// TextShare Demo Snippet\nimport { defineConfig } from 'astro/config';`,
-    expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24),
-    language: "javascript",
-    password: null,
-  });
-  store.set("image", {
-    contentType: "image",
-    textContent: "",
-    imageSrc: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=600&auto=format&fit=crop",
-    expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 48),
-    language: "plaintext",
-    password: null,
-  });
-  store.set("expired-demo", {
-    contentType: "text",
-    textContent: "Old expired text.",
-    expiryDate: new Date(Date.now() - 1000 * 60 * 60),
-    language: "plaintext",
-    password: null,
-  });
-}
 
 // Handle share deletion
 let message = "";
@@ -48,8 +28,23 @@ if (Astro.request.method === "POST") {
     const deleteSlug = formData.get("slug")?.toString();
 
     if (action === "delete" && deleteSlug) {
-      if (store.has(deleteSlug)) {
+      const canDelete = isLoggedIn ? accountSlugs.includes(deleteSlug) : deleteSlug === guestSlug;
+      if (canDelete && store.has(deleteSlug)) {
         store.delete(deleteSlug);
+        if (!isLoggedIn && deleteSlug === guestSlug) {
+          Astro.cookies.delete("guest_share_active", { path: "/" });
+        }
+        if (isLoggedIn) {
+          accountSlugs = accountSlugs.filter((slug) => slug !== deleteSlug);
+          Astro.cookies.set("account_share_slugs", JSON.stringify(accountSlugs), {
+            path: "/",
+            maxAge: 60 * 60 * 24 * 365,
+            httpOnly: true
+          });
+          if (deleteSlug === freeShareSlug) {
+            Astro.cookies.delete("free_share_active", { path: "/" });
+          }
+        }
         message = `Successfully deleted share /${deleteSlug}.`;
       }
     }
@@ -59,7 +54,14 @@ if (Astro.request.method === "POST") {
 }
 
 // Fetch current shares
-const shares = Array.from(store.entries()).map(([slug, data]) => {
+const visibleAccountSlugs = userPlan === "free" && freeShareSlug ? [freeShareSlug] : accountSlugs;
+const visibleEntries = isLoggedIn
+  ? visibleAccountSlugs.filter((slug) => store.has(slug)).map((slug) => [slug, store.get(slug)] as [string, any])
+  : guestSlug && store.has(guestSlug)
+    ? [[guestSlug, store.get(guestSlug)] as [string, any]]
+    : [];
+
+const shares = visibleEntries.map(([slug, data]) => {
   const isExpired = new Date() > new Date(data.expiryDate);
   return {
     slug,
@@ -72,12 +74,14 @@ const shares = Array.from(store.entries()).map(([slug, data]) => {
 });
 ---
 
-<Layout title="Dashboard — TextShare">
+<Layout title="All Shares — TextShare">
   <div class="dashboard-container">
     <div class="dashboard-header">
       <div>
-        <h1 style="font-size:24px;">Your Shares</h1>
-        <p style="color:var(--color-text-muted); font-size:13px; margin-top:2px;">Manage and monitor your active and past shares.</p>
+        <h1 style="font-size:24px;">{isLoggedIn ? "Your Shares" : "Your Guest Share"}</h1>
+        <p style="color:var(--color-text-muted); font-size:13px; margin-top:2px;">
+          {isLoggedIn ? "Manage and monitor your active and past shares." : "Guests keep one share at a time. Delete it or create a new one to replace it."}
+        </p>
       </div>
       <a href="/" class="btn btn-primary">
         <svg class="icon-svg" viewBox="0 0 24 24">

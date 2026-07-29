@@ -12,26 +12,43 @@ const plans = [
     featured: false,
     features: [
       'Text and code sharing',
-      '24-hour link expiry',
-      'Syntax highlighting',
-      'Shareable links and QR codes'
+      'Shares expire after 24 hours',
+      'One active share at a time',
+      'One image share at a time',
+      'Syntax highlighting and QR codes',
+      'No password protection or Quick Burn'
     ]
   },
   {
-    name: 'Pro',
-    description: 'For developers and frequent sharers.',
-    price: '$6',
+    name: 'Plus',
+    description: 'For frequent sharing without limits.',
+    price: '$3',
     period: 'per month',
-    action: 'Upgrade to Pro',
+    action: 'Choose Plus',
     href: '#',
     featured: true,
     features: [
       'Everything in Free',
-      'Custom expiry times',
+      'Quick Burn links',
       'Password-protected shares',
-      'Custom vanity URLs',
-      'Image uploads up to 5 MB',
-      'Unlimited active shares'
+      'Unlimited active shares',
+      'Unlimited image shares',
+      'Images expire after 1 hour',
+      'Up to 5 MB per image'
+    ]
+  },
+  {
+    name: 'Pro',
+    description: 'A full year of Plus at a lower price.',
+    price: '$20',
+    period: 'billed annually',
+    action: 'Choose Pro',
+    href: '#',
+    featured: false,
+    features: [
+      'Everything in Plus',
+      'One full year of access',
+      'Save compared with monthly billing'
     ]
   }
 ];
@@ -42,7 +59,7 @@ const plans = [
     <div class="pricing-hero">
       <span class="eyebrow">Simple pricing</span>
       <h1>Share freely. Upgrade when you need more.</h1>
-      <p>Start without an account. Move to Pro for advanced controls and unlimited sharing.</p>
+      <p>Start free, move to Plus for unlimited sharing, or save with annual Pro billing.</p>
     </div>
 
     <div class="pricing-grid">
