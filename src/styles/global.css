@@ -681,26 +681,117 @@ pre.shiki {
 
 /* Error/Expired Screen */
 .expired-card {
-  max-width: 460px;
-  margin: var(--space-16) auto;
+  position: relative;
+  width: min(92%, 520px);
+  max-width: 520px;
+  margin: clamp(52px, 10vh, 108px) auto;
+  padding: clamp(32px, 5vw, 48px);
   text-align: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--color-accent) 13%, transparent), transparent 48%),
+    var(--color-bg-surface);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
+  border-radius: 20px;
+  box-shadow: 0 22px 60px rgba(15, 23, 42, .08), 0 2px 8px rgba(15, 23, 42, .04);
+}
+
+.expired-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 22% auto;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-accent), transparent);
+}
+
+.expired-icon-wrap {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 20px;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 11%, var(--color-bg-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, var(--color-border));
+  border-radius: 20px;
+  transform: rotate(-3deg);
 }
 
 .expired-icon {
-  width: 64px;
-  height: 64px;
-  margin: 0 auto var(--space-6);
-  color: var(--color-text-muted);
+  width: 30px;
+  height: 30px;
+  transform: rotate(3deg);
 }
 
-.expired-card h2 {
-  font-size: 24px;
-  margin-bottom: var(--space-3);
+.expired-eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+
+.expired-card h1 {
+  margin-bottom: 12px;
+  color: var(--color-text-base);
+  font-size: clamp(28px, 4vw, 34px);
+  line-height: 1.15;
+  letter-spacing: -.035em;
 }
 
 .expired-card p {
+  max-width: 400px;
+  margin: 0 auto 28px;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-6);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.expired-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.expired-cta {
+  min-height: 46px;
+  padding-inline: 20px;
+  color: var(--color-accent-text);
+  box-shadow: 0 10px 25px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+
+.expired-cta .icon-svg {
+  width: 17px;
+  height: 17px;
+}
+
+.expired-cta:hover,
+.expired-cta:focus-visible {
+  color: var(--color-accent);
+  background: var(--color-bg-surface);
+  border-color: var(--color-accent);
+  box-shadow: 0 10px 25px color-mix(in srgb, var(--color-accent) 17%, transparent);
+}
+
+.expired-secondary-link {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.expired-secondary-link:hover {
+  color: var(--color-accent);
+}
+
+@media (max-width: 560px) {
+  .expired-card {
+    margin-block: 34px;
+    padding: 30px 22px;
+    border-radius: 16px;
+  }
 }
 
 /* Logged-In User Dashboard */

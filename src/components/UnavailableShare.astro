@@ -1,9 +1,21 @@
 <div class="expired-card">
-  <svg class="icon-svg expired-icon" viewBox="0 0 24 24" aria-hidden="true">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
-  </svg>
-  <h2>This share has expired</h2>
-  <p>The owner configured this link to automatically self-destruct after its set duration.</p>
-  <a href="/" class="btn btn-primary">Create Your Own Share</a>
+  <div class="expired-icon-wrap">
+    <svg class="icon-svg expired-icon" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9"></circle>
+      <polyline points="12 7 12 12 15.5 14"></polyline>
+    </svg>
+  </div>
+  <span class="expired-eyebrow">Link unavailable</span>
+  <h1>This share has expired</h1>
+  <p>This private link is no longer available. Its content may have expired or been removed by its owner.</p>
+  <div class="expired-actions">
+    <a href="/" class="btn btn-primary expired-cta">
+      <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Create your own share
+    </a>
+    <a href="/join" class="expired-secondary-link">Join another room <span aria-hidden="true">→</span></a>
+  </div>
 </div>
