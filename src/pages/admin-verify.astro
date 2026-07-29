@@ -1,0 +1,30 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { completeAdminVerification } from '../lib/admin-auth';
+import { getUserByEmail } from '../lib/auth';
+import { ADMIN_BASE_PATH } from '../lib/admin-path';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+
+let error = '';
+if (Astro.request.method === 'POST') {
+  const limit = await checkRateLimit('admin:verify', getClientIp(Astro.request), 5, 10 * 60);
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfter, 'Too many verification attempts. Try again later.');
+  const form = await Astro.request.formData();
+  const code = form.get('code')?.toString().trim() || '';
+  if (await completeAdminVerification(Astro.cookies, code, getUserByEmail)) return Astro.redirect(ADMIN_BASE_PATH);
+  logSecurityEvent('admin_verification_failed', Astro.request);
+  error = 'Invalid or expired verification code.';
+}
+---
+
+<Layout title="Verify Admin — TextShare">
+  <div class="auth-card admin-verify-card">
+    <h2>Verify admin sign-in</h2>
+    <p class="subtitle">Enter the six-digit code sent to the configured owner email. It expires in 10 minutes.</p>
+    {error && <div class="banner banner-warning" role="alert">{error}</div>}
+    <form method="POST" class="auth-form">
+      <div class="input-label-pair"><label for="admin-code">Verification code</label><input id="admin-code" class="text-input admin-code-input" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus placeholder="000000"/></div>
+      <button class="btn btn-primary" type="submit">Verify and continue</button>
+    </form>
+  </div>
+</Layout>

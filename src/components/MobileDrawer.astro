@@ -1,5 +1,6 @@
 ---
-const hasSession = Astro.cookies.has("session");
+import { getCurrentUser } from '../lib/auth';
+const hasSession = !!getCurrentUser(Astro.cookies);
 ---
 
 <div id="mobile-drawer" class="drawer-root" role="dialog" aria-modal="true" aria-labelledby="drawer-title">

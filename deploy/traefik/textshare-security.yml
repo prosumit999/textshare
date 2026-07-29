@@ -1,0 +1,31 @@
+http:
+  middlewares:
+    textshare-security:
+      chain:
+        middlewares:
+          - textshare-inflight
+          - textshare-ratelimit
+          - textshare-buffering
+          - textshare-headers
+    textshare-inflight:
+      inFlightReq:
+        amount: 50
+    textshare-ratelimit:
+      rateLimit:
+        average: 100
+        period: 1m
+        burst: 40
+    textshare-buffering:
+      buffering:
+        maxRequestBodyBytes: 8388608
+        memRequestBodyBytes: 1048576
+        retryExpression: IsNetworkError() && Attempts() < 2
+    textshare-headers:
+      headers:
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: strict-origin-when-cross-origin
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        customResponseHeaders:
+          Permissions-Policy: "camera=(), microphone=(), geolocation=(), payment=(), usb=()"

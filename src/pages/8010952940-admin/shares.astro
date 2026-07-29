@@ -1,0 +1,79 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { recordAudit } from '../../lib/admin';
+import { getCurrentUser } from '../../lib/auth';
+
+const admin = getCurrentUser(Astro.cookies)!;
+if (!globalThis.textSharesStore) globalThis.textSharesStore = new Map();
+const store = globalThis.textSharesStore as Map<string, any>;
+let message = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  let targets: string[] = [];
+  if (action === 'kill') targets = [form.get('slug')?.toString() || ''];
+  if (action === 'bulk-kill') targets = form.get('slug') ? [String(form.get('slug'))] : form.getAll('selected').map(String);
+  if (action === 'kill-large') {
+    const threshold = Math.max(1, Number(form.get('thresholdMb')) || 2) * 1048576;
+    targets = Array.from(store.entries()).filter(([, data]) => (data.sizeBytes || 0) > threshold).map(([slug]) => slug);
+  }
+  targets = [...new Set(targets.filter(Boolean))].slice(0, 500);
+  let killed = 0;
+  for (const slug of targets) {
+    const share = store.get(slug);
+    if (share && store.delete(slug)) {
+      killed += 1;
+      recordAudit({ actor: admin.email, action: 'kill', resourceType: 'share', resourceId: slug, details: `${share.contentType}; ${share.sizeBytes || 0} bytes` });
+    }
+  }
+  message = `${killed} share${killed === 1 ? '' : 's'} killed and invalidated.`;
+}
+
+const now = new Date();
+const search = Astro.url.searchParams.get('q')?.trim().toLowerCase() || '';
+const type = Astro.url.searchParams.get('type') || 'all';
+const status = Astro.url.searchParams.get('status') || 'active';
+const sort = Astro.url.searchParams.get('sort') || 'size-desc';
+const thresholdMb = Math.max(1, Number(Astro.url.searchParams.get('threshold')) || 2);
+const thresholdBytes = thresholdMb * 1048576;
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const perPage = 20;
+let allShares = Array.from(store.entries()).map(([slug, data]) => ({ slug, ...data, expired: new Date(data.expiryDate) <= now }));
+allShares = allShares.filter((share) => (!search || `${share.slug} ${share.owner || share.guestIp || ''}`.toLowerCase().includes(search)) && (type === 'all' || share.contentType === type) && (status === 'all' || (status === 'active' ? !share.expired : share.expired)));
+allShares.sort((a,b) => sort === 'oldest' ? new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime() : sort === 'expiry' ? new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime() : (b.sizeBytes || 0) - (a.sizeBytes || 0));
+const totalPages = Math.max(1, Math.ceil(allShares.length / perPage));
+const shares = allShares.slice((page - 1) * perPage, page * perPage);
+const activeImages = Array.from(store.entries()).map(([slug,data])=>({slug,...data})).filter((share) => share.contentType === 'image' && new Date(share.expiryDate) > now);
+const imageBytes = activeImages.reduce((sum, image) => sum + (image.sizeBytes || 0), 0);
+const largestImage = [...activeImages].sort((a,b)=>(b.sizeBytes||0)-(a.sizeBytes||0))[0];
+const oldestImage = [...activeImages].sort((a,b)=>new Date(a.createdAt||0).getTime()-new Date(b.createdAt||0).getTime())[0];
+const formatBytes = (bytes = 0) => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(2)} MB` : `${(bytes / 1024).toFixed(1)} KB`;
+---
+
+<AdminLayout title="Shares & storage">
+  {message && <div class="admin-alert success">{message}</div>}
+  <div class="admin-stat-grid compact">
+    <article><span>Matching shares</span><strong>{allShares.length}</strong></article>
+    <article><span>Active images</span><strong>{activeImages.length}</strong><small>{formatBytes(imageBytes)} total</small></article>
+    <article><span>Largest image</span><strong>{largestImage ? formatBytes(largestImage.sizeBytes) : '—'}</strong><small>{largestImage?.slug || 'No images'}</small></article>
+    <article><span>Oldest active image</span><strong>{oldestImage ? new Date(oldestImage.createdAt).toLocaleDateString() : '—'}</strong><small>{oldestImage?.slug || 'No images'}</small></article>
+  </div>
+
+  <section class="admin-panel">
+    <div class="admin-panel-heading"><div><h2>Resource inventory</h2><p>Rows above {thresholdMb} MB are flagged.</p></div>
+      <form method="POST" class="admin-inline-form" onsubmit="return confirm('Kill every share above this size? This cannot be undone.')"><input type="hidden" name="action" value="kill-large"/><input class="text-input" type="number" min="1" step="0.5" name="thresholdMb" value={thresholdMb}/><span>MB</span><button class="btn btn-danger">Kill above size</button></form>
+    </div>
+    <form method="GET" class="admin-filter-bar"><input class="text-input" name="q" value={search} placeholder="Search slug, owner, or guest IP"/><select class="select-input" name="type"><option value="all">All types</option><option value="text" selected={type==='text'}>Text</option><option value="image" selected={type==='image'}>Images</option></select><select class="select-input" name="status"><option value="active">Active</option><option value="expired" selected={status==='expired'}>Expired</option><option value="all" selected={status==='all'}>All</option></select><select class="select-input" name="sort"><option value="size-desc">Largest first</option><option value="oldest" selected={sort==='oldest'}>Oldest first</option><option value="expiry" selected={sort==='expiry'}>Expiry first</option></select><input type="hidden" name="threshold" value={thresholdMb}/><button class="btn btn-secondary">Apply</button></form>
+
+    <form method="POST" onsubmit="return confirm('Kill all selected shares? Their links and QR codes will stop working immediately.')">
+      <input type="hidden" name="action" value="bulk-kill"/>
+      <div class="admin-bulk-bar"><button class="btn btn-danger">Kill selected</button><span>Select individual rows below.</span></div>
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th></th><th>ID / owner</th><th>Type</th><th>Size</th><th>Created</th><th>Expires</th><th>Views</th><th>Action</th></tr></thead><tbody>
+        {shares.map((share) => <tr class:list={{ oversized: (share.sizeBytes || 0) > thresholdBytes }}><td><input type="checkbox" name="selected" value={share.slug} aria-label={`Select ${share.slug}`}/></td><td><a href={`/${share.slug}`} target="_blank"><strong>/{share.slug}</strong></a><small>{share.owner || `Guest: ${share.guestIp || 'unknown'}`}</small></td><td>{share.contentType}{share.passwordHash ? ' · protected' : ''}</td><td>{formatBytes(share.sizeBytes)}{(share.sizeBytes||0)>thresholdBytes && <span class="admin-size-flag">Large</span>}</td><td>{share.createdAt ? new Date(share.createdAt).toLocaleString() : '—'}</td><td>{new Date(share.expiryDate).toLocaleString()}</td><td>{share.viewCount || 0}</td><td><button type="submit" name="slug" value={share.slug} onclick="return confirm('Kill this share immediately?')" class="danger-link">Kill</button></td></tr>)}
+        {shares.length === 0 && <tr><td colspan="8" class="admin-empty">No shares match these filters.</td></tr>}
+      </tbody></table></div>
+    </form>
+    <div class="admin-pagination"><a aria-disabled={page<=1} href={`?q=${search}&type=${type}&status=${status}&sort=${sort}&threshold=${thresholdMb}&page=${page-1}`}>Previous</a><span>Page {page} of {totalPages}</span><a aria-disabled={page>=totalPages} href={`?q=${search}&type=${type}&status=${status}&sort=${sort}&threshold=${thresholdMb}&page=${page+1}`}>Next</a></div>
+  </section>
+</AdminLayout>

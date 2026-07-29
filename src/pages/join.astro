@@ -1,9 +1,13 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
 
 let error = '';
 
 if (Astro.request.method === 'POST') {
+  const joinLimit = await checkRateLimit('room:join', getClientIp(Astro.request), 10, 10 * 60);
+  if (!joinLimit.allowed) return rateLimitResponse(joinLimit.retryAfter, 'Too many room attempts. Try again later.');
+
   const formData = await Astro.request.formData();
   const rawValue = formData.get('roomCode')?.toString().trim() || '';
   let code = rawValue;
@@ -20,8 +24,10 @@ if (Astro.request.method === 'POST') {
   code = code.replace(/^\/+|\/+$/g, '');
 
   if (!code) {
+    logSecurityEvent('room_join_failed', Astro.request, { reason: 'empty' });
     error = 'Enter a valid room code or shared link.';
   } else if (!/^[a-zA-Z0-9_-]{3,64}$/.test(code)) {
+    logSecurityEvent('room_join_failed', Astro.request, { reason: 'invalid_format' });
     error = 'That code is not valid. Check it and try again.';
   } else {
     return Astro.redirect(`/${encodeURIComponent(code)}`);

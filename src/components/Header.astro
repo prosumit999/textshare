@@ -1,5 +1,6 @@
 ---
-const hasSession = Astro.cookies.has("session");
+import { getCurrentUser } from '../lib/auth';
+const hasSession = !!getCurrentUser(Astro.cookies);
 const isHome = Astro.url.pathname === "/";
 ---
 

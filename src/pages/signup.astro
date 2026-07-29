@@ -1,34 +1,44 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { createSession, normalizeEmail, registerUser, validatePasswordStrength } from '../lib/auth';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
 
 let error = "";
 
 if (Astro.request.method === "POST") {
   try {
+    const signupLimit = await checkRateLimit('auth:signup', getClientIp(Astro.request), 3, 60 * 60);
+    if (!signupLimit.allowed) return rateLimitResponse(signupLimit.retryAfter, 'Too many accounts created from this address. Try again later.');
+
     const formData = await Astro.request.formData();
     const name = formData.get("name")?.toString() || "";
     const email = formData.get("email")?.toString() || "";
     const password = formData.get("password")?.toString() || "";
     const confirmPassword = formData.get("confirmPassword")?.toString() || "";
 
+    const passwordError = validatePasswordStrength(password);
+    const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
+
     if (!name || !email || !password || !confirmPassword) {
       error = "Please fill in all fields.";
-    } else if (password.length < 6) {
-      error = "Password must be at least 6 characters.";
+    } else if (name.trim().length < 2 || name.length > 80) {
+      error = "Name must be between 2 and 80 characters.";
+    } else if (!emailValid || email.length > 254) {
+      error = "Enter a valid email address.";
+    } else if (passwordError) {
+      error = passwordError;
     } else if (password !== confirmPassword) {
       error = "Passwords do not match.";
     } else {
-      // Simulate successful signup by setting session cookie
-      Astro.cookies.set("session", "user_session_token_123456", {
-        path: "/",
-        httpOnly: true,
-        maxAge: 60 * 60 * 24 * 7 // 7 days
-      });
-      
-      // Clear any guest share locks
+      const registered = await registerUser(name, email, password);
+      if (!registered.ok) {
+        error = "Unable to create account with those details.";
+      } else {
+      createSession(Astro.cookies, registered.user);
+      logSecurityEvent('account_created', Astro.request);
       Astro.cookies.delete("guest_share_active", { path: "/" });
-
       return Astro.redirect('/');
+      }
     }
   } catch (err) {
     error = "An error occurred during signup.";
@@ -50,7 +60,7 @@ if (Astro.request.method === "POST") {
     <form method="POST" class="auth-form">
       <div class="input-label-pair">
         <label for="name-input">Full Name</label>
-        <input 
+        <input
           type="text" 
           name="name" 
           id="name-input" 
@@ -58,23 +68,26 @@ if (Astro.request.method === "POST") {
           placeholder="John Doe" 
           required 
           autofocus
+          minlength="2"
+          maxlength="80"
         />
       </div>
 
       <div class="input-label-pair">
         <label for="email-input">Email Address</label>
-        <input 
+        <input
           type="email" 
           name="email" 
           id="email-input" 
           class="text-input" 
           placeholder="name@example.com" 
           required 
+          maxlength="254"
         />
       </div>
 
       <div class="input-label-pair">
-        <label for="password-input">Password (min. 6 chars)</label>
+        <label for="password-input">Password (8+ characters, letters and numbers)</label>
         <input 
           type="password" 
           name="password" 
@@ -82,6 +95,8 @@ if (Astro.request.method === "POST") {
           class="text-input" 
           placeholder="••••••••" 
           required 
+          minlength="8"
+          maxlength="128"
         />
       </div>
 
@@ -94,6 +109,8 @@ if (Astro.request.method === "POST") {
           class="text-input" 
           placeholder="••••••••" 
           required 
+          minlength="8"
+          maxlength="128"
         />
       </div>
 

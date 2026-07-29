@@ -1,0 +1,41 @@
+---
+import Layout from './Layout.astro';
+import { ADMIN_BASE_PATH } from '../lib/admin-path';
+
+interface Props { title: string; description?: string }
+const { title, description = 'TextShare owner administration' } = Astro.props;
+const pathname = Astro.url.pathname;
+const links = [
+  { href: ADMIN_BASE_PATH, label: 'Overview' },
+  { href: `${ADMIN_BASE_PATH}/blog`, label: 'Blog' },
+  { href: `${ADMIN_BASE_PATH}/shares`, label: 'Shares & storage' },
+  { href: `${ADMIN_BASE_PATH}/traffic`, label: 'Traffic & abuse' },
+  { href: `${ADMIN_BASE_PATH}/users`, label: 'Users' }
+];
+---
+
+<Layout title={`${title} — TextShare Admin`} description={description} admin>
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <a href={ADMIN_BASE_PATH} class="admin-brand">
+        <span class="logo-accent">TextShare</span>
+        <small>Owner console</small>
+      </a>
+      <nav aria-label="Admin navigation">
+        {links.map((link) => (
+          <a href={link.href} class:list={["admin-nav-link", { active: pathname === link.href }]}>{link.label}</a>
+        ))}
+      </nav>
+      <div class="admin-sidebar-footer">
+        <a href="/">View site</a>
+        <form action="/api/logout" method="POST"><button type="submit">Sign out</button></form>
+      </div>
+    </aside>
+    <section class="admin-content">
+      <header class="admin-page-header">
+        <div><span>Administration</span><h1>{title}</h1></div>
+      </header>
+      <slot />
+    </section>
+  </div>
+</Layout>

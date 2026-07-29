@@ -1,10 +1,12 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { getCurrentUser } from '../lib/auth';
+import { checkRateLimit, getClientIp, rateLimitResponse, secureCookieOptions } from '../lib/security';
 
-const isLoggedIn = Astro.cookies.has("session");
+const currentUser = getCurrentUser(Astro.cookies);
+const isLoggedIn = !!currentUser;
 const guestSlug = Astro.cookies.get("guest_share_active")?.value;
-const storedPlan = Astro.cookies.get("plan")?.value;
-const userPlan = isLoggedIn && (storedPlan === "plus" || storedPlan === "pro") ? storedPlan : "free";
+const userPlan = currentUser?.plan || "free";
 const freeShareSlug = Astro.cookies.get("free_share_active")?.value;
 let accountSlugs: string[] = [];
 try {
@@ -23,12 +25,23 @@ const store = globalThis.textSharesStore as Map<string, any>;
 let message = "";
 if (Astro.request.method === "POST") {
   try {
+    const deleteLimit = await checkRateLimit(
+      'share:delete',
+      currentUser?.email || getClientIp(Astro.request),
+      30,
+      10 * 60
+    );
+    if (!deleteLimit.allowed) return rateLimitResponse(deleteLimit.retryAfter);
+
     const formData = await Astro.request.formData();
     const action = formData.get("action")?.toString();
     const deleteSlug = formData.get("slug")?.toString();
 
     if (action === "delete" && deleteSlug) {
-      const canDelete = isLoggedIn ? accountSlugs.includes(deleteSlug) : deleteSlug === guestSlug;
+      const storedShare = store.get(deleteSlug);
+      const canDelete = isLoggedIn
+        ? storedShare?.owner === currentUser?.email
+        : deleteSlug === guestSlug && !storedShare?.owner;
       if (canDelete && store.has(deleteSlug)) {
         store.delete(deleteSlug);
         if (!isLoggedIn && deleteSlug === guestSlug) {
@@ -36,11 +49,7 @@ if (Astro.request.method === "POST") {
         }
         if (isLoggedIn) {
           accountSlugs = accountSlugs.filter((slug) => slug !== deleteSlug);
-          Astro.cookies.set("account_share_slugs", JSON.stringify(accountSlugs), {
-            path: "/",
-            maxAge: 60 * 60 * 24 * 365,
-            httpOnly: true
-          });
+          Astro.cookies.set("account_share_slugs", JSON.stringify(accountSlugs), secureCookieOptions(60 * 60 * 24 * 365));
           if (deleteSlug === freeShareSlug) {
             Astro.cookies.delete("free_share_active", { path: "/" });
           }
@@ -56,7 +65,9 @@ if (Astro.request.method === "POST") {
 // Fetch current shares
 const visibleAccountSlugs = userPlan === "free" && freeShareSlug ? [freeShareSlug] : accountSlugs;
 const visibleEntries = isLoggedIn
-  ? visibleAccountSlugs.filter((slug) => store.has(slug)).map((slug) => [slug, store.get(slug)] as [string, any])
+  ? visibleAccountSlugs
+      .filter((slug) => store.get(slug)?.owner === currentUser?.email)
+      .map((slug) => [slug, store.get(slug)] as [string, any])
   : guestSlug && store.has(guestSlug)
     ? [[guestSlug, store.get(guestSlug)] as [string, any]]
     : [];
@@ -68,7 +79,7 @@ const shares = visibleEntries.map(([slug, data]) => {
     type: data.contentType,
     expiry: new Date(data.expiryDate).toLocaleString(),
     isExpired,
-    passwordProtected: !!data.password,
+    passwordProtected: !!data.passwordHash,
     url: `${Astro.url.origin}/${slug}`
   };
 });

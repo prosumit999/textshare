@@ -1,0 +1,68 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { blockIp, getBlockedIps, getSecuritySignals, getTrafficEvents, recordAudit, unblockIp } from '../../lib/admin';
+import { getCurrentUser } from '../../lib/auth';
+
+const admin = getCurrentUser(Astro.cookies)!;
+let message = '';
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  const ip = form.get('ip')?.toString().trim() || '';
+  if (/^[a-fA-F0-9:.]{2,64}$/.test(ip)) {
+    if (action === 'block') {
+      const duration = form.get('duration') === 'permanent' ? null : 60;
+      blockIp(ip, admin.email, duration, form.get('reason')?.toString().slice(0,200) || 'Admin block');
+      recordAudit({ actor: admin.email, action: duration ? 'temporary_block' : 'permanent_block', resourceType: 'ip', resourceId: ip, details: duration ? '60 minutes' : 'Permanent' });
+      message = `${ip} blocked.`;
+    } else if (action === 'unblock' && unblockIp(ip)) {
+      recordAudit({ actor: admin.email, action: 'unblock', resourceType: 'ip', resourceId: ip, details: 'Block removed' });
+      message = `${ip} unblocked.`;
+    }
+  }
+}
+
+const windowName = Astro.url.searchParams.get('window') || '24h';
+const windowMs = windowName === '1h' ? 3600000 : windowName === '7d' ? 7 * 86400000 : 86400000;
+const threshold = Math.max(10, Number(Astro.url.searchParams.get('threshold')) || 100);
+const events = getTrafficEvents(new Date(Date.now() - windowMs));
+const signals = getSecuritySignals(new Date(Date.now() - windowMs));
+const byIp = new Map<string, { count: number; endpoints: Map<string,number>; failed: number }>();
+for (const event of events) {
+  const row = byIp.get(event.ip) || { count: 0, endpoints: new Map(), failed: 0 };
+  row.count += 1;
+  row.endpoints.set(event.category, (row.endpoints.get(event.category) || 0) + 1);
+  if ((event.status || 0) >= 400) row.failed += 1;
+  byIp.set(event.ip, row);
+}
+const allRows = Array.from(byIp.entries()).map(([ip,data])=>({ip,...data})).sort((a,b)=>b.count-a.count);
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const perPage = 25;
+const totalPages = Math.max(1, Math.ceil(allRows.length / perPage));
+const rows = allRows.slice((page - 1) * perPage, page * perPage);
+const signalPage = Math.max(1, Number(Astro.url.searchParams.get('signalPage')) || 1);
+const signalPages = Math.max(1, Math.ceil(signals.length / perPage));
+const shownSignals = signals.slice((signalPage - 1) * perPage, signalPage * perPage);
+const blocked = getBlockedIps();
+const blockPage = Math.max(1, Number(Astro.url.searchParams.get('blockPage')) || 1);
+const blockPages = Math.max(1, Math.ceil(blocked.length / perPage));
+const shownBlocks = blocked.slice((blockPage - 1) * perPage, blockPage * perPage);
+---
+
+<AdminLayout title="Traffic & abuse">
+  {message && <div class="admin-alert success">{message}</div>}
+  <section class="admin-panel">
+    <div class="admin-panel-heading"><div><h2>Top requesting IPs</h2><p>{events.length} requests in selected window</p></div></div>
+    <form method="GET" class="admin-filter-bar"><select class="select-input" name="window"><option value="1h">Last hour</option><option value="24h" selected={windowName==='24h'}>Last 24 hours</option><option value="7d" selected={windowName==='7d'}>Last 7 days</option></select><label>Flag above <input class="text-input" type="number" name="threshold" min="10" value={threshold}/></label><button class="btn btn-secondary">Apply</button></form>
+    <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>IP</th><th>Requests</th><th>Failed</th><th>Endpoints</th><th>Action</th></tr></thead><tbody>
+      {rows.map((row)=><tr class:list={{ oversized: row.count > threshold }}><td><code>{row.ip}</code>{row.count>threshold&&<span class="admin-size-flag">Flagged</span>}</td><td>{row.count}</td><td>{row.failed}</td><td>{Array.from(row.endpoints.entries()).sort((a,b)=>b[1]-a[1]).map(([name,count])=><span class="admin-tag">{name}: {count}</span>)}</td><td><form method="POST" class="admin-row-actions" onsubmit="return confirm('Block this IP?')"><input type="hidden" name="action" value="block"/><input type="hidden" name="ip" value={row.ip}/><select name="duration" class="select-input"><option value="60">1 hour</option><option value="permanent">Permanent</option></select><input type="hidden" name="reason" value="Traffic threshold/admin review"/><button class="danger-link">Block</button></form></td></tr>)}
+      {rows.length===0&&<tr><td colspan="5" class="admin-empty">No traffic recorded in this process yet.</td></tr>}
+    </tbody></table></div>
+    <div class="admin-pagination"><a aria-disabled={page<=1} href={`?window=${windowName}&threshold=${threshold}&page=${page-1}`}>Previous</a><span>Page {page} of {totalPages}</span><a aria-disabled={page>=totalPages} href={`?window=${windowName}&threshold=${threshold}&page=${page+1}`}>Next</a></div>
+  </section>
+
+  <div class="admin-dashboard-grid">
+    <section class="admin-panel"><div class="admin-panel-heading"><div><h2>Security signals</h2><p>Failed logins, unlocks, and rejected requests</p></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>When</th><th>IP</th><th>Event</th></tr></thead><tbody>{shownSignals.map((signal)=><tr><td>{signal.createdAt.toLocaleString()}</td><td><code>{signal.ip}</code></td><td>{signal.event}</td></tr>)}{signals.length===0&&<tr><td colspan="3" class="admin-empty">No security signals.</td></tr>}</tbody></table></div><div class="admin-pagination"><a aria-disabled={signalPage<=1} href={`?window=${windowName}&threshold=${threshold}&signalPage=${signalPage-1}`}>Previous</a><span>{signalPage}/{signalPages}</span><a aria-disabled={signalPage>=signalPages} href={`?window=${windowName}&threshold=${threshold}&signalPage=${signalPage+1}`}>Next</a></div></section>
+    <section class="admin-panel"><div class="admin-panel-heading"><div><h2>Active IP blocks</h2><p>Enforced before route handling</p></div></div><div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>IP</th><th>Expires</th><th></th></tr></thead><tbody>{shownBlocks.map((entry)=><tr><td><code>{entry.ip}</code><small>{entry.reason}</small></td><td>{entry.expiresAt?.toLocaleString() || 'Permanent'}</td><td><form method="POST"><input type="hidden" name="action" value="unblock"/><input type="hidden" name="ip" value={entry.ip}/><button class="danger-link">Unblock</button></form></td></tr>)}{blocked.length===0&&<tr><td colspan="3" class="admin-empty">No blocked IPs.</td></tr>}</tbody></table></div><div class="admin-pagination"><a aria-disabled={blockPage<=1} href={`?window=${windowName}&threshold=${threshold}&blockPage=${blockPage-1}`}>Previous</a><span>{blockPage}/{blockPages}</span><a aria-disabled={blockPage>=blockPages} href={`?window=${windowName}&threshold=${threshold}&blockPage=${blockPage+1}`}>Next</a></div></section>
+  </div>
+</AdminLayout>

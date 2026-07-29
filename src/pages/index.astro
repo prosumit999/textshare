@@ -1,16 +1,24 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import { format as formatCode } from 'prettier';
+import bcrypt from 'bcryptjs';
+import { randomInt } from 'node:crypto';
+import { getCurrentUser } from '../lib/auth';
+import { sanitizeImage, UnsafeImageError } from '../lib/images';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
 
 // SSR Check Authentication & Guest Limit
-const isLoggedIn = Astro.cookies.has("session");
-const storedPlan = Astro.cookies.get("plan")?.value;
-const userPlan = isLoggedIn && (storedPlan === "plus" || storedPlan === "pro") ? storedPlan : "free";
+const currentUser = getCurrentUser(Astro.cookies);
+const isLoggedIn = !!currentUser;
+const userPlan = currentUser?.plan || "free";
 const hasPaidPlan = userPlan === "plus" || userPlan === "pro";
 const hasActiveGuestShare = Astro.cookies.has("guest_share_active");
 const activeGuestSlug = Astro.cookies.get("guest_share_active")?.value;
 const activeGuestUrl = activeGuestSlug ? `${Astro.url.origin}/${activeGuestSlug}` : null;
 const activeFreeSlug = Astro.cookies.get("free_share_active")?.value;
+
+if (!globalThis.textSharesStore) globalThis.textSharesStore = new Map();
+const shareStore = globalThis.textSharesStore as Map<string, any>;
 
 // Form Handling
 let errors: Record<string, string> = {};
@@ -23,13 +31,17 @@ let result: {
 
 if (Astro.request.method === "POST") {
   try {
+    const requester = isLoggedIn ? currentUser!.email : getClientIp(Astro.request);
+    const createLimit = await checkRateLimit('share:create', requester, isLoggedIn ? 30 : 5, 10 * 60);
+    if (!createLimit.allowed) return rateLimitResponse(createLimit.retryAfter, 'Share creation limit reached. Try again later.');
+
     const formData = await Astro.request.formData();
     const contentType = formData.get("contentType")?.toString() || "text";
     let textContent = formData.get("textContent")?.toString() || "";
     let expiry = formData.get("expiry")?.toString() || "24h";
     const language = formData.get("language")?.toString() || "plaintext";
     const password = formData.get("password")?.toString() || "";
-    const customSlug = formData.get("customSlug")?.toString()?.trim() || "";
+    const customSlug = formData.get("customSlug")?.toString()?.trim().toLowerCase() || "";
     const urlFormat = formData.get("urlFormat")?.toString() === "number" ? "number" : "string";
     const imageFile = formData.get("imageFile") as File | null;
     const highlightEnabled = formData.get("syntaxHighlightEnabled") === "on";
@@ -63,6 +75,8 @@ if (Astro.request.method === "POST") {
 
     if (contentType === "text" && !textContent.trim()) {
       errors.textContent = "Please enter some text or code content.";
+    } else if (contentType === "text" && new TextEncoder().encode(textContent).byteLength > 512 * 1024) {
+      errors.textContent = "Text shares cannot exceed 512 KB.";
     }
 
     if (contentType === "image" && (!imageFile || imageFile.size === 0)) {
@@ -72,18 +86,41 @@ if (Astro.request.method === "POST") {
     }
 
     if (customSlug) {
-      const slugRegex = /^[a-zA-Z0-9-_]{3,20}$/;
+      const slugRegex = /^[a-z0-9]{3,6}$/;
       if (!slugRegex.test(customSlug)) {
-        errors.customSlug = "Slug must be 3-20 characters, containing only letters, numbers, hyphens, and underscores.";
+        errors.customSlug = "Slug must be 3-6 lowercase letters or numbers.";
       }
       // Simple mock check for taken slugs (for demo purposes)
       if (customSlug.toLowerCase() === "admin" || customSlug.toLowerCase() === "dashboard") {
         errors.customSlug = "This custom link is already taken or reserved.";
       }
+      if (shareStore.has(customSlug)) {
+        errors.customSlug = "This custom link is already taken.";
+      }
     }
 
     // Process share if no validation errors
     if (Object.keys(errors).length === 0) {
+      let sanitizedImage: Awaited<ReturnType<typeof sanitizeImage>> | null = null;
+      if (contentType === "image" && imageFile) {
+        const uploadLimit = await checkRateLimit(
+          'image:upload',
+          isLoggedIn ? currentUser!.email : getClientIp(Astro.request),
+          isLoggedIn ? 30 : 10,
+          10 * 60
+        );
+        if (!uploadLimit.allowed) return rateLimitResponse(uploadLimit.retryAfter, 'Image upload limit reached. Try again later.');
+        try {
+          sanitizedImage = await sanitizeImage(imageFile);
+        } catch (error) {
+          logSecurityEvent('image_upload_rejected', Astro.request, { reason: error instanceof Error ? error.message : 'unknown' });
+          if (error instanceof UnsafeImageError) errors.imageFile = error.message;
+          else errors.imageFile = 'The image could not be processed safely.';
+        }
+      }
+
+      if (Object.keys(errors).length > 0) throw new Error('VALIDATION_FAILED');
+
       if (contentType === "text" && highlightEnabled) {
         const prettierParsers: Record<string, string> = {
           javascript: "babel",
@@ -109,14 +146,12 @@ if (Astro.request.method === "POST") {
       if (isLoggedIn && customSlug) {
         slug = customSlug;
       } else {
-        if (urlFormat === "number") {
-          slug = Math.floor(10000000 + Math.random() * 90000000).toString();
-        } else {
-          const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-          for (let i = 0; i < 8; i++) {
-            slug += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-        }
+        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        do {
+          slug = urlFormat === "number"
+            ? Array.from({ length: 6 }, () => randomInt(0, 10)).join("")
+            : Array.from({ length: 6 }, () => chars[randomInt(0, chars.length)]).join("");
+        } while (shareStore.has(slug));
       }
 
       // Calculate Expiry Date
@@ -130,52 +165,38 @@ if (Astro.request.method === "POST") {
       else if (expiry === "burn") expiryDate.setMinutes(now.getMinutes() + 5); // burn after reading gets a short window to read once
 
       // Save to global in-memory database for standalone execution
-      if (!globalThis.textSharesStore) {
-        globalThis.textSharesStore = new Map();
-      }
-
       // A guest keeps one share at a time; a new share replaces the previous one.
       if (!isLoggedIn && activeGuestSlug) {
-        globalThis.textSharesStore.delete(activeGuestSlug);
+        shareStore.delete(activeGuestSlug);
       }
       if (isLoggedIn && !hasPaidPlan && activeFreeSlug) {
-        globalThis.textSharesStore.delete(activeFreeSlug);
+        shareStore.delete(activeFreeSlug);
       }
 
-      let imageSrc: string | null = null;
-      if (contentType === "image" && imageFile) {
-        const imageBytes = await imageFile.arrayBuffer();
-        imageSrc = `data:${imageFile.type};base64,${Buffer.from(imageBytes).toString("base64")}`;
-      }
+      const imageSrc = sanitizedImage?.dataUrl || null;
+      const passwordHash = password ? await bcrypt.hash(password, 12) : null;
       
-      globalThis.textSharesStore.set(slug, {
+      shareStore.set(slug, {
         contentType,
         textContent,
         imageSrc,
         expiryDate,
         burnAfterReading: expiry === "burn",
         language: highlightEnabled ? language : "plaintext",
-        password: password || null
+        passwordHash,
+        owner: currentUser?.email || null,
+        guestIp: currentUser ? null : getClientIp(Astro.request),
+        sizeBytes: contentType === "image" ? sanitizedImage?.bytes || 0 : new TextEncoder().encode(textContent).byteLength,
+        createdAt: new Date(),
+        viewCount: 0
       });
 
       // Track the shares visible to this browser/account.
       if (!isLoggedIn) {
-        Astro.cookies.set("guest_share_active", slug, {
-          path: "/",
-          maxAge: 60 * 60 * 24, // 24 hours
-          httpOnly: true
-        });
+        Astro.cookies.set("guest_share_active", slug, secureCookieOptions(60 * 60 * 24));
       } else if (!hasPaidPlan) {
-        Astro.cookies.set("free_share_active", slug, {
-          path: "/",
-          maxAge: 60 * 60 * 24,
-          httpOnly: true
-        });
-        Astro.cookies.set("account_share_slugs", JSON.stringify([slug]), {
-          path: "/",
-          maxAge: 60 * 60 * 24 * 365,
-          httpOnly: true
-        });
+        Astro.cookies.set("free_share_active", slug, secureCookieOptions(60 * 60 * 24));
+        Astro.cookies.set("account_share_slugs", JSON.stringify([slug]), secureCookieOptions(60 * 60 * 24 * 365));
       } else {
         let accountSlugs: string[] = [];
         try {
@@ -184,17 +205,19 @@ if (Astro.request.method === "POST") {
           accountSlugs = [];
         }
         accountSlugs = [...new Set([...accountSlugs, slug])].slice(-100);
-        Astro.cookies.set("account_share_slugs", JSON.stringify(accountSlugs), {
-          path: "/",
-          maxAge: 60 * 60 * 24 * 365,
-          httpOnly: true
-        });
+        Astro.cookies.set("account_share_slugs", JSON.stringify(accountSlugs), secureCookieOptions(60 * 60 * 24 * 365));
+      }
+
+      if (expiry === "burn") {
+        Astro.cookies.set("burn_creator_preview", slug, secureCookieOptions(5 * 60));
       }
 
       return Astro.redirect(`/${slug}?created=1`);
     }
   } catch (e) {
-    errors.server = "An unexpected error occurred. Please try again.";
+    if (!(e instanceof Error && e.message === 'VALIDATION_FAILED')) {
+      errors.server = "An unexpected error occurred. Please try again.";
+    }
   }
 }
 ---
@@ -459,7 +482,10 @@ if (Astro.request.method === "POST") {
                     name="customSlug"
                     id="custom-slug-input"
                     class="text-input compact-control-input"
-                    placeholder="my-custom-slug"
+                    placeholder="myurl1"
+                    minlength="3"
+                    maxlength="6"
+                    pattern="[a-z0-9]{3,6}"
                     aria-describedby="slug-availability-msg"
                   />
                   <span id="slug-availability-msg" class="inline-availability-msg" style="display: none;"></span>
@@ -596,7 +622,9 @@ if (Astro.request.method === "POST") {
               return;
             }
 
-            if (slug.length < 3) {
+            slugInput.value = slug.replace(/[^a-z0-9]/g, "").slice(0, 6);
+
+            if (slugInput.value.length < 3) {
               availabilityMsg.style.display = "block";
               availabilityMsg.textContent = "Too short";
               availabilityMsg.style.color = "var(--color-danger)";

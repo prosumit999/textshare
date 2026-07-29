@@ -9,11 +9,13 @@ import MobileBottomNav from '../components/MobileBottomNav.astro';
 interface Props {
   title?: string;
   description?: string;
+  admin?: boolean;
 }
 
 const { 
   title = "TextShare — Share text, code snippets & images instantly",
-  description = "A minimal, blazing fast utility to share code snippets, text notes, and images securely with custom expiry times and QR codes."
+  description = "A minimal, blazing fast utility to share code snippets, text notes, and images securely with custom expiry times and QR codes.",
+  admin = false
 } = Astro.props;
 ---
 
@@ -38,8 +40,8 @@ const {
     </script>
   </head>
   <body>
-    <Header />
-    <MobileDrawer />
+    {!admin && <Header />}
+    {!admin && <MobileDrawer />}
     
     <main id="main-content">
       <div class="container">
@@ -47,9 +49,9 @@ const {
       </div>
     </main>
 
-    <Footer />
-    <BackToTop />
-    <MobileBottomNav />
+    {!admin && <Footer />}
+    {!admin && <BackToTop />}
+    {!admin && <MobileBottomNav />}
 
     <!-- Premium Tier Popup Lock Modal Script -->
     <script>

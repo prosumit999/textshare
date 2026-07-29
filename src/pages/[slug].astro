@@ -1,10 +1,15 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import PasswordGate from '../components/PasswordGate.astro';
+import UnavailableShare from '../components/UnavailableShare.astro';
 import { Code } from 'astro:components';
 import QRCode from 'qrcode';
+import bcrypt from 'bcryptjs';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
 
 const { slug } = Astro.params;
+const resolutionLimit = await checkRateLimit('share:resolve', getClientIp(Astro.request), 100, 60);
+if (!resolutionLimit.allowed) return rateLimitResponse(resolutionLimit.retryAfter, 'Too many share requests. Try again shortly.');
 
 // Access global mock database
 if (!globalThis.textSharesStore) {
@@ -31,7 +36,7 @@ if (!share) {
       textContent: "const secret = 'Unlocks successfully!';\nconsole.log(secret);",
       expiryDate: new Date(Date.now() + 1000 * 60 * 60 * 24), // 24 hours later
       language: "javascript",
-      password: "password",
+      passwordHash: await bcrypt.hash("password", 12),
     };
   } else if (slug === "image") {
     share = {
@@ -53,16 +58,25 @@ if (!share) {
   }
 }
 
-// 404/Not Found
+// Missing links use the same generic expired response to avoid enumeration clues.
 if (!share) {
-  return Astro.redirect('/?error=not_found');
+  share = {
+    contentType: "text",
+    textContent: "",
+    expiryDate: new Date(0),
+    language: "plaintext",
+    passwordHash: null
+  };
 }
 
 // Check if share is expired
 const isExpired = new Date() > new Date(share.expiryDate);
+if (!isExpired && store.has(slug)) {
+  share.viewCount = (share.viewCount || 0) + 1;
+}
 
 // Password check state
-let isLocked = !!share.password;
+let isLocked = !!share.passwordHash;
 let passwordError = "";
 
 // Handle Password Validation POST Request
@@ -73,15 +87,14 @@ if (Astro.request.method === "POST" && isLocked) {
     
     if (action === "verify_password") {
       const enteredPassword = formData.get("sharePassword")?.toString();
-      if (enteredPassword === share.password) {
+      if (enteredPassword && await bcrypt.compare(enteredPassword, share.passwordHash)) {
         isLocked = false;
         // Temporarily store unlocked permission in session cookie
-        Astro.cookies.set(`unlocked_${slug}`, "true", {
-          path: "/",
-          maxAge: 60 * 5, // 5 min session
-          httpOnly: true
-        });
+        Astro.cookies.set(`unlocked_${slug}`, "true", secureCookieOptions(60 * 5));
       } else {
+        const unlockLimit = await checkRateLimit('share:unlock', `${getClientIp(Astro.request)}:${slug}`, 5, 10 * 60);
+        logSecurityEvent('share_unlock_failed', Astro.request, { slug });
+        if (!unlockLimit.allowed) return rateLimitResponse(unlockLimit.retryAfter, 'Too many incorrect password attempts. Try again later.');
         passwordError = "Incorrect password. Please try again.";
       }
     }
@@ -95,8 +108,11 @@ if (isLocked && Astro.cookies.has(`unlocked_${slug}`)) {
   isLocked = false;
 }
 
-// Quick Burn allows this request to render once, then removes the stored share.
-if (share.burnAfterReading && !isExpired && !isLocked) {
+const isCreatorBurnPreview = Astro.cookies.get("burn_creator_preview")?.value === slug;
+if (isCreatorBurnPreview) Astro.cookies.delete("burn_creator_preview", { path: "/" });
+
+// Quick Burn permits one creator preview, then removes the share after its first recipient view.
+if (share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview) {
   store.delete(slug);
 }
 
@@ -106,16 +122,7 @@ const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
 
 <Layout title={`View Share: ${slug} — TextShare`}>
   {isExpired ? (
-    /* Expired Screen */
-    <div class="expired-card">
-      <svg class="icon-svg expired-icon" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      <h2>This share has expired</h2>
-      <p>The owner configured this link to automatically self-destruct after its set duration.</p>
-      <a href="/" class="btn btn-primary">Create Your Own Share</a>
-    </div>
+    <UnavailableShare />
   ) : isLocked ? (
     /* Password Gate Component */
     <PasswordGate error={passwordError} slug={slug} />

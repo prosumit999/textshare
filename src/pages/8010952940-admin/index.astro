@@ -1,0 +1,76 @@
+---
+import { statfs } from 'node:fs/promises';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getAuditLog, getTrafficEvents } from '../../lib/admin';
+import { countActiveSessions, listUsers } from '../../lib/auth';
+import { getRedisHealth } from '../../lib/security';
+
+if (!globalThis.textSharesStore) globalThis.textSharesStore = new Map();
+const now = new Date();
+const shares = Array.from(globalThis.textSharesStore.entries()).map(([slug, data]) => ({ slug, ...data }));
+const activeShares = shares.filter((share) => new Date(share.expiryDate) > now);
+const imageShares = activeShares.filter((share) => share.contentType === 'image');
+const protectedShares = activeShares.filter((share) => !!share.passwordHash);
+const users = listUsers();
+const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+const weekStart = new Date(now.getTime() - 7 * 86400000);
+const imageBytes = imageShares.reduce((sum, share) => sum + (share.sizeBytes || 0), 0);
+const redis = await getRedisHealth();
+let disk = { available: 0, total: 0, percentFree: 0 };
+try {
+  const fs = await statfs('/');
+  disk = { available: fs.bavail * fs.bsize, total: fs.blocks * fs.bsize, percentFree: (fs.bavail / fs.blocks) * 100 };
+} catch {}
+
+const daily = Array.from({ length: 30 }, (_, index) => {
+  const date = new Date(now);
+  date.setHours(0, 0, 0, 0);
+  date.setDate(date.getDate() - (29 - index));
+  const next = new Date(date.getTime() + 86400000);
+  return { label: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), count: shares.filter((s) => s.createdAt && new Date(s.createdAt) >= date && new Date(s.createdAt) < next).length };
+});
+const maxDaily = Math.max(1, ...daily.map((day) => day.count));
+const formatBytes = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1024).toFixed(1)} KB`;
+---
+
+<AdminLayout title="Platform overview">
+  {disk.percentFree > 0 && disk.percentFree < 15 && <div class="admin-alert danger">Disk space is below 15%. Free storage immediately.</div>}
+  {!redis.connected && <div class="admin-alert warning">Redis is unavailable. Production rate-limited actions will fail closed.</div>}
+
+  <div class="admin-stat-grid">
+    <article><span>Active shares</span><strong>{activeShares.length}</strong><small>{shares.length} all-time in current store</small></article>
+    <article><span>Text / protected</span><strong>{activeShares.length - imageShares.length} / {protectedShares.length}</strong><small>Active text and password shares</small></article>
+    <article><span>Images</span><strong>{imageShares.length}</strong><small>{formatBytes(imageBytes)} stored</small></article>
+    <article><span>Users</span><strong>{users.length}</strong><small>{users.filter((u) => u.createdAt >= todayStart).length} today · {users.filter((u) => u.createdAt >= weekStart).length} this week</small></article>
+    <article><span>Active rooms</span><strong>{activeShares.length}</strong><small>Resolvable, unexpired rooms</small></article>
+    <article><span>Sessions</span><strong>{countActiveSessions()}</strong><small>Current process</small></article>
+  </div>
+
+  <div class="admin-dashboard-grid">
+    <section class="admin-panel admin-chart-panel">
+      <div class="admin-panel-heading"><div><h2>Shares created</h2><p>Last 30 days</p></div></div>
+      <div class="admin-bar-chart" role="img" aria-label="Shares created per day over the last 30 days">
+        {daily.map((day) => <div title={`${day.label}: ${day.count}`}><span style={`height:${Math.max(4, (day.count / maxDaily) * 100)}%`}></span></div>)}
+      </div>
+      <div class="admin-chart-axis"><span>{daily[0].label}</span><span>{daily.at(-1)?.label}</span></div>
+    </section>
+
+    <section class="admin-panel">
+      <div class="admin-panel-heading"><div><h2>System health</h2><p>Current runtime snapshot</p></div></div>
+      <dl class="admin-health-list">
+        <div><dt>Redis</dt><dd class:list={{ good: redis.connected, bad: !redis.connected }}>{redis.connected ? formatBytes(redis.usedMemory || 0) : 'Unavailable'}</dd></div>
+        <div><dt>Disk available</dt><dd>{formatBytes(disk.available)} ({disk.percentFree.toFixed(1)}%)</dd></div>
+        <div><dt>Primary database</dt><dd class="warning-text">Not configured</dd></div>
+        <div><dt>Traffic events (24h)</dt><dd>{getTrafficEvents(new Date(Date.now() - 86400000)).length}</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="admin-panel">
+    <div class="admin-panel-heading"><div><h2>Recent admin audit log</h2><p>Every destructive or privileged action</p></div></div>
+    <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>When</th><th>Admin</th><th>Action</th><th>Resource</th><th>Details</th></tr></thead><tbody>
+      {getAuditLog().slice(0, 10).map((entry) => <tr><td>{entry.createdAt.toLocaleString()}</td><td>{entry.actor}</td><td><span class="admin-tag">{entry.action}</span></td><td>{entry.resourceType}:{entry.resourceId}</td><td>{entry.details}</td></tr>)}
+      {getAuditLog().length === 0 && <tr><td colspan="5" class="admin-empty">No admin actions recorded yet.</td></tr>}
+    </tbody></table></div>
+  </section>
+</AdminLayout>

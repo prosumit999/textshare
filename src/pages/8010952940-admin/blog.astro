@@ -1,0 +1,68 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { deleteBlogPost, getBlogPost, getBlogPosts, recordAudit, saveBlogPost, slugify } from '../../lib/admin';
+import { getCurrentUser } from '../../lib/auth';
+
+const admin = getCurrentUser(Astro.cookies)!;
+let message = '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  const id = form.get('id')?.toString();
+  if (action === 'delete' && id) {
+    const post = getBlogPost(id);
+    if (post && deleteBlogPost(id)) {
+      recordAudit({ actor: admin.email, action: 'delete', resourceType: 'blog_post', resourceId: id, details: post.title });
+      message = 'Post deleted.';
+    }
+  } else if (action === 'save') {
+    const title = form.get('title')?.toString().trim() || '';
+    const manualSlug = form.get('slug')?.toString().trim() || '';
+    const content = form.get('content')?.toString() || '';
+    const coverImage = form.get('coverImage')?.toString().trim() || '';
+    const status = form.get('status') === 'published' ? 'published' : 'draft';
+    const slug = slugify(manualSlug || title);
+    if (title.length < 3 || title.length > 160 || !slug || content.length > 200000) error = 'Check the title, slug, and content length.';
+    else if (getBlogPosts().some((post) => post.slug === slug && post.id !== id)) error = 'That slug is already in use.';
+    else {
+      const post = saveBlogPost({ id, title, slug, content, coverImage, status, publishDate: status === 'published' ? new Date() : null });
+      recordAudit({ actor: admin.email, action: id ? 'update' : 'create', resourceType: 'blog_post', resourceId: post.id, details: `${post.title} (${status})` });
+      message = 'Post saved.';
+    }
+  }
+}
+
+const search = Astro.url.searchParams.get('q')?.trim().toLowerCase() || '';
+const statusFilter = Astro.url.searchParams.get('status') || 'all';
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const perPage = 15;
+const filtered = getBlogPosts().filter((post) => (!search || `${post.title} ${post.slug}`.toLowerCase().includes(search)) && (statusFilter === 'all' || post.status === statusFilter)).sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+const posts = filtered.slice((page - 1) * perPage, page * perPage);
+const editPost = Astro.url.searchParams.get('edit') ? getBlogPost(Astro.url.searchParams.get('edit')!) : null;
+const previewPost = Astro.url.searchParams.get('preview') ? getBlogPost(Astro.url.searchParams.get('preview')!) : null;
+---
+
+<AdminLayout title="Blog management">
+  {message && <div class="admin-alert success">{message}</div>}{error && <div class="admin-alert danger">{error}</div>}
+  <div class="admin-split-view">
+    <section class="admin-panel">
+      <div class="admin-panel-heading"><div><h2>Posts</h2><p>{filtered.length} matching posts</p></div><a href="/8010952940-admin/blog?edit=new" class="btn btn-primary">New post</a></div>
+      <form method="GET" class="admin-filter-bar"><input class="text-input" name="q" value={search} placeholder="Search title or slug" /><select class="select-input" name="status"><option value="all">All statuses</option><option value="draft" selected={statusFilter==='draft'}>Draft</option><option value="published" selected={statusFilter==='published'}>Published</option></select><button class="btn btn-secondary">Filter</button></form>
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Title</th><th>Status</th><th>Published</th><th>Actions</th></tr></thead><tbody>
+        {posts.map((post) => <tr><td><strong>{post.title}</strong><small>/{post.slug}</small></td><td><span class:list={["admin-tag", post.status]}>{post.status}</span></td><td>{post.publishDate?.toLocaleDateString() || '—'}</td><td><div class="admin-row-actions"><a href={`/8010952940-admin/blog?edit=${post.id}`}>Edit</a><a href={`/8010952940-admin/blog?preview=${post.id}`}>Preview</a><form method="POST" onsubmit="return confirm('Delete this post permanently?')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="id" value={post.id}/><button class="danger-link">Delete</button></form></div></td></tr>)}
+        {posts.length === 0 && <tr><td colspan="4" class="admin-empty">No posts found.</td></tr>}
+      </tbody></table></div>
+      <div class="admin-pagination"><a aria-disabled={page<=1} href={`?q=${search}&status=${statusFilter}&page=${page-1}`}>Previous</a><span>Page {page} of {totalPages}</span><a aria-disabled={page>=totalPages} href={`?q=${search}&status=${statusFilter}&page=${page+1}`}>Next</a></div>
+    </section>
+
+    <section class="admin-panel admin-editor-panel">
+      {previewPost ? <><div class="admin-panel-heading"><div><h2>Preview</h2><p>/{previewPost.slug}</p></div><a href="/8010952940-admin/blog">Close</a></div>{previewPost.coverImage && <img class="admin-cover-preview" src={previewPost.coverImage} alt=""/>}<h1 class="admin-preview-title">{previewPost.title}</h1><pre class="admin-markdown-preview">{previewPost.content}</pre></> : <>
+        <div class="admin-panel-heading"><div><h2>{editPost ? 'Edit post' : 'Create post'}</h2><p>Markdown content is rendered as escaped text in this admin preview.</p></div></div>
+        <form method="POST" class="admin-editor-form"><input type="hidden" name="action" value="save"/><input type="hidden" name="id" value={editPost?.id || ''}/><label>Title<input class="text-input" name="title" maxlength="160" required value={editPost?.title || ''}/></label><label>Slug<input class="text-input" name="slug" maxlength="80" placeholder="Generated from title" value={editPost?.slug || ''}/></label><label>Cover image URL<input class="text-input" name="coverImage" type="url" value={editPost?.coverImage || ''}/></label><label>Content<textarea class="text-input admin-content-editor" name="content" maxlength="200000" required>{editPost?.content || ''}</textarea></label><label>Status<select class="select-input" name="status"><option value="draft">Draft</option><option value="published" selected={editPost?.status==='published'}>Published</option></select></label><button class="btn btn-primary">Save post</button></form>
+      </>}
+    </section>
+  </div>
+</AdminLayout>
