@@ -133,6 +133,16 @@ export function getBlogPost(id: string) {
   return blogPosts.get(id);
 }
 
+export function getPublishedBlogPosts(now = new Date()) {
+  return getBlogPosts()
+    .filter((post) => post.status === 'published' && post.publishDate && post.publishDate <= now)
+    .sort((a, b) => (b.publishDate?.getTime() || 0) - (a.publishDate?.getTime() || 0));
+}
+
+export function getPublishedBlogPostBySlug(slug: string, now = new Date()) {
+  return getPublishedBlogPosts(now).find((post) => post.slug === slug) || null;
+}
+
 export function saveBlogPost(input: Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }) {
   const now = new Date();
   const existing = input.id ? blogPosts.get(input.id) : null;

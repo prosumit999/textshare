@@ -1,0 +1,43 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import UnavailableShare from '../../components/UnavailableShare.astro';
+import { getPublishedBlogPostBySlug, getPublishedBlogPosts } from '../../lib/admin';
+import { blogTextExcerpt } from '../../lib/blog-content';
+
+const post = getPublishedBlogPostBySlug(Astro.params.slug || '');
+if (!post) Astro.response.status = 404;
+const publishedOn = post?.publishDate?.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+const publishedPosts = getPublishedBlogPosts();
+const currentIndex = post ? publishedPosts.findIndex((item) => item.id === post.id) : -1;
+const newerPost = currentIndex > 0 ? publishedPosts[currentIndex - 1] : null;
+const olderPost = currentIndex >= 0 && currentIndex < publishedPosts.length - 1 ? publishedPosts[currentIndex + 1] : null;
+const articleUrl = post ? new URL(`/blog/${post.slug}`, Astro.url.origin).toString() : '';
+const encodedUrl = encodeURIComponent(articleUrl);
+const encodedTitle = encodeURIComponent(post?.title || '');
+---
+
+<Layout title={post ? `${post.title} — TextShare` : 'Article unavailable — TextShare'} description={post ? blogTextExcerpt(post.content, 155) : 'This article is unavailable.'}>
+  {post ? <article class="public-article">
+    <header class="public-article-header"><a href="/blog" class="article-back">← All articles</a><div class="post-meta"><span>TextShare</span><span>{publishedOn}</span></div><h1>{post.title}</h1></header>
+    {post.coverImage && <figure class="public-article-feature"><img class="public-article-cover" src={post.coverImage} alt={`Featured image for ${post.title}`} /></figure>}
+    <div class="public-article-content" set:html={post.content}></div>
+    <footer class="article-footer">
+      <div class="article-share"><span>Share this article</span><div><a href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`} target="_blank" rel="noopener noreferrer" aria-label="Share on X">X</a><a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn">in</a><a href={`mailto:?subject=${encodedTitle}&body=${encodedUrl}`} aria-label="Share by email">Email</a><button type="button" id="copy-article-link" data-url={articleUrl}>Copy link</button></div></div>
+      <nav class="article-pagination" aria-label="More articles">
+        {newerPost ? <a href={`/blog/${newerPost.slug}`}><span>← Newer article</span><strong>{newerPost.title}</strong></a> : <span></span>}
+        {olderPost ? <a href={`/blog/${olderPost.slug}`} class="article-next"><span>Older article →</span><strong>{olderPost.title}</strong></a> : <span></span>}
+      </nav>
+    </footer>
+  </article> : <UnavailableShare />}
+</Layout>
+
+<script>
+  const copyButton = document.querySelector<HTMLButtonElement>('#copy-article-link');
+  copyButton?.addEventListener('click', async () => {
+    const url = copyButton.dataset.url;
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    copyButton.textContent = 'Copied';
+    window.setTimeout(() => copyButton.textContent = 'Copy link', 1600);
+  });
+</script>

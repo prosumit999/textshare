@@ -2,6 +2,7 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { deleteBlogPost, getBlogPost, getBlogPosts, recordAudit, saveBlogPost, slugify } from '../../lib/admin';
 import { getCurrentUser } from '../../lib/auth';
+import { sanitizeBlogHtml } from '../../lib/blog-content';
 
 const admin = getCurrentUser(Astro.cookies)!;
 let message = '';
@@ -20,11 +21,12 @@ if (Astro.request.method === 'POST') {
   } else if (action === 'save') {
     const title = form.get('title')?.toString().trim() || '';
     const manualSlug = form.get('slug')?.toString().trim() || '';
-    const content = form.get('content')?.toString() || '';
+    const rawContent = form.get('content')?.toString() || '';
+    const content = sanitizeBlogHtml(rawContent);
     const coverImage = form.get('coverImage')?.toString().trim() || '';
     const status = form.get('status') === 'published' ? 'published' : 'draft';
     const slug = slugify(manualSlug || title);
-    if (title.length < 3 || title.length > 160 || !slug || content.length > 200000) error = 'Check the title, slug, and content length.';
+    if (title.length < 3 || title.length > 160 || !slug || !content.trim() || rawContent.length > 200000) error = 'Check the title, slug, and content length.';
     else if (getBlogPosts().some((post) => post.slug === slug && post.id !== id)) error = 'That slug is already in use.';
     else {
       const post = saveBlogPost({ id, title, slug, content, coverImage, status, publishDate: status === 'published' ? new Date() : null });
@@ -47,22 +49,41 @@ const previewPost = Astro.url.searchParams.get('preview') ? getBlogPost(Astro.ur
 
 <AdminLayout title="Blog management">
   {message && <div class="admin-alert success">{message}</div>}{error && <div class="admin-alert danger">{error}</div>}
-  <div class="admin-split-view">
+  <div class="admin-blog-stack">
     <section class="admin-panel">
-      <div class="admin-panel-heading"><div><h2>Posts</h2><p>{filtered.length} matching posts</p></div><a href="/8010952940-admin/blog?edit=new" class="btn btn-primary">New post</a></div>
+      <div class="admin-panel-heading"><div><h2>All blog posts</h2><p>{filtered.length} matching posts</p></div><a href="/8010952940-admin/blog?edit=new#blog-editor" class="btn btn-primary">New post</a></div>
       <form method="GET" class="admin-filter-bar"><input class="text-input" name="q" value={search} placeholder="Search title or slug" /><select class="select-input" name="status"><option value="all">All statuses</option><option value="draft" selected={statusFilter==='draft'}>Draft</option><option value="published" selected={statusFilter==='published'}>Published</option></select><button class="btn btn-secondary">Filter</button></form>
-      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Title</th><th>Status</th><th>Published</th><th>Actions</th></tr></thead><tbody>
-        {posts.map((post) => <tr><td><strong>{post.title}</strong><small>/{post.slug}</small></td><td><span class:list={["admin-tag", post.status]}>{post.status}</span></td><td>{post.publishDate?.toLocaleDateString() || '—'}</td><td><div class="admin-row-actions"><a href={`/8010952940-admin/blog?edit=${post.id}`}>Edit</a><a href={`/8010952940-admin/blog?preview=${post.id}`}>Preview</a><form method="POST" onsubmit="return confirm('Delete this post permanently?')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="id" value={post.id}/><button class="danger-link">Delete</button></form></div></td></tr>)}
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Post</th><th>Status</th><th>Published</th><th>Actions</th></tr></thead><tbody>
+        {posts.map((post) => <tr><td><div class="admin-post-cell">{post.coverImage ? <img src={post.coverImage} alt=""/> : <span class="admin-post-placeholder">Aa</span>}<div><strong>{post.title}</strong><small>/{post.slug}</small></div></div></td><td><span class:list={["admin-tag", post.status]}>{post.status}</span></td><td>{post.publishDate?.toLocaleDateString() || '—'}</td><td><div class="admin-row-actions">{post.status === 'published' && <a class="admin-view-link" href={`/blog/${post.slug}`} target="_blank">View</a>}<a href={`/8010952940-admin/blog?edit=${post.id}#blog-editor`}>Edit</a><a href={`/8010952940-admin/blog?preview=${post.id}#blog-editor`}>Preview</a><form method="POST" onsubmit="return confirm('Delete this post permanently?')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="id" value={post.id}/><button class="danger-link">Delete</button></form></div></td></tr>)}
         {posts.length === 0 && <tr><td colspan="4" class="admin-empty">No posts found.</td></tr>}
       </tbody></table></div>
       <div class="admin-pagination"><a aria-disabled={page<=1} href={`?q=${search}&status=${statusFilter}&page=${page-1}`}>Previous</a><span>Page {page} of {totalPages}</span><a aria-disabled={page>=totalPages} href={`?q=${search}&status=${statusFilter}&page=${page+1}`}>Next</a></div>
     </section>
 
-    <section class="admin-panel admin-editor-panel">
-      {previewPost ? <><div class="admin-panel-heading"><div><h2>Preview</h2><p>/{previewPost.slug}</p></div><a href="/8010952940-admin/blog">Close</a></div>{previewPost.coverImage && <img class="admin-cover-preview" src={previewPost.coverImage} alt=""/>}<h1 class="admin-preview-title">{previewPost.title}</h1><pre class="admin-markdown-preview">{previewPost.content}</pre></> : <>
-        <div class="admin-panel-heading"><div><h2>{editPost ? 'Edit post' : 'Create post'}</h2><p>Markdown content is rendered as escaped text in this admin preview.</p></div></div>
-        <form method="POST" class="admin-editor-form"><input type="hidden" name="action" value="save"/><input type="hidden" name="id" value={editPost?.id || ''}/><label>Title<input class="text-input" name="title" maxlength="160" required value={editPost?.title || ''}/></label><label>Slug<input class="text-input" name="slug" maxlength="80" placeholder="Generated from title" value={editPost?.slug || ''}/></label><label>Cover image URL<input class="text-input" name="coverImage" type="url" value={editPost?.coverImage || ''}/></label><label>Content<textarea class="text-input admin-content-editor" name="content" maxlength="200000" required>{editPost?.content || ''}</textarea></label><label>Status<select class="select-input" name="status"><option value="draft">Draft</option><option value="published" selected={editPost?.status==='published'}>Published</option></select></label><button class="btn btn-primary">Save post</button></form>
+    <section class="admin-panel admin-editor-panel" id="blog-editor">
+      {previewPost ? <><div class="admin-panel-heading"><div><h2>Post preview</h2><p>/{previewPost.slug}</p></div><a href="/8010952940-admin/blog">Close</a></div>{previewPost.coverImage && <img class="admin-cover-preview" src={previewPost.coverImage} alt=""/>}<h1 class="admin-preview-title">{previewPost.title}</h1><div class="admin-rich-preview" set:html={previewPost.content}></div></> : <>
+        <div class="admin-panel-heading"><div><h2>{editPost ? 'Edit post' : 'Create post'}</h2><p>Format your article, insert images, lists, links, code, and tables.</p></div></div>
+        <form method="POST" class="admin-editor-form rich-post-form"><input type="hidden" name="action" value="save"/><input type="hidden" name="id" value={editPost?.id || ''}/><div class="admin-editor-grid"><label>Title<input class="text-input" name="title" maxlength="160" required value={editPost?.title || ''}/></label><label>Slug<input class="text-input" name="slug" maxlength="80" placeholder="Generated from title" value={editPost?.slug || ''}/></label></div><label>Featured image URL<input class="text-input" name="coverImage" type="url" placeholder="https://example.com/image.jpg" value={editPost?.coverImage || ''}/></label><label>Content</label><div class="rich-editor-shell"><div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting"><button type="button" data-block="h2">H2</button><button type="button" data-block="h3">H3</button><button type="button" data-command="bold"><strong>B</strong></button><button type="button" data-command="italic"><em>I</em></button><button type="button" data-command="underline"><u>U</u></button><span></span><button type="button" data-command="insertUnorderedList">• List</button><button type="button" data-command="insertOrderedList">1. List</button><button type="button" data-block="blockquote">Quote</button><button type="button" data-block="pre">Code</button><span></span><button type="button" data-action="link">Link</button><button type="button" data-action="image">Image</button><button type="button" data-action="table">Table</button><button type="button" data-command="undo">Undo</button></div><div id="rich-post-editor" class="rich-post-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Start writing your article…" set:html={editPost?.content || '<p></p>'}></div><textarea id="rich-post-content" name="content" hidden required>{editPost?.content || ''}</textarea></div><div class="admin-editor-footer"><label>Status<select class="select-input" name="status"><option value="draft">Draft</option><option value="published" selected={editPost?.status==='published'}>Published</option></select></label><button class="btn btn-primary">Save post</button></div></form>
       </>}
     </section>
   </div>
 </AdminLayout>
+
+<script>
+  const editor = document.querySelector<HTMLElement>('#rich-post-editor');
+  const content = document.querySelector<HTMLTextAreaElement>('#rich-post-content');
+  const form = document.querySelector<HTMLFormElement>('.rich-post-form');
+  const focusEditor = () => editor?.focus();
+  document.querySelectorAll<HTMLButtonElement>('.rich-editor-toolbar button').forEach((button) => button.addEventListener('click', () => {
+    focusEditor();
+    const command = button.dataset.command;
+    const block = button.dataset.block;
+    const action = button.dataset.action;
+    if (command) document.execCommand(command, false);
+    if (block) document.execCommand('formatBlock', false, block);
+    if (action === 'link') { const url = window.prompt('Paste the link URL'); if (url) document.execCommand('createLink', false, url); }
+    if (action === 'image') { const url = window.prompt('Paste an HTTPS image URL'); if (url?.startsWith('https://')) document.execCommand('insertImage', false, url); }
+    if (action === 'table') document.execCommand('insertHTML', false, '<table><thead><tr><th>Heading 1</th><th>Heading 2</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>');
+  }));
+  form?.addEventListener('submit', () => { if (editor && content) content.value = editor.innerHTML; });
+</script>

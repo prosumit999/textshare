@@ -1,113 +1,52 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { getPublishedBlogPosts } from '../lib/admin';
+import { blogTextExcerpt } from '../lib/blog-content';
 
-const posts = [
-  {
-    id: 'secure-text-sharing',
-    title: 'Secure text sharing: Best practices',
-    excerpt: 'A practical guide to sharing sensitive notes and snippets without leaving unnecessary copies behind.',
-    category: 'Security',
-    date: 'Jul 28, 2026',
-    readTime: '6 min read',
-    featured: true,
-    visual: 'shield'
-  },
-  {
-    id: 'share-code',
-    title: 'How to share code without the noise',
-    excerpt: 'Keep formatting intact and give collaborators exactly the context they need—nothing more.',
-    category: 'Workflow',
-    date: 'Jul 22, 2026',
-    readTime: '4 min read',
-    featured: false,
-    visual: 'code'
-  },
-  {
-    id: 'expiring-links',
-    title: 'Expiring links explained',
-    excerpt: 'Learn when temporary links are useful and how expiration reduces the lifetime of shared data.',
-    category: 'Privacy',
-    date: 'Jul 15, 2026',
-    readTime: '5 min read',
-    featured: false,
-    visual: 'clock'
-  },
-  {
-    id: 'syntax-highlighting',
-    title: 'Why syntax highlighting improves code reviews',
-    excerpt: 'Readable snippets make bugs easier to spot and technical conversations faster to follow.',
-    category: 'Development',
-    date: 'Jul 8, 2026',
-    readTime: '7 min read',
-    featured: false,
-    visual: 'brackets'
-  },
-  {
-    id: 'password-protection',
-    title: 'When should you password-protect a share?',
-    excerpt: 'A simple framework for deciding when a public link is enough and when another layer is worthwhile.',
-    category: 'Security',
-    date: 'Jun 30, 2026',
-    readTime: '5 min read',
-    featured: false,
-    visual: 'lock'
-  },
-  {
-    id: 'qr-sharing',
-    title: 'Faster sharing across devices with QR codes',
-    excerpt: 'Move text and code between phones, tablets, and desktops without emailing it to yourself.',
-    category: 'Tips',
-    date: 'Jun 21, 2026',
-    readTime: '3 min read',
-    featured: false,
-    visual: 'qr'
-  }
+const fallbackPosts = [
+  { id: 'secure-text-sharing', title: 'Secure text sharing: Best practices', excerpt: 'A practical guide to sharing sensitive notes and snippets without leaving unnecessary copies behind.', category: 'Security', date: 'Jul 28, 2026', readTime: '6 min read', visual: 'shield', href: '#secure-text-sharing', coverImage: '' },
+  { id: 'share-code', title: 'How to share code without the noise', excerpt: 'Keep formatting intact and give collaborators exactly the context they need—nothing more.', category: 'Workflow', date: 'Jul 22, 2026', readTime: '4 min read', visual: 'code', href: '#share-code', coverImage: '' },
+  { id: 'expiring-links', title: 'Expiring links explained', excerpt: 'Learn when temporary links are useful and how expiration reduces the lifetime of shared data.', category: 'Privacy', date: 'Jul 15, 2026', readTime: '5 min read', visual: 'clock', href: '#expiring-links', coverImage: '' },
+  { id: 'syntax-highlighting', title: 'Why syntax highlighting improves code reviews', excerpt: 'Readable snippets make bugs easier to spot and technical conversations faster to follow.', category: 'Development', date: 'Jul 8, 2026', readTime: '7 min read', visual: 'brackets', href: '#syntax-highlighting', coverImage: '' },
+  { id: 'password-protection', title: 'When should you password-protect a share?', excerpt: 'A simple framework for deciding when a public link is enough and when another layer is worthwhile.', category: 'Security', date: 'Jun 30, 2026', readTime: '5 min read', visual: 'lock', href: '#password-protection', coverImage: '' },
+  { id: 'qr-sharing', title: 'Faster sharing across devices with QR codes', excerpt: 'Move text and code between phones, tablets, and desktops without emailing it to yourself.', category: 'Tips', date: 'Jun 21, 2026', readTime: '3 min read', visual: 'qr', href: '#qr-sharing', coverImage: '' }
 ];
 
-const featuredPost = posts.find((post) => post.featured)!;
-const gridPosts = posts.filter((post) => !post.featured);
+const managedPosts = getPublishedBlogPosts().map((post) => ({
+  id: post.slug,
+  title: post.title,
+  excerpt: blogTextExcerpt(post.content) || 'Read the latest article from TextShare.',
+  category: 'TextShare',
+  date: (post.publishDate || post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+  readTime: `${Math.max(1, Math.ceil(post.content.trim().split(/\s+/).length / 220))} min read`,
+  visual: 'article',
+  href: `/blog/${post.slug}`,
+  coverImage: post.coverImage
+}));
+
+const managedSlugs = new Set(managedPosts.map((post) => post.id));
+const posts = [...managedPosts, ...fallbackPosts.filter((post) => !managedSlugs.has(post.id))];
+const featuredPost = posts[0];
+const gridPosts = posts.slice(1);
 ---
 
 <Layout title="Blog — TextShare" description="Guides and ideas about sharing text, code, and sensitive information securely.">
   <section class="blog-page">
+    <div class="blog-hero"><span class="eyebrow">TextShare journal</span><h1>Ideas for simpler sharing</h1><p>Practical guides for sharing text, code, and images with less friction and more control.</p></div>
 
-    <a href={`#${featuredPost.id}`} class="featured-post" id={featuredPost.id}>
-      <div class="post-visual post-visual-featured" data-visual={featuredPost.visual} aria-hidden="true">
-        <svg class="icon-svg" viewBox="0 0 24 24">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          <polyline points="9 12 11 14 15 10"></polyline>
-        </svg>
+    {featuredPost && <a href={featuredPost.href} class="featured-post" id={featuredPost.id}>
+      <div class:list={["post-visual post-visual-featured", { "has-cover": featuredPost.coverImage }]} aria-hidden="true">
+        {featuredPost.coverImage ? <img src={featuredPost.coverImage} alt="" /> : <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>}
       </div>
-      <div class="featured-post-content">
-        <div class="post-meta"><span>{featuredPost.category}</span><span>{featuredPost.date}</span></div>
-        <h2>{featuredPost.title}</h2>
-        <p>{featuredPost.excerpt}</p>
-        <span class="read-link">Read article <span aria-hidden="true">→</span></span>
-        <span class="read-time">{featuredPost.readTime}</span>
-      </div>
-    </a>
+      <div class="featured-post-content"><div class="post-meta"><span>{featuredPost.category}</span><span>{featuredPost.date}</span></div><h2>{featuredPost.title}</h2><p>{featuredPost.excerpt}</p><span class="read-link">Read article <span aria-hidden="true">→</span></span><span class="read-time">{featuredPost.readTime}</span></div>
+    </a>}
 
-    <div class="blog-section-heading">
-      <h2>Latest articles</h2>
-      <span>{gridPosts.length} articles</span>
-    </div>
-
+    <div class="blog-section-heading"><h2>Latest articles</h2><span>{gridPosts.length} articles</span></div>
     <div class="blog-grid">
-      {gridPosts.map((post) => (
-        <article class="post-card" id={post.id}>
-          <a href={`#${post.id}`} class="post-card-link" aria-label={`Read ${post.title}`}>
-            <div class="post-visual" data-visual={post.visual} aria-hidden="true">
-              <span>{post.visual === 'code' ? '</>' : post.visual === 'clock' ? '24h' : post.visual === 'brackets' ? '{ }' : post.visual === 'lock' ? '•••' : '▦'}</span>
-            </div>
-            <div class="post-card-content">
-              <div class="post-meta"><span>{post.category}</span><span>{post.readTime}</span></div>
-              <h3>{post.title}</h3>
-              <p>{post.excerpt}</p>
-              <div class="post-card-footer"><span>{post.date}</span><span class="read-arrow" aria-hidden="true">→</span></div>
-            </div>
-          </a>
-        </article>
-      ))}
+      {gridPosts.map((post) => <article class="post-card" id={post.id}><a href={post.href} class="post-card-link" aria-label={`Read ${post.title}`}>
+        <div class:list={["post-visual", { "has-cover": post.coverImage }]} aria-hidden="true">{post.coverImage ? <img src={post.coverImage} alt="" /> : <span>{post.visual === 'code' ? '</>' : post.visual === 'clock' ? '24h' : post.visual === 'brackets' ? '{ }' : post.visual === 'lock' ? '•••' : post.visual === 'article' ? 'Aa' : '▦'}</span>}</div>
+        <div class="post-card-content"><div class="post-meta"><span>{post.category}</span><span>{post.readTime}</span></div><h3>{post.title}</h3><p>{post.excerpt}</p><div class="post-card-footer"><span>{post.date}</span><span class="read-arrow" aria-hidden="true">→</span></div></div>
+      </a></article>)}
     </div>
   </section>
 </Layout>
