@@ -30,6 +30,10 @@ if (Astro.request.method === 'POST') {
     logSecurityEvent('room_join_failed', Astro.request, { reason: 'invalid_format' });
     error = 'That code is not valid. Check it and try again.';
   } else {
+    // Joining is an explicit new access attempt. Remove any short-lived unlock
+    // grant left by a previous visit in this browser so protected rooms always
+    // require their password when entered through the Join Room workflow.
+    Astro.cookies.delete(`unlocked_${code}`, { path: '/' });
     return Astro.redirect(`/${encodeURIComponent(code)}`);
   }
 }

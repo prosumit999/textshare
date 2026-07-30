@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import UnavailableShare from '../../components/UnavailableShare.astro';
 import { getPublishedBlogPostBySlug, getPublishedBlogPosts } from '../../lib/admin';
-import { blogTextExcerpt } from '../../lib/blog-content';
+import { blogTextExcerpt, sanitizeBlogHtml } from '../../lib/blog-content';
 
 const post = getPublishedBlogPostBySlug(Astro.params.slug || '');
 if (!post) Astro.response.status = 404;
@@ -14,15 +14,31 @@ const olderPost = currentIndex >= 0 && currentIndex < publishedPosts.length - 1 
 const articleUrl = post ? new URL(`/blog/${post.slug}`, Astro.url.origin).toString() : '';
 const encodedUrl = encodeURIComponent(articleUrl);
 const encodedTitle = encodeURIComponent(post?.title || '');
+const publicContent = post ? sanitizeBlogHtml(post.content) : '';
+const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 100000).split(/\s+/).length / 220)) : 0;
 ---
 
 <Layout title={post ? `${post.title} — TextShare` : 'Article unavailable — TextShare'} description={post ? blogTextExcerpt(post.content, 155) : 'This article is unavailable.'}>
   {post ? <article class="public-article">
-    <header class="public-article-header"><a href="/blog" class="article-back">← All articles</a><div class="post-meta"><span>TextShare</span><span>{publishedOn}</span></div><h1>{post.title}</h1></header>
-    {post.coverImage && <figure class="public-article-feature"><img class="public-article-cover" src={post.coverImage} alt={`Featured image for ${post.title}`} /></figure>}
-    <div class="public-article-content" set:html={post.content}></div>
+    <header class="public-article-header">
+      <nav class="article-breadcrumb" aria-label="Breadcrumb">
+        <a href="/">Home</a><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4 6 6-6 6"></path></svg>
+        <a href="/blog">Blog</a><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4 6 6-6 6"></path></svg>
+        <span aria-current="page">{post.title}</span>
+      </nav>
+      <div class="article-meta"><span>TextShare editorial</span><span>{publishedOn}</span><span>{readTime} min read</span></div>
+      <h1>{post.title}</h1>
+      <p class="article-deck">{blogTextExcerpt(post.content, 190)}</p>
+    </header>
+    <figure class:list={["public-article-feature", { generated: !post.coverImage }]}>{post.coverImage ? <img class="public-article-cover" src={post.coverImage} alt={`Featured image for ${post.title}`} /> : <div class="generated-article-visual" aria-hidden="true"><span>Aa</span></div>}</figure>
+    <div class="public-article-content" set:html={publicContent}></div>
     <footer class="article-footer">
-      <div class="article-share"><span>Share this article</span><div><a href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`} target="_blank" rel="noopener noreferrer" aria-label="Share on X">X</a><a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn">in</a><a href={`mailto:?subject=${encodedTitle}&body=${encodedUrl}`} aria-label="Share by email">Email</a><button type="button" id="copy-article-link" data-url={articleUrl}>Copy link</button></div></div>
+      <div class="article-share"><span>Share this article</span><div>
+        <a href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`} target="_blank" rel="noopener noreferrer" aria-label="Share on X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4l14 16M19 4 5 20"></path></svg><span>X</span></a>
+        <a href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`} target="_blank" rel="noopener noreferrer" aria-label="Share on LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="9" width="4" height="11"></rect><path d="M6 4.5v.01M12 20V9m0 5c0-3 2-5 4.5-5S20 11 20 14v6"></path></svg><span>LinkedIn</span></a>
+        <a href={`mailto:?subject=${encodedTitle}&body=${encodedUrl}`} aria-label="Share by email"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg><span>Email</span></a>
+        <button type="button" id="copy-article-link" data-url={articleUrl}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1 1"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1-1"></path></svg><span id="copy-article-label">Copy link</span></button>
+      </div></div>
       <nav class="article-pagination" aria-label="More articles">
         {newerPost ? <a href={`/blog/${newerPost.slug}`}><span>← Newer article</span><strong>{newerPost.title}</strong></a> : <span></span>}
         {olderPost ? <a href={`/blog/${olderPost.slug}`} class="article-next"><span>Older article →</span><strong>{olderPost.title}</strong></a> : <span></span>}
@@ -33,11 +49,12 @@ const encodedTitle = encodeURIComponent(post?.title || '');
 
 <script>
   const copyButton = document.querySelector<HTMLButtonElement>('#copy-article-link');
+  const copyLabel = document.querySelector<HTMLElement>('#copy-article-label');
   copyButton?.addEventListener('click', async () => {
     const url = copyButton.dataset.url;
     if (!url) return;
     await navigator.clipboard.writeText(url);
-    copyButton.textContent = 'Copied';
-    window.setTimeout(() => copyButton.textContent = 'Copy link', 1600);
+    if (copyLabel) copyLabel.textContent = 'Copied';
+    window.setTimeout(() => { if (copyLabel) copyLabel.textContent = 'Copy link'; }, 1600);
   });
 </script>

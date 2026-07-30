@@ -1,11 +1,11 @@
 ---
-const currentYear = new Date().getFullYear();
+import { getPublishedBlogPosts } from '../lib/admin';
 
-const posts = [
-  { title: 'Secure text sharing: Best practices', href: '/blog#secure-text-sharing' },
-  { title: 'How to share code without the noise', href: '/blog#share-code' },
-  { title: 'Expiring links explained', href: '/blog#expiring-links' }
-];
+const currentYear = new Date().getFullYear();
+const posts = getPublishedBlogPosts().slice(0, 5).map((post) => ({
+  title: post.title,
+  href: `/blog/${post.slug}`
+}));
 ---
 
 <footer>
