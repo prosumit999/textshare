@@ -1,6 +1,6 @@
 ---
 import { getCurrentUser } from '../lib/auth';
-const hasSession = !!getCurrentUser(Astro.cookies);
+const hasSession = !!(await getCurrentUser(Astro.cookies));
 const isHome = Astro.url.pathname === "/";
 ---
 

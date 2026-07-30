@@ -31,7 +31,7 @@ export async function beginAdminVerification(cookies: AstroCookies, user: User) 
   }
 }
 
-export async function completeAdminVerification(cookies: AstroCookies, code: string, userLookup: (email: string) => User | null) {
+export async function completeAdminVerification(cookies: AstroCookies, code: string, userLookup: (email: string) => Promise<User | null>) {
   const token = cookies.get('admin_challenge')?.value;
   if (!token) return false;
   const key = challengeKey(token);
@@ -43,7 +43,7 @@ export async function completeAdminVerification(cookies: AstroCookies, code: str
   }
   challenge.attempts += 1;
   if (!/^\d{6}$/.test(code) || !(await bcrypt.compare(code, challenge.codeHash))) return false;
-  const user = userLookup(challenge.email);
+  const user = await userLookup(challenge.email);
   if (!user?.isAdmin || user.disabled) return false;
   challenges.delete(key);
   cookies.delete('admin_challenge', { path: '/' });

@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createClient, type RedisClientType } from 'redis';
 import { recordSecuritySignal } from './admin';
+import { serverEnv } from './env';
 
 type RateLimitResult = { allowed: boolean; remaining: number; retryAfter: number };
 type MemoryEntry = { count: number; expiresAt: number };
@@ -13,7 +14,7 @@ function hashIdentifier(value: string) {
 }
 
 async function getRedis(): Promise<RedisClientType | null> {
-  const redisUrl = import.meta.env.REDIS_URL || process.env.REDIS_URL;
+  const redisUrl = serverEnv.REDIS_URL;
   if (!redisUrl) return null;
 
   if (!redisPromise) {

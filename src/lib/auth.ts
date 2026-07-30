@@ -2,6 +2,8 @@ import { createHash, randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { AstroCookies } from 'astro';
 import { secureCookieOptions } from './security';
+import { getMongo } from './mongo';
+import { serverEnv } from './env';
 
 export type User = {
   name: string;
@@ -16,12 +18,9 @@ type Session = { email: string; expiresAt: number; adminVerified: boolean };
 
 declare global {
   // eslint-disable-next-line no-var
-  var textShareUsers: Map<string, User> | undefined;
-  // eslint-disable-next-line no-var
   var textShareSessions: Map<string, Session> | undefined;
 }
 
-const users = globalThis.textShareUsers ??= new Map<string, User>();
 const sessions = globalThis.textShareSessions ??= new Map<string, Session>();
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const COMMON_PASSWORDS = new Set([
@@ -29,25 +28,25 @@ const COMMON_PASSWORDS = new Set([
   'admin123', 'welcome1', 'iloveyou', 'abc12345'
 ]);
 
-const bootstrapAdminEmail = normalizeEmail(import.meta.env.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'prosumit999@gmail.com');
-const configuredAdminHash = import.meta.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD_HASH;
-const configuredAdminPassword = import.meta.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
+const bootstrapAdminEmail = normalizeEmail(serverEnv.ADMIN_EMAIL || 'prosumit999@gmail.com');
+const configuredAdminHash = serverEnv.ADMIN_PASSWORD_HASH;
+const configuredAdminPassword = serverEnv.ADMIN_PASSWORD;
 // The plaintext environment value is used only to derive the in-memory bcrypt hash.
 // A precomputed hash is preferred and takes precedence when both are configured.
 const bootstrapAdminHash = configuredAdminHash || (configuredAdminPassword ? bcrypt.hashSync(configuredAdminPassword, 12) : undefined);
-if (bootstrapAdminEmail && bootstrapAdminHash) {
-  const existingAdmin = users.get(bootstrapAdminEmail);
-  if (existingAdmin?.isAdmin) {
-    existingAdmin.passwordHash = bootstrapAdminHash;
-  } else if (!existingAdmin) users.set(bootstrapAdminEmail, {
-    name: 'TextShare Admin',
-    email: bootstrapAdminEmail,
-    passwordHash: bootstrapAdminHash,
-    createdAt: new Date(),
-    plan: 'pro',
-    isAdmin: true,
-    disabled: false
-  });
+let adminReady: Promise<void> | null = null;
+
+function ensureBootstrapAdmin() {
+  if (!adminReady) adminReady = (async () => {
+    if (!bootstrapAdminEmail || !bootstrapAdminHash) return;
+    const { db } = await getMongo();
+    await db.collection<User>('users').updateOne(
+      { email: bootstrapAdminEmail },
+      { $set: { name: 'TextShare Admin', passwordHash: bootstrapAdminHash, plan: 'pro', isAdmin: true, disabled: false }, $setOnInsert: { email: bootstrapAdminEmail, createdAt: new Date() } },
+      { upsert: true }
+    );
+  })().catch((error) => { adminReady = null; throw error; });
+  return adminReady;
 }
 
 function sessionKey(token: string) {
@@ -67,18 +66,24 @@ export function validatePasswordStrength(password: string): string | null {
 }
 
 export async function registerUser(name: string, rawEmail: string, password: string) {
+  await ensureBootstrapAdmin();
   const email = normalizeEmail(rawEmail);
-  if (users.has(email) || (bootstrapAdminEmail && email === bootstrapAdminEmail)) return { ok: false as const };
+  const { db } = await getMongo();
+  if (email === bootstrapAdminEmail || await db.collection('users').findOne({ email })) return { ok: false as const };
   const passwordHash = await bcrypt.hash(password, 12);
-  users.set(email, {
+  const user: User = {
     name: name.trim(), email, passwordHash, createdAt: new Date(), plan: 'free', isAdmin: false, disabled: false
-  });
-  return { ok: true as const, user: users.get(email)! };
+  };
+  try { await db.collection<User>('users').insertOne(user); }
+  catch { return { ok: false as const }; }
+  return { ok: true as const, user };
 }
 
 export async function verifyCredentials(rawEmail: string, password: string) {
+  await ensureBootstrapAdmin();
   const email = normalizeEmail(rawEmail);
-  const user = users.get(email);
+  const { db } = await getMongo();
+  const user = await db.collection<User>('users').findOne({ email });
   if (!user) {
     // Equalize timing for unknown accounts.
     await bcrypt.compare(password, '$2b$12$C6UzMDM.H6dfI/f/IKcEe.7c4bPTmBJeRtJ0zVZ/4ZOiVHTp71l4i');
@@ -105,7 +110,7 @@ export function isAdminSessionVerified(cookies: AstroCookies) {
   return Boolean(session?.adminVerified && session.expiresAt > Date.now());
 }
 
-export function getCurrentUser(cookies: AstroCookies): User | null {
+export async function getCurrentUser(cookies: AstroCookies): Promise<User | null> {
   const token = cookies.get('session')?.value;
   if (!token) return null;
   const key = sessionKey(token);
@@ -114,7 +119,9 @@ export function getCurrentUser(cookies: AstroCookies): User | null {
     sessions.delete(key);
     return null;
   }
-  return users.get(session.email) || null;
+  await ensureBootstrapAdmin();
+  const { db } = await getMongo();
+  return await db.collection<User>('users').findOne({ email: session.email });
 }
 
 export function destroySession(cookies: AstroCookies) {
@@ -124,20 +131,24 @@ export function destroySession(cookies: AstroCookies) {
   cookies.delete('plan', { path: '/' });
 }
 
-export function listUsers() {
-  return Array.from(users.values()).map(({ passwordHash: _passwordHash, ...user }) => user);
+export async function listUsers() {
+  await ensureBootstrapAdmin();
+  const { db } = await getMongo();
+  return await db.collection<User>('users').find({}, { projection: { passwordHash: 0 } }).sort({ createdAt: -1 }).limit(1000).toArray();
 }
 
-export function getUserByEmail(email: string) {
-  return users.get(normalizeEmail(email)) || null;
+export async function getUserByEmail(email: string) {
+  await ensureBootstrapAdmin();
+  const { db } = await getMongo();
+  return await db.collection<User>('users').findOne({ email: normalizeEmail(email) });
 }
 
-export function setUserDisabled(email: string, disabled: boolean) {
-  const user = users.get(normalizeEmail(email));
-  if (!user || user.isAdmin) return false;
-  user.disabled = disabled;
-  if (disabled) invalidateUserSessions(user.email);
-  return true;
+export async function setUserDisabled(email: string, disabled: boolean) {
+  const normalized = normalizeEmail(email);
+  const { db } = await getMongo();
+  const result = await db.collection<User>('users').updateOne({ email: normalized, isAdmin: false }, { $set: { disabled } });
+  if (disabled && result.modifiedCount) invalidateUserSessions(normalized);
+  return result.modifiedCount > 0;
 }
 
 export function invalidateUserSessions(email: string) {

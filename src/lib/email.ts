@@ -1,8 +1,9 @@
 import nodemailer from 'nodemailer';
+import { serverEnv } from './env';
 
 export async function sendAdminVerificationCode(to: string, code: string) {
-  const user = import.meta.env.GMAIL_USER || process.env.GMAIL_USER || 'prosumit999@gmail.com';
-  const appPassword = import.meta.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASSWORD;
+  const user = serverEnv.GMAIL_USER || 'prosumit999@gmail.com';
+  const appPassword = serverEnv.GMAIL_APP_PASSWORD;
   if (!appPassword) throw new Error('GMAIL_APP_PASSWORD is not configured.');
 
   const transporter = nodemailer.createTransport({

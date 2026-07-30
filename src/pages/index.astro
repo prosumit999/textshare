@@ -6,9 +6,11 @@ import { randomInt } from 'node:crypto';
 import { getCurrentUser } from '../lib/auth';
 import { sanitizeImage, UnsafeImageError } from '../lib/images';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
+import { MAX_SHARE_BYTES, pruneOversizedShares } from '../lib/shares';
+import { deleteShare, hasShare, listShares, saveShare } from '../lib/share-store';
 
 // SSR Check Authentication & Guest Limit
-const currentUser = getCurrentUser(Astro.cookies);
+const currentUser = await getCurrentUser(Astro.cookies);
 const isLoggedIn = !!currentUser;
 const userPlan = currentUser?.plan || "free";
 const hasPaidPlan = userPlan === "plus" || userPlan === "pro";
@@ -17,11 +19,11 @@ const activeGuestSlug = Astro.cookies.get("guest_share_active")?.value;
 const activeGuestUrl = activeGuestSlug ? `${Astro.url.origin}/${activeGuestSlug}` : null;
 const activeFreeSlug = Astro.cookies.get("free_share_active")?.value;
 
-if (!globalThis.textSharesStore) globalThis.textSharesStore = new Map();
-const shareStore = globalThis.textSharesStore as Map<string, any>;
+await pruneOversizedShares();
 
 // Form Handling
 let errors: Record<string, string> = {};
+let textContent = '';
 let result: {
   url: string;
   qrCode: string;
@@ -37,7 +39,7 @@ if (Astro.request.method === "POST") {
 
     const formData = await Astro.request.formData();
     const contentType = formData.get("contentType")?.toString() || "text";
-    let textContent = formData.get("textContent")?.toString() || "";
+    textContent = formData.get("textContent")?.toString() || "";
     let expiry = formData.get("expiry")?.toString() || "24h";
     const language = formData.get("language")?.toString() || "plaintext";
     const password = formData.get("password")?.toString() || "";
@@ -75,8 +77,8 @@ if (Astro.request.method === "POST") {
 
     if (contentType === "text" && !textContent.trim()) {
       errors.textContent = "Please enter some text or code content.";
-    } else if (contentType === "text" && new TextEncoder().encode(textContent).byteLength > 512 * 1024) {
-      errors.textContent = "Text shares cannot exceed 512 KB.";
+    } else if (contentType === "text" && new TextEncoder().encode(textContent).byteLength > MAX_SHARE_BYTES) {
+      errors.textContent = "This text is larger than 50 MB. Reduce its size before creating the share.";
     }
 
     if (contentType === "image" && (!imageFile || imageFile.size === 0)) {
@@ -94,7 +96,7 @@ if (Astro.request.method === "POST") {
       if (customSlug.toLowerCase() === "admin" || customSlug.toLowerCase() === "dashboard") {
         errors.customSlug = "This custom link is already taken or reserved.";
       }
-      if (shareStore.has(customSlug)) {
+      if (await hasShare(customSlug)) {
         errors.customSlug = "This custom link is already taken.";
       }
     }
@@ -141,6 +143,11 @@ if (Astro.request.method === "POST") {
         }
       }
 
+      if (contentType === "text" && new TextEncoder().encode(textContent).byteLength > MAX_SHARE_BYTES) {
+        errors.textContent = "Formatted content is larger than 50 MB. Reduce its size before creating the share.";
+        throw new Error('VALIDATION_FAILED');
+      }
+
       let slug = "";
       
       if (isLoggedIn && customSlug) {
@@ -151,7 +158,7 @@ if (Astro.request.method === "POST") {
           slug = urlFormat === "number"
             ? Array.from({ length: 6 }, () => randomInt(0, 10)).join("")
             : Array.from({ length: 6 }, () => chars[randomInt(0, chars.length)]).join("");
-        } while (shareStore.has(slug));
+        } while (await hasShare(slug));
       }
 
       // Calculate Expiry Date
@@ -167,16 +174,17 @@ if (Astro.request.method === "POST") {
       // Save to global in-memory database for standalone execution
       // A guest keeps one share at a time; a new share replaces the previous one.
       if (!isLoggedIn && activeGuestSlug) {
-        shareStore.delete(activeGuestSlug);
+        await deleteShare(activeGuestSlug);
       }
-      if (isLoggedIn && !hasPaidPlan && activeFreeSlug) {
-        shareStore.delete(activeFreeSlug);
+      if (isLoggedIn && !hasPaidPlan) {
+        const existingFreeShares = await listShares(currentUser!.email);
+        for (const existing of existingFreeShares) await deleteShare(existing.slug, currentUser!.email);
       }
 
       const imageSrc = sanitizedImage?.dataUrl || null;
       const passwordHash = password ? await bcrypt.hash(password, 12) : null;
       
-      shareStore.set(slug, {
+      await saveShare(slug, {
         contentType,
         textContent,
         imageSrc,
@@ -367,11 +375,13 @@ if (Astro.request.method === "POST") {
         <!-- Main text content area -->
         <div class="textarea-wrapper" id="text-input-section">
           <textarea 
+            id="share-text-content"
             name="textContent" 
             class="share-textarea" 
             placeholder="Type or paste your text or code snippet here..."
             aria-label="Text content"
-          ></textarea>
+          >{textContent}</textarea>
+          <div id="share-size-feedback" class="share-size-feedback" aria-live="polite"><span>0 B</span><span>50 MB maximum</span></div>
           {errors.textContent && (
             <span style="color:var(--color-danger); font-size:12px; padding:0 var(--space-4) var(--space-2); display:block;">
               {errors.textContent}
@@ -525,6 +535,31 @@ if (Astro.request.method === "POST") {
         const textInputSection = document.getElementById("text-input-section");
         const imageInputSection = document.getElementById("image-input-section");
         const syntaxHighlightWrapper = document.getElementById("syntax-highlight-toggle-wrapper");
+        const shareForm = document.querySelector<HTMLFormElement>('.share-form');
+        const shareText = document.getElementById('share-text-content') as HTMLTextAreaElement | null;
+        const sizeFeedback = document.getElementById('share-size-feedback');
+        const createButton = document.querySelector<HTMLButtonElement>('.create-share-btn');
+        const maxShareBytes = 50 * 1024 * 1024;
+
+        const updateTextSize = () => {
+          if (!shareText || !sizeFeedback) return;
+          const bytes = new TextEncoder().encode(shareText.value).byteLength;
+          const current = sizeFeedback.querySelector('span');
+          if (current) current.textContent = bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(bytes < 1024 ? 1 : 0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+          const oversized = bytes > maxShareBytes;
+          sizeFeedback.classList.toggle('oversized', oversized);
+          if (createButton && contentTypeInput?.value === 'text') createButton.disabled = oversized;
+          sizeFeedback.lastElementChild!.textContent = oversized ? 'Text exceeds the 50 MB limit' : '50 MB maximum';
+        };
+        shareText?.addEventListener('input', updateTextSize);
+        shareForm?.addEventListener('submit', (event) => {
+          if (contentTypeInput?.value === 'text' && shareText && new TextEncoder().encode(shareText.value).byteLength > maxShareBytes) {
+            event.preventDefault();
+            updateTextSize();
+            shareText.focus();
+          }
+        });
+        updateTextSize();
 
         if (tabText && tabImage && contentTypeInput) {
           tabText.addEventListener("click", () => {
@@ -536,6 +571,7 @@ if (Astro.request.method === "POST") {
             if (textInputSection) textInputSection.style.display = "block";
             if (imageInputSection) imageInputSection.style.display = "none";
             if (syntaxHighlightWrapper) syntaxHighlightWrapper.style.display = "flex";
+            updateTextSize();
           });
 
           tabImage.addEventListener("click", () => {
@@ -547,6 +583,7 @@ if (Astro.request.method === "POST") {
             if (textInputSection) textInputSection.style.display = "none";
             if (imageInputSection) imageInputSection.style.display = "block";
             if (syntaxHighlightWrapper) syntaxHighlightWrapper.style.display = "none";
+            if (createButton) createButton.disabled = false;
           });
         }
 

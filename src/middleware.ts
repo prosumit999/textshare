@@ -4,13 +4,16 @@ import { getClientIp } from './lib/security';
 import { getCurrentUser, isAdminSessionVerified } from './lib/auth';
 import { isIpBlocked, recordTraffic } from './lib/admin';
 import { ADMIN_BASE_PATH } from './lib/admin-path';
+import { MAX_SHARE_BYTES, pruneOversizedShares } from './lib/shares';
 
 const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
+const MAX_SHARE_REQUEST_BYTES = MAX_SHARE_BYTES + 2 * 1024 * 1024;
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { request, url } = context;
   const contentLength = Number(request.headers.get('content-length') || '0');
   const clientIp = getClientIp(request);
+  await pruneOversizedShares();
 
   const renderUnavailable = async () => {
     const fallback = await context.rewrite('/expired');
@@ -32,7 +35,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   const isOwnerRoute = url.pathname === ADMIN_BASE_PATH || url.pathname.startsWith(`${ADMIN_BASE_PATH}/`);
   if (isOwnerRoute) {
-    const user = getCurrentUser(context.cookies);
+    const user = await getCurrentUser(context.cookies);
     if (!user?.isAdmin || user.disabled || !isAdminSessionVerified(context.cookies)) {
       logSecurityEvent('admin_access_rejected', request, { path: url.pathname });
       return renderUnavailable();
@@ -43,9 +46,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return renderUnavailable();
   }
 
-  if (contentLength > MAX_REQUEST_BYTES) {
+  const requestLimit = request.method === 'POST' && url.pathname === '/' ? MAX_SHARE_REQUEST_BYTES : MAX_REQUEST_BYTES;
+  if (contentLength > requestLimit) {
     logSecurityEvent('request_body_rejected', request, { bytes: contentLength, path: url.pathname });
-    return new Response(JSON.stringify({ error: 'Request body is too large.' }), {
+    return new Response(JSON.stringify({ error: url.pathname === '/' ? 'Share content cannot exceed 50 MB.' : 'Request body is too large.' }), {
       status: 413,
       headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }
     });

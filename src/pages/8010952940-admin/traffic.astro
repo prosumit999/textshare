@@ -3,7 +3,7 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { blockIp, getBlockedIps, getSecuritySignals, getTrafficEvents, recordAudit, unblockIp } from '../../lib/admin';
 import { getCurrentUser } from '../../lib/auth';
 
-const admin = getCurrentUser(Astro.cookies)!;
+const admin = (await getCurrentUser(Astro.cookies))!;
 let message = '';
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();

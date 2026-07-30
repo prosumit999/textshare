@@ -3,16 +3,16 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { countActiveSessions, getCurrentUser, invalidateUserSessions, listUsers, setUserDisabled } from '../../lib/auth';
 import { recordAudit } from '../../lib/admin';
 
-const admin = getCurrentUser(Astro.cookies)!;
+const admin = (await getCurrentUser(Astro.cookies))!;
 let message = '';
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   const action = form.get('action')?.toString();
   const email = form.get('email')?.toString().toLowerCase() || '';
   if (email && email !== admin.email) {
-    if (action === 'disable' && setUserDisabled(email, true)) {
+    if (action === 'disable' && await setUserDisabled(email, true)) {
       recordAudit({ actor: admin.email, action: 'disable', resourceType: 'user', resourceId: email, details: 'Account disabled and sessions revoked' }); message = `${email} disabled.`;
-    } else if (action === 'enable' && setUserDisabled(email, false)) {
+    } else if (action === 'enable' && await setUserDisabled(email, false)) {
       recordAudit({ actor: admin.email, action: 'enable', resourceType: 'user', resourceId: email, details: 'Account restored' }); message = `${email} enabled.`;
     } else if (action === 'logout') {
       const removed = invalidateUserSessions(email); recordAudit({ actor: admin.email, action: 'force_logout', resourceType: 'user', resourceId: email, details: `${removed} sessions invalidated` }); message = `${removed} sessions invalidated.`;
@@ -22,7 +22,7 @@ if (Astro.request.method === 'POST') {
 const search = Astro.url.searchParams.get('q')?.trim().toLowerCase() || '';
 const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
 const perPage = 20;
-const filtered = listUsers().filter((user)=>!search || `${user.name} ${user.email}`.toLowerCase().includes(search)).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime());
+const filtered = (await listUsers()).filter((user)=>!search || `${user.name} ${user.email}`.toLowerCase().includes(search)).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime());
 const totalPages = Math.max(1, Math.ceil(filtered.length/perPage));
 const users = filtered.slice((page-1)*perPage,page*perPage);
 ---

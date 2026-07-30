@@ -2,8 +2,9 @@
 import Layout from '../layouts/Layout.astro';
 import { getCurrentUser } from '../lib/auth';
 import { checkRateLimit, getClientIp, rateLimitResponse, secureCookieOptions } from '../lib/security';
+import { deleteShare, getShare, listShares } from '../lib/share-store';
 
-const currentUser = getCurrentUser(Astro.cookies);
+const currentUser = await getCurrentUser(Astro.cookies);
 const isLoggedIn = !!currentUser;
 const guestSlug = Astro.cookies.get("guest_share_active")?.value;
 const userPlan = currentUser?.plan || "free";
@@ -14,12 +15,6 @@ try {
 } catch {
   accountSlugs = [];
 }
-
-// Access store
-if (!globalThis.textSharesStore) {
-  globalThis.textSharesStore = new Map();
-}
-const store = globalThis.textSharesStore as Map<string, any>;
 
 // Handle share deletion
 let message = "";
@@ -38,12 +33,11 @@ if (Astro.request.method === "POST") {
     const deleteSlug = formData.get("slug")?.toString();
 
     if (action === "delete" && deleteSlug) {
-      const storedShare = store.get(deleteSlug);
+      const storedShare = await getShare(deleteSlug);
       const canDelete = isLoggedIn
         ? storedShare?.owner === currentUser?.email
         : deleteSlug === guestSlug && !storedShare?.owner;
-      if (canDelete && store.has(deleteSlug)) {
-        store.delete(deleteSlug);
+      if (canDelete && await deleteShare(deleteSlug, isLoggedIn ? currentUser!.email : undefined)) {
         if (!isLoggedIn && deleteSlug === guestSlug) {
           Astro.cookies.delete("guest_share_active", { path: "/" });
         }
@@ -63,16 +57,13 @@ if (Astro.request.method === "POST") {
 }
 
 // Fetch current shares
-const visibleAccountSlugs = userPlan === "free" && freeShareSlug ? [freeShareSlug] : accountSlugs;
+const guestShare = !isLoggedIn && guestSlug ? await getShare(guestSlug) : null;
 const visibleEntries = isLoggedIn
-  ? visibleAccountSlugs
-      .filter((slug) => store.get(slug)?.owner === currentUser?.email)
-      .map((slug) => [slug, store.get(slug)] as [string, any])
-  : guestSlug && store.has(guestSlug)
-    ? [[guestSlug, store.get(guestSlug)] as [string, any]]
-    : [];
+  ? await listShares(currentUser!.email)
+  : guestSlug && guestShare ? [{ slug: guestSlug, ...guestShare }] : [];
 
-const shares = visibleEntries.map(([slug, data]) => {
+const shares = visibleEntries.map((data: any) => {
+  const slug = data.slug;
   const isExpired = new Date() > new Date(data.expiryDate);
   return {
     slug,

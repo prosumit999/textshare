@@ -6,19 +6,15 @@ import { Code } from 'astro:components';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
+import { deleteShare, getShare, incrementShareViews } from '../lib/share-store';
 
 const { slug } = Astro.params;
 const resolutionLimit = await checkRateLimit('share:resolve', getClientIp(Astro.request), 100, 60);
 if (!resolutionLimit.allowed) return rateLimitResponse(resolutionLimit.retryAfter, 'Too many share requests. Try again shortly.');
 
-// Access global mock database
-if (!globalThis.textSharesStore) {
-  globalThis.textSharesStore = new Map();
-}
-const store = globalThis.textSharesStore as Map<string, any>;
-
 // Fetch share data
-let share = store.get(slug);
+let share = slug ? await getShare(slug) : null;
+const isStoredShare = Boolean(share);
 
 // Mock presets for testing/demonstration
 if (!share) {
@@ -71,8 +67,9 @@ if (!share) {
 
 // Check if share is expired
 const isExpired = new Date() > new Date(share.expiryDate);
-if (!isExpired && store.has(slug)) {
+if (!isExpired && isStoredShare && slug) {
   share.viewCount = (share.viewCount || 0) + 1;
+  await incrementShareViews(slug);
 }
 
 // Password check state
@@ -113,7 +110,7 @@ if (isCreatorBurnPreview) Astro.cookies.delete("burn_creator_preview", { path: "
 
 // Quick Burn permits one creator preview, then removes the share after its first recipient view.
 if (share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview) {
-  store.delete(slug);
+  if (slug) await deleteShare(slug);
 }
 
 const roomUrl = Astro.url.origin + Astro.url.pathname;

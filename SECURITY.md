@@ -5,7 +5,7 @@
 1. Deploy this directory with the included `Dockerfile`.
 2. Set the application port to `4321` and health check path to `/api/health`.
 3. Set every variable from `.env.example`. Production requests fail closed when Redis is unavailable.
-4. Add Redis as a private Coolify service. Use a long random password, do not publish port `6379`, and use its internal service hostname in `REDIS_URL`.
+4. Add Redis and MongoDB as private Coolify services. Use long random passwords, do not publish ports `6379` or `27017`, and use their internal service hostnames in `REDIS_URL` and `MONGODB_URI`. `localhost` works only for local development, not from the application container.
 5. Set the application domain with `https://` in Coolify. Set `APP_ORIGIN` to that exact origin.
 6. Mount `deploy/traefik/textshare-security.yml` in Coolify's Traefik dynamic configuration and attach `textshare-security@file` to the application's router. Application-level limits remain authoritative and endpoint-specific.
 
@@ -48,6 +48,6 @@ Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_U
 - Configure encrypted off-server backups and uptime/error monitoring.
 - Optional but recommended: deploy ClamAV privately and connect upload scanning before accepting public image traffic.
 
-## Current persistence limitation
+## Persistence model
 
-The prototype still uses process-memory Maps for users, sessions, shares, and image data. This is not durable across deployments and cannot support multiple replicas. Before public production launch, migrate users/shares to PostgreSQL and sanitized images to private object storage. Use parameterized queries or an ORM, signed/proxied image delivery, and encrypted backups. Redis should remain dedicated to rate limits and ephemeral sessions, not primary records.
+Users, subscription plans, and signed-in share metadata now use MongoDB. Signed-in share payloads are encrypted with AES-256-GCM and stored in GridFS so content can exceed MongoDB's 16 MB document limit. Passwords and protected-share passwords remain one-way bcrypt hashes. Guest shares, sessions, admin OTP challenges, audit events, traffic events, IP blocks, and blog posts still use process memory and are not durable across deployments. Move ephemeral sessions/OTP challenges to Redis and the remaining operational records to durable collections before running multiple replicas.

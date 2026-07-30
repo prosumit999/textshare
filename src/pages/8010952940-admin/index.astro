@@ -4,14 +4,14 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getAuditLog, getTrafficEvents } from '../../lib/admin';
 import { countActiveSessions, listUsers } from '../../lib/auth';
 import { getRedisHealth } from '../../lib/security';
+import { listShares } from '../../lib/share-store';
 
-if (!globalThis.textSharesStore) globalThis.textSharesStore = new Map();
 const now = new Date();
-const shares = Array.from(globalThis.textSharesStore.entries()).map(([slug, data]) => ({ slug, ...data }));
+const shares = await listShares();
 const activeShares = shares.filter((share) => new Date(share.expiryDate) > now);
 const imageShares = activeShares.filter((share) => share.contentType === 'image');
 const protectedShares = activeShares.filter((share) => !!share.passwordHash);
-const users = listUsers();
+const users = await listUsers();
 const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 const weekStart = new Date(now.getTime() - 7 * 86400000);
 const imageBytes = imageShares.reduce((sum, share) => sum + (share.sizeBytes || 0), 0);
@@ -60,7 +60,7 @@ const formatBytes = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).t
       <dl class="admin-health-list">
         <div><dt>Redis</dt><dd class:list={{ good: redis.connected, bad: !redis.connected }}>{redis.connected ? formatBytes(redis.usedMemory || 0) : 'Unavailable'}</dd></div>
         <div><dt>Disk available</dt><dd>{formatBytes(disk.available)} ({disk.percentFree.toFixed(1)}%)</dd></div>
-        <div><dt>Primary database</dt><dd class="warning-text">Not configured</dd></div>
+        <div><dt>Primary database</dt><dd class="good">MongoDB</dd></div>
         <div><dt>Traffic events (24h)</dt><dd>{getTrafficEvents(new Date(Date.now() - 86400000)).length}</dd></div>
       </dl>
     </section>

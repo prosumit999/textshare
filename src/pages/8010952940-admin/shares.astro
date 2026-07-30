@@ -2,10 +2,9 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { recordAudit } from '../../lib/admin';
 import { getCurrentUser } from '../../lib/auth';
+import { deleteShare, listShares } from '../../lib/share-store';
 
-const admin = getCurrentUser(Astro.cookies)!;
-if (!globalThis.textSharesStore) globalThis.textSharesStore = new Map();
-const store = globalThis.textSharesStore as Map<string, any>;
+const admin = (await getCurrentUser(Astro.cookies))!;
 let message = '';
 
 if (Astro.request.method === 'POST') {
@@ -16,13 +15,13 @@ if (Astro.request.method === 'POST') {
   if (action === 'bulk-kill') targets = form.get('slug') ? [String(form.get('slug'))] : form.getAll('selected').map(String);
   if (action === 'kill-large') {
     const threshold = Math.max(1, Number(form.get('thresholdMb')) || 2) * 1048576;
-    targets = Array.from(store.entries()).filter(([, data]) => (data.sizeBytes || 0) > threshold).map(([slug]) => slug);
+    targets = (await listShares()).filter((data) => (data.sizeBytes || 0) > threshold).map((data) => data.slug);
   }
   targets = [...new Set(targets.filter(Boolean))].slice(0, 500);
   let killed = 0;
   for (const slug of targets) {
-    const share = store.get(slug);
-    if (share && store.delete(slug)) {
+    const share = (await listShares()).find((item) => item.slug === slug);
+    if (share && await deleteShare(slug)) {
       killed += 1;
       recordAudit({ actor: admin.email, action: 'kill', resourceType: 'share', resourceId: slug, details: `${share.contentType}; ${share.sizeBytes || 0} bytes` });
     }
@@ -39,12 +38,12 @@ const thresholdMb = Math.max(1, Number(Astro.url.searchParams.get('threshold')) 
 const thresholdBytes = thresholdMb * 1048576;
 const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
 const perPage = 20;
-let allShares = Array.from(store.entries()).map(([slug, data]) => ({ slug, ...data, expired: new Date(data.expiryDate) <= now }));
+let allShares = (await listShares()).map((data) => ({ ...data, expired: new Date(data.expiryDate) <= now }));
 allShares = allShares.filter((share) => (!search || `${share.slug} ${share.owner || share.guestIp || ''}`.toLowerCase().includes(search)) && (type === 'all' || share.contentType === type) && (status === 'all' || (status === 'active' ? !share.expired : share.expired)));
 allShares.sort((a,b) => sort === 'oldest' ? new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime() : sort === 'expiry' ? new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime() : (b.sizeBytes || 0) - (a.sizeBytes || 0));
 const totalPages = Math.max(1, Math.ceil(allShares.length / perPage));
 const shares = allShares.slice((page - 1) * perPage, page * perPage);
-const activeImages = Array.from(store.entries()).map(([slug,data])=>({slug,...data})).filter((share) => share.contentType === 'image' && new Date(share.expiryDate) > now);
+const activeImages = (await listShares()).filter((share) => share.contentType === 'image' && new Date(share.expiryDate) > now);
 const imageBytes = activeImages.reduce((sum, image) => sum + (image.sizeBytes || 0), 0);
 const largestImage = [...activeImages].sort((a,b)=>(b.sizeBytes||0)-(a.sizeBytes||0))[0];
 const oldestImage = [...activeImages].sort((a,b)=>new Date(a.createdAt||0).getTime()-new Date(b.createdAt||0).getTime())[0];

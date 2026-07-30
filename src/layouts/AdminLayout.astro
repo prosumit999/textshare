@@ -5,12 +5,15 @@ import { ADMIN_BASE_PATH } from '../lib/admin-path';
 interface Props { title: string; description?: string }
 const { title, description = 'TextShare owner administration' } = Astro.props;
 const pathname = Astro.url.pathname;
+const blogView = Astro.url.searchParams.get('view');
+const isBlogEditor = pathname === `${ADMIN_BASE_PATH}/blog` && (blogView === 'create' || Astro.url.searchParams.has('edit') || Astro.url.searchParams.has('preview'));
 const links = [
-  { href: ADMIN_BASE_PATH, label: 'Overview' },
-  { href: `${ADMIN_BASE_PATH}/blog`, label: 'Blog' },
-  { href: `${ADMIN_BASE_PATH}/shares`, label: 'Shares & storage' },
-  { href: `${ADMIN_BASE_PATH}/traffic`, label: 'Traffic & abuse' },
-  { href: `${ADMIN_BASE_PATH}/users`, label: 'Users' }
+  { href: ADMIN_BASE_PATH, label: 'Overview', active: pathname === ADMIN_BASE_PATH },
+  { href: `${ADMIN_BASE_PATH}/blog`, label: 'All blog posts', active: pathname === `${ADMIN_BASE_PATH}/blog` && !isBlogEditor },
+  { href: `${ADMIN_BASE_PATH}/blog?view=create`, label: 'Create blog post', active: isBlogEditor },
+  { href: `${ADMIN_BASE_PATH}/shares`, label: 'Shares & storage', active: pathname === `${ADMIN_BASE_PATH}/shares` },
+  { href: `${ADMIN_BASE_PATH}/traffic`, label: 'Traffic & abuse', active: pathname === `${ADMIN_BASE_PATH}/traffic` },
+  { href: `${ADMIN_BASE_PATH}/users`, label: 'Users', active: pathname === `${ADMIN_BASE_PATH}/users` }
 ];
 ---
 
@@ -23,7 +26,7 @@ const links = [
       </a>
       <nav aria-label="Admin navigation">
         {links.map((link) => (
-          <a href={link.href} class:list={["admin-nav-link", { active: pathname === link.href }]}>{link.label}</a>
+          <a href={link.href} class:list={["admin-nav-link", { active: link.active }]}>{link.label}</a>
         ))}
       </nav>
       <div class="admin-sidebar-footer">
