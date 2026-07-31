@@ -79,6 +79,10 @@ export function getMongo() {
             { expireAfterSeconds: 60 * 60 * 24 * 90 },
           ),
         db.collection("securitySignals").createIndex({ ip: 1, createdAt: -1 }),
+        db.collection("users").createIndex({ "billing.customerId": 1 }, { sparse: true }),
+        db.collection("users").createIndex({ "billing.subscriptionId": 1 }, { sparse: true }),
+        db.collection("stripeEvents").createIndex({ eventId: 1 }, { unique: true }),
+        db.collection("stripeEvents").createIndex({ receivedAt: -1 }),
         db
           .collection("workerLocks")
           .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),

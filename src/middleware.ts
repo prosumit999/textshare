@@ -88,6 +88,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
           ? 64 * 1024
           : url.pathname === "/api/csp-report"
             ? 64 * 1024
+            : url.pathname === "/api/webhooks/stripe"
+              ? 1024 * 1024
             : url.pathname === "/api/admin/blog-image"
               ? 6 * 1024 * 1024
               : isOwnerRoute
@@ -118,7 +120,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   if (
     !["GET", "HEAD", "OPTIONS"].includes(request.method) &&
     url.pathname !== "/api/internal/cleanup" &&
-    url.pathname !== "/api/csp-report"
+    url.pathname !== "/api/csp-report" &&
+    url.pathname !== "/api/webhooks/stripe"
   ) {
     const origin = request.headers.get("origin");
     const configuredOrigin =

@@ -7,6 +7,8 @@ import { checkRateLimit, rateLimitResponse } from '../lib/security';
 const user = await getCurrentUser(Astro.cookies);
 if (!user) return Astro.redirect('/login');
 let message = '';
+if (Astro.url.searchParams.get('checkout') === 'success') message = 'Payment received. Your Pro access will appear as soon as Stripe confirms the subscription.';
+if (Astro.url.searchParams.get('billing') === 'unavailable') message = 'Billing management is temporarily unavailable. Please try again shortly.';
 if (Astro.request.method === 'POST') {
   const limit = await checkRateLimit('share:delete', user.email, 30, 10 * 60);
   if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
@@ -25,6 +27,8 @@ const protectedShares = shares.filter((share: any) => !!share.passwordHash);
 const storageBytes = shares.reduce((total: number, share: any) => total + Number(share.sizeBytes || 0), 0);
 const isPro = user.plan === 'plus' || user.plan === 'pro';
 const planName = isPro ? 'Pro' : 'Free';
+const billingStatus = user.billing?.status;
+const billingPeriodEnd = user.billing?.currentPeriodEnd ? new Date(user.billing.currentPeriodEnd) : null;
 const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 ---
 
@@ -75,7 +79,11 @@ const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, byte
           <li><span>✓</span>{isPro ? 'Custom expiry and slugs' : '24-hour text links'}</li>
           <li><span>✓</span>Burn After First View</li>
         </ul>
-        {isPro ? <a href="/" class="btn btn-primary">Create a Pro share</a> : <a href="/pricing" class="btn btn-primary">Explore Pro</a>}
+        {isPro ? <>
+          <a href="/" class="btn btn-primary">Create a Pro share</a>
+          {user.billing?.customerId && <form method="POST" action="/api/billing/portal"><button class="btn btn-secondary" type="submit">Manage billing</button></form>}
+        </> : <a href="/pricing" class="btn btn-primary">Explore Pro</a>}
+        {billingStatus && <small>Billing: {billingStatus}{billingPeriodEnd ? ` · through ${billingPeriodEnd.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : ''}</small>}
         <small>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'long', year:'numeric' })}</small>
       </aside>
     </div>

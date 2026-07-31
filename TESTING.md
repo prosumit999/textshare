@@ -17,4 +17,13 @@ k6 run -e BASE_URL=http://test-host tests/load/share-abuse.js
 k6 run -e BASE_URL=http://test-host tests/load/large-share.js
 ```
 
-Do not run load tests against production. Billing webhook tests will be added with the payment provider because no billing endpoint or signature format exists yet.
+Do not run load tests against production.
+
+Stripe webhook signature verification, duplicate-event protection, price mapping,
+and Pro activation/revocation are included in the MongoDB integration suite:
+
+```bash
+npm run test:integration
+```
+
+These tests use fake Stripe identifiers and never create real charges.

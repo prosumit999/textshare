@@ -66,9 +66,31 @@
       }
     });
   });
-  checkoutButton?.addEventListener('click', () => {
+  checkoutButton?.addEventListener('click', async () => {
       const note = modal?.querySelector<HTMLElement>('.pricing-modal-note');
-      if (note) note.textContent = `${checkoutButton.dataset.plan === 'annual' ? 'Annual' : 'Monthly'} checkout will be available soon.`;
+      const label = checkoutButton.querySelector('span');
+      const plan = checkoutButton.dataset.plan === 'monthly' ? 'monthly' : 'annual';
+      checkoutButton.disabled = true;
+      if (label) label.textContent = 'Opening secure checkout…';
+      if (note) note.textContent = '';
+      try {
+        const response = await fetch('/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan }),
+        });
+        if (response.status === 401) {
+          window.location.assign(`/login?next=${encodeURIComponent(`/?pricing=1`)}`);
+          return;
+        }
+        const result = await response.json() as { url?: string; error?: string };
+        if (!response.ok || !result.url) throw new Error(result.error || 'Checkout could not be opened.');
+        window.location.assign(result.url);
+      } catch (error) {
+        if (note) note.textContent = error instanceof Error ? error.message : 'Checkout could not be opened.';
+        checkoutButton.disabled = false;
+        if (label) label.textContent = `Continue with ${plan}`;
+      }
   });
   if (new URLSearchParams(window.location.search).has('pricing')) openPricing();
 </script>

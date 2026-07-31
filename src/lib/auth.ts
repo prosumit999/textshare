@@ -13,6 +13,18 @@ export type User = {
   plan: "free" | "plus" | "pro";
   isAdmin: boolean;
   disabled: boolean;
+  billing?: {
+    provider?: "stripe";
+    customerId?: string | null;
+    subscriptionId?: string | null;
+    priceId?: string | null;
+    interval?: "monthly" | "annual";
+    status?: string;
+    currentPeriodStart?: Date | null;
+    currentPeriodEnd?: Date | null;
+    cancelAtPeriodEnd?: boolean;
+    updatedAt?: Date;
+  };
 };
 type Session = {
   sessionId: string;
