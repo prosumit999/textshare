@@ -2,7 +2,7 @@
 import { getPublishedBlogPosts } from '../lib/admin';
 
 const currentYear = new Date().getFullYear();
-const posts = getPublishedBlogPosts().slice(0, 5).map((post) => ({
+const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
   title: post.title,
   href: `/blog/${post.slug}`
 }));

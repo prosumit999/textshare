@@ -12,7 +12,7 @@ const fallbackPosts = [
   { id: 'qr-sharing', title: 'Faster sharing across devices with QR codes', excerpt: 'Move text and code between phones, tablets, and desktops without emailing it to yourself.', category: 'Tips', date: 'Jun 21, 2026', readTime: '3 min read', visual: 'qr', href: '#qr-sharing', coverImage: '' }
 ];
 
-const managedPosts = getPublishedBlogPosts().map((post) => ({
+const managedPosts = (await getPublishedBlogPosts()).map((post) => ({
   id: post.slug,
   title: post.title,
   excerpt: blogTextExcerpt(post.content) || 'Read the latest article from TextShare.',

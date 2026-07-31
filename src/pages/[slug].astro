@@ -90,7 +90,7 @@ if (Astro.request.method === "POST" && isLocked) {
         Astro.cookies.set(`unlocked_${slug}`, "true", secureCookieOptions(60 * 5));
       } else {
         const unlockLimit = await checkRateLimit('share:unlock', `${getClientIp(Astro.request)}:${slug}`, 5, 10 * 60);
-        logSecurityEvent('share_unlock_failed', Astro.request, { slug });
+        await logSecurityEvent('share_unlock_failed', Astro.request, { slug });
         if (!unlockLimit.allowed) return rateLimitResponse(unlockLimit.retryAfter, 'Too many incorrect password attempts. Try again later.');
         passwordError = "Incorrect password. Please try again.";
       }
@@ -115,6 +115,9 @@ if (share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview) 
 
 const roomUrl = Astro.url.origin + Astro.url.pathname;
 const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
+const sharedImages = share.contentType === 'image'
+  ? ((Array.isArray(share.imageSrcs) && share.imageSrcs.length ? share.imageSrcs : [share.imageSrc]).filter(Boolean) as string[])
+  : [];
 ---
 
 <Layout title={`View Share: ${slug} — TextShare`}>
@@ -146,21 +149,6 @@ const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
               </button>
             )}
             
-            {share.contentType === "image" && (
-              <a 
-                href={share.imageSrc} 
-                download={`textshare-${slug}`} 
-                class="btn btn-primary btn-sm" 
-                style="font-size:12px; padding: 4px 8px;"
-              >
-                <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px;">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                  <polyline points="7 10 12 15 17 10"></polyline>
-                  <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Download Image
-              </a>
-            )}
               <button id="copy-room-link" class="btn btn-secondary" data-url={roomUrl}>
                 <svg class="icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l2-2a5 5 0 0 0-7-7l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.5-.5l-2 2a5 5 0 0 0 7 7l1.1-1.1"></path></svg>
                 <span>Copy room link</span>
@@ -186,8 +174,17 @@ const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
             )
           ) : (
             /* Render uploaded image */
-            <div class="content-display-image">
-              <img src={share.imageSrc} alt={`Shared image ${slug}`} />
+            <div class:list={["content-display-image", { "content-display-image-grid": sharedImages.length > 1 }]}>
+              {sharedImages.map((image, index) => <figure class="shared-image-card">
+                <img src={image} alt={`Shared image ${index + 1} from ${slug}`} />
+                <figcaption>
+                  <span>Image {index + 1}</span>
+                  <a href={image} download={`textshare-${slug}-${index + 1}`} class="btn btn-primary btn-sm">
+                    <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Download image
+                  </a>
+                </figcaption>
+              </figure>)}
             </div>
           )}
         </div>

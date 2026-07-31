@@ -1,7 +1,7 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { deleteBlogPost, getBlogPost, getBlogPosts, recordAudit, saveBlogPost, slugify } from '../../lib/admin';
-import { getCurrentUser } from '../../lib/auth';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
 import { sanitizeBlogHtml } from '../../lib/blog-content';
 import { deleteBlogImageFromUrl } from '../../lib/blog-images';
 
@@ -14,10 +14,11 @@ if (Astro.request.method === 'POST') {
   const action = form.get('action')?.toString();
   const id = form.get('id')?.toString();
   if (action === 'delete' && id) {
-    const post = getBlogPost(id);
-    if (post && deleteBlogPost(id)) {
+    if (!await hasRecentAdminStepUp(Astro.cookies)) return Astro.redirect('/login?stepup=1');
+    const post = await getBlogPost(id);
+    if (post && await deleteBlogPost(id)) {
       await deleteBlogImageFromUrl(post.coverImage);
-      recordAudit({ actor: admin.email, action: 'delete', resourceType: 'blog_post', resourceId: id, details: post.title });
+      await recordAudit({ actor: admin.email, action: 'delete', resourceType: 'blog_post', resourceId: id, details: post.title });
       message = 'Post deleted.';
     }
   } else if (action === 'save') {
@@ -30,12 +31,12 @@ if (Astro.request.method === 'POST') {
     const status = form.get('status') === 'published' ? 'published' : 'draft';
     const slug = slugify(manualSlug || title);
     if (title.length < 3 || title.length > 160 || !slug || !content.trim() || rawContent.length > 200000 || !validCoverImage) error = 'Check the title, slug, content length, and featured image.';
-    else if (getBlogPosts().some((post) => post.slug === slug && post.id !== id)) error = 'That slug is already in use.';
+    else if ((await getBlogPosts()).some((post) => post.slug === slug && post.id !== id)) error = 'That slug is already in use.';
     else {
-      const previousCoverImage = id ? getBlogPost(id)?.coverImage : '';
-      const post = saveBlogPost({ id, title, slug, content, coverImage, status, publishDate: status === 'published' ? new Date() : null });
+      const previousCoverImage = id ? (await getBlogPost(id))?.coverImage : '';
+      const post = await saveBlogPost({ id, title, slug, content, coverImage, status, publishDate: status === 'published' ? new Date() : null });
       if (previousCoverImage && previousCoverImage !== coverImage) await deleteBlogImageFromUrl(previousCoverImage);
-      recordAudit({ actor: admin.email, action: id ? 'update' : 'create', resourceType: 'blog_post', resourceId: post.id, details: `${post.title} (${status})` });
+      await recordAudit({ actor: admin.email, action: id ? 'update' : 'create', resourceType: 'blog_post', resourceId: post.id, details: `${post.title} (${status})` });
       message = 'Post saved.';
     }
   }
@@ -45,11 +46,11 @@ const search = Astro.url.searchParams.get('q')?.trim().toLowerCase() || '';
 const statusFilter = Astro.url.searchParams.get('status') || 'all';
 const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
 const perPage = 15;
-const filtered = getBlogPosts().filter((post) => (!search || `${post.title} ${post.slug}`.toLowerCase().includes(search)) && (statusFilter === 'all' || post.status === statusFilter)).sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+const filtered = (await getBlogPosts()).filter((post) => (!search || `${post.title} ${post.slug}`.toLowerCase().includes(search)) && (statusFilter === 'all' || post.status === statusFilter)).sort((a,b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
 const posts = filtered.slice((page - 1) * perPage, page * perPage);
-const editPost = Astro.url.searchParams.get('edit') ? getBlogPost(Astro.url.searchParams.get('edit')!) : null;
-const previewPost = Astro.url.searchParams.get('preview') ? getBlogPost(Astro.url.searchParams.get('preview')!) : null;
+const editPost = Astro.url.searchParams.get('edit') ? await getBlogPost(Astro.url.searchParams.get('edit')!) : null;
+const previewPost = Astro.url.searchParams.get('preview') ? await getBlogPost(Astro.url.searchParams.get('preview')!) : null;
 const previewHtml = previewPost ? sanitizeBlogHtml(previewPost.content) : '';
 const showEditor = Astro.url.searchParams.get('view') === 'create' || Astro.url.searchParams.has('edit') || Astro.url.searchParams.has('preview');
 ---

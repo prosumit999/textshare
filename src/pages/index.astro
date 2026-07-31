@@ -2,12 +2,12 @@
 import Layout from '../layouts/Layout.astro';
 import { format as formatCode } from 'prettier';
 import bcrypt from 'bcryptjs';
-import { randomInt } from 'node:crypto';
 import { getCurrentUser } from '../lib/auth';
 import { sanitizeImage, UnsafeImageError } from '../lib/images';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
 import { MAX_SHARE_BYTES, pruneOversizedShares } from '../lib/shares';
 import { deleteShare, hasShare, listShares, saveShare } from '../lib/share-store';
+import { calculateExpiry, generateAvailableSlug, type ExpiryOption } from '../lib/share-policy';
 
 // SSR Check Authentication & Guest Limit
 const currentUser = await getCurrentUser(Astro.cookies);
@@ -45,14 +45,18 @@ if (Astro.request.method === "POST") {
     const password = formData.get("password")?.toString() || "";
     const customSlug = formData.get("customSlug")?.toString()?.trim().toLowerCase() || "";
     const urlFormat = formData.get("urlFormat")?.toString() === "number" ? "number" : "string";
-    const imageFile = formData.get("imageFile") as File | null;
+    const imageFiles = formData.getAll("imageFile").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    const maxImageCount = hasPaidPlan ? 5 : 1;
     const highlightEnabled = formData.get("syntaxHighlightEnabled") === "on";
+
+    // Image duration is fixed by plan unless the free Burn After First View mode is selected.
+    if (contentType === "image" && expiry !== "burn") expiry = hasPaidPlan ? "24h" : "3h";
 
     // Validation
     if (!isLoggedIn) {
       // Guest permission checks
-      if (expiry !== "24h") {
-        errors.expiry = "Guests can only create shares that expire in 24 hours.";
+      if (contentType === "text" && !["24h", "burn"].includes(expiry)) {
+        errors.expiry = "Guests can use 24-hour expiry or Burn After First View.";
       }
       if (customSlug) {
         errors.customSlug = "Only registered users can set custom vanity URLs.";
@@ -63,16 +67,15 @@ if (Astro.request.method === "POST") {
     }
 
     if (isLoggedIn && !hasPaidPlan) {
-      if (expiry !== "24h") {
-        errors.expiry = "Free shares always expire after 24 hours.";
+      if (contentType === "text" && !["24h", "burn"].includes(expiry)) {
+        errors.expiry = "Free shares can use 24-hour expiry or Burn After First View.";
       }
       if (password) {
         errors.password = "Password protection is available on Plus and Pro.";
       }
-    }
-
-    if (isLoggedIn && hasPaidPlan && contentType === "image") {
-      expiry = "1h";
+      if (customSlug) {
+        errors.customSlug = "Custom slugs are available on Pro.";
+      }
     }
 
     if (contentType === "text" && !textContent.trim()) {
@@ -81,10 +84,12 @@ if (Astro.request.method === "POST") {
       errors.textContent = "This text is larger than 50 MB. Reduce its size before creating the share.";
     }
 
-    if (contentType === "image" && (!imageFile || imageFile.size === 0)) {
-      errors.imageFile = "Please select an image file to upload.";
-    } else if (contentType === "image" && imageFile && imageFile.size > 5 * 1024 * 1024) {
-      errors.imageFile = "File size must not exceed 5MB.";
+    if (contentType === "image" && imageFiles.length === 0) {
+      errors.imageFile = "Please select at least one image.";
+    } else if (contentType === "image" && imageFiles.length > maxImageCount) {
+      errors.imageFile = hasPaidPlan ? "Paid shares support up to 5 images." : "Free image shares support one image. Upgrade to Pro for up to 5.";
+    } else if (contentType === "image" && imageFiles.some((file) => file.size > 5 * 1024 * 1024)) {
+      errors.imageFile = "Each image must not exceed 5 MB.";
     }
 
     if (customSlug) {
@@ -103,8 +108,8 @@ if (Astro.request.method === "POST") {
 
     // Process share if no validation errors
     if (Object.keys(errors).length === 0) {
-      let sanitizedImage: Awaited<ReturnType<typeof sanitizeImage>> | null = null;
-      if (contentType === "image" && imageFile) {
+      let sanitizedImages: Awaited<ReturnType<typeof sanitizeImage>>[] = [];
+      if (contentType === "image" && imageFiles.length) {
         const uploadLimit = await checkRateLimit(
           'image:upload',
           isLoggedIn ? currentUser!.email : getClientIp(Astro.request),
@@ -113,9 +118,9 @@ if (Astro.request.method === "POST") {
         );
         if (!uploadLimit.allowed) return rateLimitResponse(uploadLimit.retryAfter, 'Image upload limit reached. Try again later.');
         try {
-          sanitizedImage = await sanitizeImage(imageFile);
+          sanitizedImages = await Promise.all(imageFiles.map((file) => sanitizeImage(file)));
         } catch (error) {
-          logSecurityEvent('image_upload_rejected', Astro.request, { reason: error instanceof Error ? error.message : 'unknown' });
+          await logSecurityEvent('image_upload_rejected', Astro.request, { reason: error instanceof Error ? error.message : 'unknown' });
           if (error instanceof UnsafeImageError) errors.imageFile = error.message;
           else errors.imageFile = 'The image could not be processed safely.';
         }
@@ -153,23 +158,11 @@ if (Astro.request.method === "POST") {
       if (isLoggedIn && customSlug) {
         slug = customSlug;
       } else {
-        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-        do {
-          slug = urlFormat === "number"
-            ? Array.from({ length: 6 }, () => randomInt(0, 10)).join("")
-            : Array.from({ length: 6 }, () => chars[randomInt(0, chars.length)]).join("");
-        } while (await hasShare(slug));
+        slug = await generateAvailableSlug(urlFormat, hasShare);
       }
 
       // Calculate Expiry Date
-      const now = new Date();
-      let expiryDate = new Date();
-      if (expiry === "1h") expiryDate.setHours(now.getHours() + 1);
-      else if (expiry === "24h") expiryDate.setDate(now.getDate() + 1);
-      else if (expiry === "1w") expiryDate.setDate(now.getDate() + 7);
-      else if (expiry === "1m") expiryDate.setMonth(now.getMonth() + 1);
-      else if (expiry === "1y") expiryDate.setFullYear(now.getFullYear() + 1);
-      else if (expiry === "burn") expiryDate.setMinutes(now.getMinutes() + 5); // burn after reading gets a short window to read once
+      const expiryDate = calculateExpiry(expiry as ExpiryOption);
 
       // Save to global in-memory database for standalone execution
       // A guest keeps one share at a time; a new share replaces the previous one.
@@ -181,20 +174,22 @@ if (Astro.request.method === "POST") {
         for (const existing of existingFreeShares) await deleteShare(existing.slug, currentUser!.email);
       }
 
-      const imageSrc = sanitizedImage?.dataUrl || null;
+      const imageSrcs = sanitizedImages.map((image) => image.dataUrl);
+      const imageSrc = imageSrcs[0] || null;
       const passwordHash = password ? await bcrypt.hash(password, 12) : null;
       
       await saveShare(slug, {
         contentType,
         textContent,
         imageSrc,
+        imageSrcs,
         expiryDate,
         burnAfterReading: expiry === "burn",
         language: highlightEnabled ? language : "plaintext",
         passwordHash,
         owner: currentUser?.email || null,
         guestIp: currentUser ? null : getClientIp(Astro.request),
-        sizeBytes: contentType === "image" ? sanitizedImage?.bytes || 0 : new TextEncoder().encode(textContent).byteLength,
+        sizeBytes: contentType === "image" ? sanitizedImages.reduce((total, image) => total + image.bytes, 0) : new TextEncoder().encode(textContent).byteLength,
         createdAt: new Date(),
         viewCount: 0
       });
@@ -392,20 +387,18 @@ if (Astro.request.method === "POST") {
         <!-- Main image upload area (hidden until selected) -->
         <div id="image-input-section" style="display: none;">
             <div class="image-upload-wrapper" id="image-drag-area">
-              <input type="file" name="imageFile" id="image-file-input" accept="image/png, image/jpeg, image/webp" style="display: none;" />
-              <div class="image-preview-container" id="image-upload-placeholder">
+              <input type="file" name="imageFile" id="image-file-input" accept="image/png, image/jpeg, image/webp" multiple={hasPaidPlan} style="display: none;" />
+              <div class="image-upload-heading">
                 <svg class="icon-svg icon-svg-lg" viewBox="0 0 24 24" style="width:48px; height:48px; color:var(--color-text-muted);">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                   <circle cx="8.5" cy="8.5" r="1.5"></circle>
                   <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
-                <div style="font-weight: 500;">Click to select an image file (PNG, JPG, WEBP)</div>
-                <div style="color: var(--color-text-muted); font-size:12px;">One active guest image · Max file size: 5MB</div>
+                <div style="font-weight: 500;">Click to select {hasPaidPlan ? 'up to 5 images' : 'an image'} (PNG, JPG, WEBP)</div>
+                <div id="image-expiry-hint" style="color: var(--color-text-muted); font-size:12px;">{hasPaidPlan ? 'Pro: up to 5 images · expires in 24 hours' : 'One image · expires in 3 hours'} · 5 MB per image</div>
               </div>
-              <div class="image-preview-container" id="image-uploaded-preview" style="display: none;">
-                <img id="preview-img" src="" alt="Selected Preview" />
-                <button type="button" id="remove-img-btn" class="btn btn-danger btn-sm" style="font-size:12px; padding:4px 8px;">Remove Image</button>
-              </div>
+              <div id="image-preview-grid" class:list={["image-preview-grid", { single: !hasPaidPlan }]} data-max={hasPaidPlan ? 5 : 1}></div>
+              <div class="image-upload-footer"><button type="button" id="add-images-btn" class="btn btn-secondary">Add {hasPaidPlan ? 'images' : 'image'}</button><span id="image-selection-status">0 / {hasPaidPlan ? 5 : 1} selected</span></div>
             </div>
             {errors.imageFile && (
               <span style="color:var(--color-danger); font-size:12px; padding:var(--space-2) var(--space-4); display:block;">
@@ -440,16 +433,24 @@ if (Astro.request.method === "POST") {
               <label for="expiry-select" style="font-size: 13px;">Expires in:</label>
               <select name="expiry" id="expiry-select" class="select-input">
                 {isLoggedIn && hasPaidPlan ? (
-                  <option value="1h">1 hour</option>
                   <option value="24h" selected>24 hours</option>
                   <option value="1w">1 week</option>
                   <option value="1m">1 month</option>
                   <option value="1y">1 year</option>
-                  <option value="burn">Burn after reading</option>
+                  <option value="burn">Burn after first view · Free</option>
                 ) : (
-                  <option value="24h" selected>24 hours</option>
+                  <>
+                    <option value="24h" selected>24 hours</option>
+                    <option value="burn">Burn after first view · Free</option>
+                    <option value="1w" data-premium="true">🔒 1 week · Pro</option>
+                    <option value="1m" data-premium="true">🔒 1 month · Pro</option>
+                    <option value="1y" data-premium="true">🔒 1 year · Pro</option>
+                  </>
                 )}
               </select>
+              <span id="burn-flame" class="burn-flame" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M13.4 2.7c.5 3.2-1.8 4.5-3 6.5-1-1-1.3-2-1.1-3.3C6.9 8 5 10.5 5 14a7 7 0 0 0 14 0c0-4.7-2.8-8.5-5.6-11.3Z"></path><path d="M9.2 16.1c0 1.7 1.2 3 2.8 3s2.8-1.3 2.8-3c0-1.4-.8-2.7-2.1-4.1-.1 1.5-.8 2.2-1.5 3-.5-.6-.8-1.2-.7-2-1 .9-1.3 1.9-1.3 3.1Z"></path></svg>
+              </span>
             </div>
 
             <fieldset class="link-style-control">
@@ -463,6 +464,13 @@ if (Astro.request.method === "POST") {
                 <span>Numbers</span>
               </label>
             </fieldset>
+
+            {!hasPaidPlan && (
+              <a class="premium-unlock" href="/pricing" aria-label="View premium sharing features" title="Unlock custom expiry, password protection, and more">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 7.7-1.5"></path><path d="m15 5 2-2 2 2"></path></svg>
+                <span>Unlock more</span>
+              </a>
+            )}
 
             {isLoggedIn && (
               <>
@@ -484,22 +492,24 @@ if (Astro.request.method === "POST") {
                   </div>
                 )}
 
-                <div class="inline-slug-control">
-                  <label for="custom-slug-input">Custom slug</label>
-                  <span>/</span>
-                  <input
-                    type="text"
-                    name="customSlug"
-                    id="custom-slug-input"
-                    class="text-input compact-control-input"
-                    placeholder="myurl1"
-                    minlength="3"
-                    maxlength="6"
-                    pattern="[a-z0-9]{3,6}"
-                    aria-describedby="slug-availability-msg"
-                  />
-                  <span id="slug-availability-msg" class="inline-availability-msg" style="display: none;"></span>
-                </div>
+                {hasPaidPlan && (
+                  <div class="inline-slug-control">
+                    <label for="custom-slug-input">Custom slug</label>
+                    <span>/</span>
+                    <input
+                      type="text"
+                      name="customSlug"
+                      id="custom-slug-input"
+                      class="text-input compact-control-input"
+                      placeholder="myurl1"
+                      minlength="3"
+                      maxlength="6"
+                      pattern="[a-z0-9]{3,6}"
+                      aria-describedby="slug-availability-msg"
+                    />
+                    <span id="slug-availability-msg" class="inline-availability-msg" style="display: none;"></span>
+                  </div>
+                )}
 
               </>
             )}
@@ -539,7 +549,29 @@ if (Astro.request.method === "POST") {
         const shareText = document.getElementById('share-text-content') as HTMLTextAreaElement | null;
         const sizeFeedback = document.getElementById('share-size-feedback');
         const createButton = document.querySelector<HTMLButtonElement>('.create-share-btn');
+        const expirySelect = document.getElementById('expiry-select') as HTMLSelectElement | null;
+        const burnFlame = document.getElementById('burn-flame');
+        const imageExpiryHint = document.getElementById('image-expiry-hint');
         const maxShareBytes = 50 * 1024 * 1024;
+
+        let lastAvailableExpiry = expirySelect?.value || '24h';
+        const updateBurnState = () => {
+          const burnsAfterView = expirySelect?.value === 'burn';
+          burnFlame?.classList.toggle('active', burnsAfterView);
+          if (imageExpiryHint) imageExpiryHint.textContent = burnsAfterView
+            ? 'Deleted after the first recipient view · 5 MB per image'
+            : `${document.querySelector<HTMLInputElement>('#image-file-input')?.multiple ? 'Pro: up to 5 images · expires in 24 hours' : 'One image · expires in 3 hours'} · 5 MB per image`;
+        };
+        expirySelect?.addEventListener('change', () => {
+          const selected = expirySelect.selectedOptions[0];
+          if (selected?.dataset.premium === 'true') {
+            expirySelect.value = lastAvailableExpiry;
+            document.dispatchEvent(new CustomEvent('textshare:pricing'));
+          } else {
+            lastAvailableExpiry = expirySelect.value;
+          }
+          updateBurnState();
+        });
 
         const updateTextSize = () => {
           if (!shareText || !sizeFeedback) return;
@@ -572,6 +604,7 @@ if (Astro.request.method === "POST") {
             if (imageInputSection) imageInputSection.style.display = "none";
             if (syntaxHighlightWrapper) syntaxHighlightWrapper.style.display = "flex";
             updateTextSize();
+            updateBurnState();
           });
 
           tabImage.addEventListener("click", () => {
@@ -584,47 +617,82 @@ if (Astro.request.method === "POST") {
             if (imageInputSection) imageInputSection.style.display = "block";
             if (syntaxHighlightWrapper) syntaxHighlightWrapper.style.display = "none";
             if (createButton) createButton.disabled = false;
+            updateBurnState();
           });
         }
+        updateBurnState();
 
         // Image Drag/Click upload logic
         const imageDragArea = document.getElementById("image-drag-area");
         const imageFileInput = document.getElementById("image-file-input") as HTMLInputElement;
-        const placeholderView = document.getElementById("image-upload-placeholder");
-        const previewView = document.getElementById("image-uploaded-preview");
-        const previewImg = document.getElementById("preview-img") as HTMLImageElement;
-        const removeImgBtn = document.getElementById("remove-img-btn");
+        const imageGrid = document.getElementById('image-preview-grid');
+        const addImagesButton = document.getElementById('add-images-btn');
+        const imageSelectionStatus = document.getElementById('image-selection-status');
+        const maxImages = Number(imageGrid?.dataset.max || 1);
+        let selectedImages: File[] = [];
+        let previewUrls: string[] = [];
 
-        if (imageDragArea && imageFileInput && placeholderView && previewView && previewImg && removeImgBtn) {
-          imageDragArea.addEventListener("click", (e) => {
-            if (e.target !== removeImgBtn) {
-              imageFileInput.click();
+        const syncImageInput = () => {
+          const transfer = new DataTransfer();
+          selectedImages.forEach((file) => transfer.items.add(file));
+          imageFileInput.files = transfer.files;
+        };
+        const renderImageGrid = () => {
+          previewUrls.forEach((url) => URL.revokeObjectURL(url));
+          previewUrls = [];
+          if (!imageGrid) return;
+          imageGrid.replaceChildren();
+          for (let index = 0; index < maxImages; index += 1) {
+            const slot = document.createElement('div');
+            slot.className = `image-grid-slot${selectedImages[index] ? ' filled' : ''}`;
+            if (selectedImages[index]) {
+              const url = URL.createObjectURL(selectedImages[index]);
+              previewUrls.push(url);
+              const image = document.createElement('img');
+              image.src = url;
+              image.alt = `Selected image ${index + 1}`;
+              const remove = document.createElement('button');
+              remove.type = 'button';
+              remove.className = 'image-grid-remove';
+              remove.dataset.removeImage = String(index);
+              remove.setAttribute('aria-label', `Remove image ${index + 1}`);
+              remove.textContent = '×';
+              slot.append(image, remove);
+            } else {
+              const add = document.createElement('button');
+              add.type = 'button';
+              add.className = 'image-grid-add';
+              add.setAttribute('aria-label', 'Add an image');
+              add.innerHTML = '<span>+</span><small>Add image</small>';
+              slot.append(add);
             }
-          });
-
-          imageFileInput.addEventListener("change", () => {
-            const files = imageFileInput.files;
-            if (files && files[0]) {
-              const reader = new FileReader();
-              reader.onload = (e) => {
-                if (e.target?.result && previewImg) {
-                  previewImg.src = e.target.result.toString();
-                  placeholderView.style.display = "none";
-                  previewView.style.display = "flex";
-                }
-              };
-              reader.readAsDataURL(files[0]);
-            }
-          });
-
-          removeImgBtn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            imageFileInput.value = "";
-            previewImg.src = "";
-            placeholderView.style.display = "flex";
-            previewView.style.display = "none";
-          });
-        }
+            imageGrid.append(slot);
+          }
+          if (imageSelectionStatus) imageSelectionStatus.textContent = `${selectedImages.length} / ${maxImages} selected`;
+          if (addImagesButton instanceof HTMLButtonElement) addImagesButton.disabled = selectedImages.length >= maxImages;
+        };
+        const openImagePicker = () => { if (selectedImages.length < maxImages) imageFileInput.click(); };
+        addImagesButton?.addEventListener('click', openImagePicker);
+        imageGrid?.addEventListener('click', (event) => {
+          const target = event.target as HTMLElement;
+          const remove = target.closest<HTMLButtonElement>('[data-remove-image]');
+          if (remove) {
+            selectedImages.splice(Number(remove.dataset.removeImage), 1);
+            syncImageInput();
+            renderImageGrid();
+          } else if (target.closest('.image-grid-add')) openImagePicker();
+        });
+        imageFileInput.addEventListener('change', () => {
+          const incoming = Array.from(imageFileInput.files || []);
+          const known = new Set(selectedImages.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+          for (const file of incoming) {
+            const key = `${file.name}:${file.size}:${file.lastModified}`;
+            if (!known.has(key) && selectedImages.length < maxImages) { selectedImages.push(file); known.add(key); }
+          }
+          syncImageInput();
+          renderImageGrid();
+        });
+        renderImageGrid();
 
         // Syntax Highlighter Selector Toggle
         const syntaxHighlightCheckbox = document.getElementById("syntax-highlight-toggle") as HTMLInputElement;

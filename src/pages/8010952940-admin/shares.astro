@@ -1,13 +1,14 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { recordAudit } from '../../lib/admin';
-import { getCurrentUser } from '../../lib/auth';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
 import { deleteShare, listShares } from '../../lib/share-store';
 
 const admin = (await getCurrentUser(Astro.cookies))!;
 let message = '';
 
 if (Astro.request.method === 'POST') {
+  if (!await hasRecentAdminStepUp(Astro.cookies)) return Astro.redirect('/login?stepup=1');
   const form = await Astro.request.formData();
   const action = form.get('action')?.toString();
   let targets: string[] = [];
@@ -23,7 +24,7 @@ if (Astro.request.method === 'POST') {
     const share = (await listShares()).find((item) => item.slug === slug);
     if (share && await deleteShare(slug)) {
       killed += 1;
-      recordAudit({ actor: admin.email, action: 'kill', resourceType: 'share', resourceId: slug, details: `${share.contentType}; ${share.sizeBytes || 0} bytes` });
+      await recordAudit({ actor: admin.email, action: 'kill', resourceType: 'share', resourceId: slug, details: `${share.contentType}; ${share.sizeBytes || 0} bytes` });
     }
   }
   message = `${killed} share${killed === 1 ? '' : 's'} killed and invalidated.`;

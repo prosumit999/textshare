@@ -1,0 +1,93 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCurrentUser, listUserSessions, revokeUserSession } from '../lib/auth';
+import { deleteShare, listShares } from '../lib/share-store';
+import { checkRateLimit, rateLimitResponse } from '../lib/security';
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user) return Astro.redirect('/login');
+let message = '';
+if (Astro.request.method === 'POST') {
+  const limit = await checkRateLimit('share:delete', user.email, 30, 10 * 60);
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
+  const form = await Astro.request.formData();
+  const sessionId = form.get('sessionId')?.toString() || '';
+  if (form.get('action') === 'revoke-session' && /^[a-f0-9]{32}$/.test(sessionId) && await revokeUserSession(user.email, sessionId)) message = 'Device session revoked.';
+  const slug = form.get('slug')?.toString();
+  if (form.get('action') === 'delete' && slug && await deleteShare(slug, user.email)) message = `Share /${slug} was deleted.`;
+}
+const shares = await listShares(user.email);
+const sessions = await listUserSessions(Astro.cookies, user.email);
+const now = Date.now();
+const activeShares = shares.filter((share: any) => new Date(share.expiryDate).getTime() > now);
+const imageShares = shares.filter((share: any) => share.contentType === 'image');
+const protectedShares = shares.filter((share: any) => !!share.passwordHash);
+const storageBytes = shares.reduce((total: number, share: any) => total + Number(share.sizeBytes || 0), 0);
+const isPro = user.plan === 'plus' || user.plan === 'pro';
+const planName = isPro ? 'Pro' : 'Free';
+const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+---
+
+<Layout title="Profile — TextShare" description="Review your TextShare plan and sharing activity.">
+  <section class="profile-page">
+    <section class="profile-hero">
+      <div class="profile-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div>
+      <div class="profile-identity"><span class="eyebrow">Your TextShare account</span><h1>{user.name}</h1><p>{user.email}<span></span>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'short', year:'numeric' })}</p></div>
+      <div class="profile-account-actions"><span class:list={["profile-plan-badge", { pro: isPro }]}>{planName}</span><form action="/api/logout" method="POST"><button type="submit" class="btn btn-secondary"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Sign out</button></form></div>
+    </section>
+
+    {message && <div class="profile-message">{message}</div>}
+
+    <div class="profile-layout">
+      <div class="profile-main">
+        <section class="profile-panel">
+          <div class="profile-panel-heading"><div><span class="profile-section-kicker">Usage overview</span><h2>Your sharing activity</h2></div></div>
+          <div class="profile-stats">
+            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg></span><div><span>Total created</span><strong>{shares.length}</strong><small>All recorded shares</small></div></article>
+            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg></span><div><span>Currently active</span><strong>{activeShares.length}</strong><small>Available right now</small></div></article>
+            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="m21 15-5-5L5 21"></path></svg></span><div><span>Image rooms</span><strong>{imageShares.length}</strong><small>{formatBytes(storageBytes)} stored</small></div></article>
+            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span><div><span>Protected</span><strong>{protectedShares.length}</strong><small>Password-secured rooms</small></div></article>
+          </div>
+        </section>
+        <section class="profile-panel">
+          <div class="profile-panel-heading"><div><span class="profile-section-kicker">Security</span><h2>Signed-in devices</h2></div></div>
+          <div class="profile-share-list">{sessions.map((session) => <div class="profile-share-row"><span class="profile-share-type">DEV</span><div class="profile-share-info"><strong>{session.current ? 'This device' : 'Device session'}</strong><small>{session.userAgent} · active {new Date(session.lastSeenAt).toLocaleString()}</small></div>{!session.current && <form method="POST"><input type="hidden" name="action" value="revoke-session"/><input type="hidden" name="sessionId" value={session.sessionId}/><button class="btn btn-secondary">Sign out device</button></form>}</div>)}</div>
+          <small>Sessions automatically expire after 30 minutes without activity.</small>
+        </section>
+
+        <section class="profile-panel">
+          <div class="profile-panel-heading"><div><span class="profile-section-kicker">Share management</span><h2>All your shares</h2></div><a class="btn btn-secondary" href="/">New share</a></div>
+          {shares.length ? <div class="profile-share-list">{shares.map((share: any) => {
+            const active = new Date(share.expiryDate).getTime() > now;
+            const url = `${Astro.url.origin}/${share.slug}`;
+            return <div class="profile-share-row"><span class="profile-share-type">{share.contentType === 'image' ? 'IMG' : 'TXT'}</span><a class="profile-share-info" href={`/${share.slug}`}><strong>/{share.slug}</strong><small>{share.contentType} · {new Date(share.createdAt).toLocaleDateString()} · expires {new Date(share.expiryDate).toLocaleString()}</small></a><em class:list={{ active }}>{active ? 'Active' : 'Expired'}</em><div class="profile-share-actions"><button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={url} aria-label={`Copy /${share.slug}`}><svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><form method="POST" onsubmit="return confirm('Delete this share permanently?')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="slug" value={share.slug}/><button class="btn btn-danger btn-icon" aria-label={`Delete /${share.slug}`}><svg class="icon-svg" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></form></div></div>;
+          })}</div> : <div class="profile-empty"><p>You have not created a share yet.</p><a href="/">Create your first share</a></div>}
+        </section>
+      </div>
+
+      <aside class="profile-plan-card">
+        <span class="profile-section-kicker">Current plan</span>
+        <div class="profile-plan-title"><h2>{planName}</h2>{isPro && <span>PRO</span>}</div>
+        <p>{isPro ? 'Full access to longer expiry, private rooms, custom slugs, and multi-image sharing.' : 'The essentials for quick, temporary sharing.'}</p>
+        <ul>
+          <li><span>✓</span>{isPro ? 'Unlimited active shares' : 'One active share'}</li>
+          <li><span>✓</span>{isPro ? 'Up to 5 images per room' : 'One image per room'}</li>
+          <li><span>✓</span>{isPro ? 'Custom expiry and slugs' : '24-hour text links'}</li>
+          <li><span>✓</span>Burn After First View</li>
+        </ul>
+        {isPro ? <a href="/" class="btn btn-primary">Create a Pro share</a> : <a href="/pricing" class="btn btn-primary">Explore Pro</a>}
+        <small>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'long', year:'numeric' })}</small>
+      </aside>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('.profile-copy-share').forEach((button) => button.addEventListener('click', async () => {
+    const url = button.dataset.url;
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    button.classList.add('copied');
+    window.setTimeout(() => button.classList.remove('copied'), 1200);
+  }));
+</script>

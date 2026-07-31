@@ -24,10 +24,10 @@ if (Astro.request.method === 'POST') {
   code = code.replace(/^\/+|\/+$/g, '');
 
   if (!code) {
-    logSecurityEvent('room_join_failed', Astro.request, { reason: 'empty' });
+    await logSecurityEvent('room_join_failed', Astro.request, { reason: 'empty' });
     error = 'Enter a valid room code or shared link.';
   } else if (!/^[a-zA-Z0-9_-]{3,64}$/.test(code)) {
-    logSecurityEvent('room_join_failed', Astro.request, { reason: 'invalid_format' });
+    await logSecurityEvent('room_join_failed', Astro.request, { reason: 'invalid_format' });
     error = 'That code is not valid. Check it and try again.';
   } else {
     // Joining is an explicit new access attempt. Remove any short-lived unlock

@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import { createSession, normalizeEmail, registerUser, validatePasswordStrength } from '../lib/auth';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+import { breachedPasswordCount } from '../lib/password-security';
 
 let error = "";
 
@@ -30,18 +31,28 @@ if (Astro.request.method === "POST") {
     } else if (password !== confirmPassword) {
       error = "Passwords do not match.";
     } else {
+      const breachCount = await breachedPasswordCount(password);
+      if (breachCount === null && import.meta.env.PROD) {
+        error = "Password safety verification is temporarily unavailable. Try again shortly.";
+        throw new Error('PASSWORD_SCREENING_UNAVAILABLE');
+      }
+      if (breachCount && breachCount > 0) {
+        error = "This password appears in known data breaches. Choose a unique password.";
+        await logSecurityEvent('breached_password_rejected', Astro.request);
+        throw new Error('VALIDATION_FAILED');
+      }
       const registered = await registerUser(name, email, password);
       if (!registered.ok) {
         error = "Unable to create account with those details.";
       } else {
-      createSession(Astro.cookies, registered.user);
-      logSecurityEvent('account_created', Astro.request);
+      await createSession(Astro.cookies, registered.user, { request: Astro.request });
+      await logSecurityEvent('account_created', Astro.request);
       Astro.cookies.delete("guest_share_active", { path: "/" });
       return Astro.redirect('/');
       }
     }
   } catch (err) {
-    error = "An error occurred during signup.";
+    if (!(err instanceof Error && ['VALIDATION_FAILED', 'PASSWORD_SCREENING_UNAVAILABLE'].includes(err.message))) error = "An error occurred during signup.";
   }
 }
 ---

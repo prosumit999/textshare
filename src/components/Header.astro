@@ -29,17 +29,11 @@ const isHome = Astro.url.pathname === "/";
             </svg>
           </a>
         )}
-        <a href="/join" class="btn btn-secondary">Join Room</a>
+        <a href="/join" class="btn btn-secondary"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"></circle><path d="M3 21v-2a6 6 0 0 1 12 0v2"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>Join Room</a>
         {hasSession ? (
-          <a href="/dashboard" class="btn btn-secondary">All Shares</a>
-          <form action="/api/logout" method="POST" style="display:inline;">
-            <button type="submit" class="btn btn-secondary">Sign Out</button>
-          </form>
+          <a href="/profile" class="btn btn-secondary" aria-label="Open profile"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Profile</a>
         ) : (
-          <>
-            <a href="/dashboard" class="btn btn-secondary">All Shares</a>
-            <a href="/login" class="btn btn-secondary">Sign In</a>
-          </>
+          <a href="/login" class="btn btn-secondary">Sign In</a>
         )}
         <a href="/pricing" class="btn btn-primary upgrade-btn">
           Upgrade <span class="badge-pro">PRO</span>

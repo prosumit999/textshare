@@ -15,14 +15,14 @@ const currentPath = Astro.url.pathname;
     <span>Join</span>
   </a>
 
-  <a href="/dashboard" class:list={["mobile-nav-item", { active: currentPath === '/dashboard' }]}>
+  <a href="/blog" class:list={["mobile-nav-item", { active: currentPath.startsWith('/blog') }]}>
     <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
       <rect x="3" y="3" width="7" height="7" rx="1"></rect>
       <rect x="14" y="3" width="7" height="7" rx="1"></rect>
       <rect x="3" y="14" width="7" height="7" rx="1"></rect>
       <rect x="14" y="14" width="7" height="7" rx="1"></rect>
     </svg>
-    <span>Shares</span>
+    <span>Blog</span>
   </a>
 
   <a href="/" class:list={["mobile-nav-create", { active: currentPath === '/' }]} aria-label="Create a new share">
@@ -33,7 +33,7 @@ const currentPath = Astro.url.pathname;
     <span>Create</span>
   </a>
 
-  <a href={hasSession ? '/dashboard' : '/login'} class:list={["mobile-nav-item", { active: currentPath === '/login' }]}>
+  <a href={hasSession ? '/profile' : '/login'} class:list={["mobile-nav-item", { active: currentPath === '/login' || currentPath === '/profile' }]}>
     <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="8" r="4"></circle>
       <path d="M4 21a8 8 0 0 1 16 0"></path>

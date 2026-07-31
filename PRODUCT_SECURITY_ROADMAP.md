@@ -2,10 +2,10 @@
 
 ## Production blockers — build before public launch
 
-1. **Complete persistent storage:** MongoDB now stores users, plans, signed-in share metadata, and encrypted GridFS payloads. Move blog posts, audit logs, IP blocks, traffic/security events, and remaining operational records out of process-memory Maps. Add migrations/versioning, indexes, retention jobs, and transactional cleanup.
-2. **Durable sessions and OTP challenges:** move sessions and admin verification challenges to Redis/PostgreSQL so deployments and multiple replicas do not invalidate or disagree about access.
+1. **Complete persistent storage:** completed for users, plans, blog posts, signed-in and guest shares, encrypted GridFS payloads, IP blocks, traffic/security events, admin challenges, recovery codes, and signed audit records. Add formal migration versioning and transactional multi-document cleanup as the data model evolves.
+2. **Durable OTP challenges:** completed. Authentication sessions and admin verification challenges are stored in MongoDB and survive deployments, restarts, and multiple replicas.
 3. **Real billing and entitlements:** integrate a payment provider, signed webhook verification, subscription state, renewals, cancellations, failed-payment handling, invoices, and server-side Plus/Pro authorization. Current plans are application flags only.
-4. **Background lifecycle worker:** expire shares, remove MongoDB/GridFS image assets, auto-kill oversized content, reconcile orphaned files, and record every action durably. The current request-time cleanup is only a safety net.
+4. **Background lifecycle worker deployment:** the secret-protected, lease-based worker now expires shares, removes MongoDB/GridFS image assets, auto-kills oversized content, reconciles orphaned files, and records actions in `systemAuditLogs`. Configure its daily Coolify schedule in production.
 5. **Production email:** configure a reliable transactional provider, sender-domain authentication, delivery/error monitoring, admin OTP resend controls, and account verification/password-reset flows.
 6. **Cloudflare/edge protection:** after purchasing a domain, enable Turnstile on signup, login risk events, guest creation, joining, password unlock, and abuse spikes. Configure WAF, bot rules, DDoS controls, and trusted proxy headers.
 
@@ -56,3 +56,5 @@
 - Rich blog HTML sanitization, protected MongoDB image upload endpoint, published-post filtering, and dynamic blog/footer links.
 - 50 MB share ceiling with client feedback, server rejection, automatic oversized-share cleanup, and system audit entries.
 - MongoDB-backed users/plans and signed-in share metadata, with AES-256-GCM encrypted share payloads stored in GridFS.
+- Concurrency-safe scheduled cleanup for expired/oversized shares, encrypted GridFS payloads, orphaned files, blog images, and durable system audit events.
+- Durable MongoDB authentication sessions with hashed tokens, TTL expiration, cross-replica validation, force logout, and database-backed active-session counts.

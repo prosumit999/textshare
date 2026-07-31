@@ -1,0 +1,28 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { generateAdminRecoveryCodes } from '../../lib/admin-auth';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
+import { recordAudit } from '../../lib/admin';
+
+const admin = (await getCurrentUser(Astro.cookies))!;
+let codes: string[] = [];
+let error = '';
+if (Astro.request.method === 'POST') {
+  if (!await hasRecentAdminStepUp(Astro.cookies)) return Astro.redirect('/login?stepup=1');
+  codes = await generateAdminRecoveryCodes(admin.email);
+  await recordAudit({ actor: admin.email, action: 'rotate_recovery_codes', resourceType: 'admin_security', resourceId: admin.email, details: 'Previous recovery codes revoked; 10 new single-use codes generated' });
+}
+---
+
+<AdminLayout title="Admin security">
+  <section class="admin-panel">
+    <div class="admin-panel-heading"><div><h2>Recovery codes</h2><p>Use a recovery code if email verification is unavailable. Each code works once.</p></div></div>
+    {error && <div class="admin-alert danger">{error}</div>}
+    {codes.length > 0 ? <div class="admin-alert success" role="status">Save these codes now. They will not be shown again.</div> : null}
+    {codes.length > 0 && <div class="recovery-code-grid">{codes.map((code) => <code>{code}</code>)}</div>}
+    <form method="POST" onsubmit="return confirm('Generate new recovery codes? Every previous code will stop working.')">
+      <button class="btn btn-primary" type="submit">Generate new recovery codes</button>
+    </form>
+    <p class="admin-security-note">This action requires a recent password and email verification. Sign in again when prompted.</p>
+  </section>
+</AdminLayout>

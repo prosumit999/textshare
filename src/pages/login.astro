@@ -3,6 +3,8 @@ import Layout from '../layouts/Layout.astro';
 import { createSession, destroySession, normalizeEmail, verifyCredentials } from '../lib/auth';
 import { beginAdminVerification } from '../lib/admin-auth';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+import { sendSecurityAlert } from '../lib/email';
+import { serverEnv } from '../lib/env';
 
 let error = "";
 
@@ -16,21 +18,23 @@ if (Astro.request.method === "POST") {
     if (!user) {
       const ip = getClientIp(Astro.request);
       const limit = await checkRateLimit('auth:login-failed', `${ip}:${normalizeEmail(email)}`, 5, 15 * 60);
-      logSecurityEvent('login_failed', Astro.request, { emailHash: normalizeEmail(email).slice(0, 3) });
+      await logSecurityEvent('login_failed', Astro.request, { emailHash: normalizeEmail(email).slice(0, 3) });
+      if (normalizeEmail(email) === normalizeEmail(serverEnv.ADMIN_EMAIL || 'prosumit999@gmail.com') && limit.remaining <= 1)
+        await sendSecurityAlert('Repeated owner sign-in failures', `Repeated failed owner sign-in attempts were detected from ${getClientIp(Astro.request)}.`).catch(() => false);
       if (!limit.allowed) return rateLimitResponse(limit.retryAfter, 'Too many failed sign-in attempts. Try again later.');
       error = "Invalid email or password.";
     } else {
       if (user.isAdmin) {
         try {
-          destroySession(Astro.cookies);
+          await destroySession(Astro.cookies);
           await beginAdminVerification(Astro.cookies, user);
           return Astro.redirect('/admin-verify');
         } catch {
-          logSecurityEvent('admin_verification_email_failed', Astro.request);
+          await logSecurityEvent('admin_verification_email_failed', Astro.request);
           error = 'Admin verification email could not be sent. Check the mail configuration.';
         }
       } else {
-        createSession(Astro.cookies, user);
+        await createSession(Astro.cookies, user, { request: Astro.request });
         Astro.cookies.delete("guest_share_active", { path: "/" });
         return Astro.redirect('/');
       }
