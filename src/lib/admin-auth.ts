@@ -25,14 +25,18 @@ export async function beginAdminVerification(
   const code = randomInt(100000, 1000000).toString();
   const key = challengeKey(token);
   const { db } = await getMongo();
-  await db.collection<Challenge & { tokenHash: string; createdAt: Date }>("adminChallenges").insertOne({
-    tokenHash: key,
-    email: user.email,
-    codeHash: await bcrypt.hash(code, 12),
-    expiresAt: Date.now() + 10 * 60_000,
-    attempts: 0,
-    createdAt: new Date(),
-  });
+  await db
+    .collection<Challenge & { tokenHash: string; createdAt: Date }>(
+      "adminChallenges",
+    )
+    .insertOne({
+      tokenHash: key,
+      email: user.email,
+      codeHash: await bcrypt.hash(code, 12),
+      expiresAt: Date.now() + 10 * 60_000,
+      attempts: 0,
+      createdAt: new Date(),
+    });
   try {
     await sendAdminVerificationCode(user.email, code);
     cookies.set("admin_challenge", token, secureCookieOptions(10 * 60));
@@ -52,7 +56,9 @@ export async function completeAdminVerification(
   if (!token) return false;
   const key = challengeKey(token);
   const { db } = await getMongo();
-  const challenge = await db.collection<Challenge & { tokenHash: string }>("adminChallenges").findOne({ tokenHash: key });
+  const challenge = await db
+    .collection<Challenge & { tokenHash: string }>("adminChallenges")
+    .findOne({ tokenHash: key });
   if (
     !challenge ||
     challenge.expiresAt <= Date.now() ||
@@ -62,16 +68,22 @@ export async function completeAdminVerification(
     cookies.delete("admin_challenge", { path: "/" });
     return false;
   }
-  await db.collection("adminChallenges").updateOne({ tokenHash: key }, { $inc: { attempts: 1 } });
+  await db
+    .collection("adminChallenges")
+    .updateOne({ tokenHash: key }, { $inc: { attempts: 1 } });
   const normalizedCode = code.trim().toLowerCase();
-  let verified = /^\d{6}$/.test(normalizedCode) && await bcrypt.compare(normalizedCode, challenge.codeHash);
+  let verified =
+    /^\d{6}$/.test(normalizedCode) &&
+    (await bcrypt.compare(normalizedCode, challenge.codeHash));
   if (!verified && /^[a-z0-9]{5}-[a-z0-9]{5}$/.test(normalizedCode)) {
     const codeHash = createHash("sha256").update(normalizedCode).digest("hex");
-    const used = await db.collection("adminRecoveryCodes").findOneAndUpdate(
-      { email: challenge.email, codeHash, usedAt: null },
-      { $set: { usedAt: new Date() } },
-      { returnDocument: "after" },
-    );
+    const used = await db
+      .collection("adminRecoveryCodes")
+      .findOneAndUpdate(
+        { email: challenge.email, codeHash, usedAt: null },
+        { $set: { usedAt: new Date() } },
+        { returnDocument: "after" },
+      );
     verified = Boolean(used);
   }
   if (!verified) return false;
@@ -84,12 +96,20 @@ export async function completeAdminVerification(
 }
 
 export async function generateAdminRecoveryCodes(email: string) {
-  const codes = Array.from({ length: 10 }, () => `${randomBytes(4).toString("hex").slice(0, 5)}-${randomBytes(4).toString("hex").slice(0, 5)}`);
+  const codes = Array.from(
+    { length: 10 },
+    () =>
+      `${randomBytes(4).toString("hex").slice(0, 5)}-${randomBytes(4).toString("hex").slice(0, 5)}`,
+  );
   const { db } = await getMongo();
   await db.collection("adminRecoveryCodes").deleteMany({ email });
-  await db.collection("adminRecoveryCodes").insertMany(codes.map((code) => ({
-    email, codeHash: createHash("sha256").update(code).digest("hex"),
-    createdAt: new Date(), usedAt: null,
-  })));
+  await db.collection("adminRecoveryCodes").insertMany(
+    codes.map((code) => ({
+      email,
+      codeHash: createHash("sha256").update(code).digest("hex"),
+      createdAt: new Date(),
+      usedAt: null,
+    })),
+  );
   return codes;
 }

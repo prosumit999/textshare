@@ -6,7 +6,11 @@ import { saveBlogImage } from "../../../lib/blog-images";
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const admin = await getCurrentUser(cookies);
-  if (!admin?.isAdmin || admin.disabled || !(await isAdminSessionVerified(cookies))) {
+  if (
+    !admin?.isAdmin ||
+    admin.disabled ||
+    !(await isAdminSessionVerified(cookies))
+  ) {
     return Response.json({ error: "Not found." }, { status: 404 });
   }
 

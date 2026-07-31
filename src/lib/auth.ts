@@ -14,7 +14,18 @@ export type User = {
   isAdmin: boolean;
   disabled: boolean;
 };
-type Session = { sessionId: string; tokenHash: string; email: string; expiresAt: Date; lastSeenAt: Date; adminVerified: boolean; adminVerifiedAt?: Date; createdAt: Date; userAgent?: string; ipHash?: string };
+type Session = {
+  sessionId: string;
+  tokenHash: string;
+  email: string;
+  expiresAt: Date;
+  lastSeenAt: Date;
+  adminVerified: boolean;
+  adminVerifiedAt?: Date;
+  createdAt: Date;
+  userAgent?: string;
+  ipHash?: string;
+};
 const SESSION_SECONDS = 60 * 60 * 24 * 7;
 const SESSION_IDLE_SECONDS = 60 * 30;
 const COMMON_PASSWORDS = new Set([
@@ -147,7 +158,10 @@ export async function createSession(
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000);
   const { db } = await getMongo();
   const previousToken = cookies.get("session")?.value;
-  if (previousToken) await db.collection("sessions").deleteOne({ tokenHash: sessionKey(previousToken) });
+  if (previousToken)
+    await db
+      .collection("sessions")
+      .deleteOne({ tokenHash: sessionKey(previousToken) });
   await db.collection<Session>("sessions").insertOne({
     sessionId: randomBytes(16).toString("hex"),
     tokenHash,
@@ -157,29 +171,61 @@ export async function createSession(
     adminVerified: options.adminVerified === true,
     ...(options.adminVerified ? { adminVerifiedAt: new Date() } : {}),
     createdAt: new Date(),
-    userAgent: options.request?.headers.get("user-agent")?.slice(0, 200) || undefined,
-    ipHash: options.request ? createHash("sha256").update(options.request.headers.get("cf-connecting-ip") || options.request.headers.get("x-forwarded-for") || options.request.headers.get("x-real-ip") || "unknown").digest("hex").slice(0, 16) : undefined,
+    userAgent:
+      options.request?.headers.get("user-agent")?.slice(0, 200) || undefined,
+    ipHash: options.request
+      ? createHash("sha256")
+          .update(
+            options.request.headers.get("cf-connecting-ip") ||
+              options.request.headers.get("x-forwarded-for") ||
+              options.request.headers.get("x-real-ip") ||
+              "unknown",
+          )
+          .digest("hex")
+          .slice(0, 16)
+      : undefined,
   });
   cookies.set("session", token, secureCookieOptions(SESSION_SECONDS));
   cookies.set("plan", user.plan, secureCookieOptions(SESSION_SECONDS));
 }
 
-export async function hasRecentAdminStepUp(cookies: AstroCookies, maxAgeSeconds = 10 * 60) {
+export async function hasRecentAdminStepUp(
+  cookies: AstroCookies,
+  maxAgeSeconds = 10 * 60,
+) {
   const token = cookies.get("session")?.value;
   if (!token) return false;
   const cutoff = new Date(Date.now() - maxAgeSeconds * 1000);
   const { db } = await getMongo();
-  return Boolean(await db.collection<Session>("sessions").findOne({
-    tokenHash: sessionKey(token), adminVerified: true,
-    adminVerifiedAt: { $gte: cutoff }, expiresAt: { $gt: new Date() },
-  }, { projection: { _id: 1 } }));
+  return Boolean(
+    await db.collection<Session>("sessions").findOne(
+      {
+        tokenHash: sessionKey(token),
+        adminVerified: true,
+        adminVerifiedAt: { $gte: cutoff },
+        expiresAt: { $gt: new Date() },
+      },
+      { projection: { _id: 1 } },
+    ),
+  );
 }
 
 export async function isAdminSessionVerified(cookies: AstroCookies) {
   const token = cookies.get("session")?.value;
   if (!token) return false;
   const { db } = await getMongo();
-  return Boolean(await db.collection<Session>("sessions").findOne({ tokenHash: sessionKey(token), adminVerified: true, expiresAt: { $gt: new Date() } }, { projection: { _id: 1 } }));
+  return Boolean(
+    await db
+      .collection<Session>("sessions")
+      .findOne(
+        {
+          tokenHash: sessionKey(token),
+          adminVerified: true,
+          expiresAt: { $gt: new Date() },
+        },
+        { projection: { _id: 1 } },
+      ),
+  );
 }
 
 export async function getCurrentUser(
@@ -192,11 +238,21 @@ export async function getCurrentUser(
   const tokenHash = sessionKey(token);
   const now = new Date();
   const idleCutoff = new Date(now.getTime() - SESSION_IDLE_SECONDS * 1000);
-  const session = await db.collection<Session>("sessions").findOne({ tokenHash, expiresAt: { $gt: now }, lastSeenAt: { $gt: idleCutoff } });
+  const session = await db
+    .collection<Session>("sessions")
+    .findOne({
+      tokenHash,
+      expiresAt: { $gt: now },
+      lastSeenAt: { $gt: idleCutoff },
+    });
   if (!session) return null;
   if (now.getTime() - new Date(session.lastSeenAt).getTime() > 5 * 60_000)
-    await db.collection<Session>("sessions").updateOne({ tokenHash }, { $set: { lastSeenAt: now } });
-  const user = await db.collection<User>("users").findOne({ email: session.email, disabled: false });
+    await db
+      .collection<Session>("sessions")
+      .updateOne({ tokenHash }, { $set: { lastSeenAt: now } });
+  const user = await db
+    .collection<User>("users")
+    .findOne({ email: session.email, disabled: false });
   if (!user) await db.collection("sessions").deleteOne({ tokenHash });
   return user;
 }
@@ -205,13 +261,42 @@ export async function listUserSessions(cookies: AstroCookies, email: string) {
   const current = cookies.get("session")?.value;
   const currentHash = current ? sessionKey(current) : "";
   const { db } = await getMongo();
-  const rows = await db.collection<Session>("sessions").find({ email: normalizeEmail(email), expiresAt: { $gt: new Date() } }, { projection: { tokenHash: 1, sessionId: 1, createdAt: 1, lastSeenAt: 1, userAgent: 1, ipHash: 1 } }).sort({ lastSeenAt: -1 }).toArray();
-  return rows.map((row) => ({ sessionId: row.sessionId, createdAt: row.createdAt, lastSeenAt: row.lastSeenAt, userAgent: row.userAgent || "Unknown device", ipHash: row.ipHash, current: row.tokenHash === currentHash }));
+  const rows = await db
+    .collection<Session>("sessions")
+    .find(
+      { email: normalizeEmail(email), expiresAt: { $gt: new Date() } },
+      {
+        projection: {
+          tokenHash: 1,
+          sessionId: 1,
+          createdAt: 1,
+          lastSeenAt: 1,
+          userAgent: 1,
+          ipHash: 1,
+        },
+      },
+    )
+    .sort({ lastSeenAt: -1 })
+    .toArray();
+  return rows.map((row) => ({
+    sessionId: row.sessionId,
+    createdAt: row.createdAt,
+    lastSeenAt: row.lastSeenAt,
+    userAgent: row.userAgent || "Unknown device",
+    ipHash: row.ipHash,
+    current: row.tokenHash === currentHash,
+  }));
 }
 
 export async function revokeUserSession(email: string, sessionId: string) {
   const { db } = await getMongo();
-  return (await db.collection("sessions").deleteOne({ email: normalizeEmail(email), sessionId })).deletedCount > 0;
+  return (
+    (
+      await db
+        .collection("sessions")
+        .deleteOne({ email: normalizeEmail(email), sessionId })
+    ).deletedCount > 0
+  );
 }
 
 export async function destroySession(cookies: AstroCookies) {
@@ -219,7 +304,9 @@ export async function destroySession(cookies: AstroCookies) {
   try {
     if (token) {
       const { db } = await getMongo();
-      await db.collection("sessions").deleteOne({ tokenHash: sessionKey(token) });
+      await db
+        .collection("sessions")
+        .deleteOne({ tokenHash: sessionKey(token) });
     }
   } finally {
     cookies.delete("session", { path: "/" });
@@ -252,16 +339,24 @@ export async function setUserDisabled(email: string, disabled: boolean) {
   const result = await db
     .collection<User>("users")
     .updateOne({ email: normalized, isAdmin: false }, { $set: { disabled } });
-  if (disabled && result.modifiedCount) await invalidateUserSessions(normalized);
+  if (disabled && result.modifiedCount)
+    await invalidateUserSessions(normalized);
   return result.modifiedCount > 0;
 }
 
 export async function invalidateUserSessions(email: string) {
   const { db } = await getMongo();
-  return (await db.collection("sessions").deleteMany({ email: normalizeEmail(email) })).deletedCount;
+  return (
+    await db.collection("sessions").deleteMany({ email: normalizeEmail(email) })
+  ).deletedCount;
 }
 
 export async function countActiveSessions(email?: string) {
   const { db } = await getMongo();
-  return await db.collection("sessions").countDocuments({ expiresAt: { $gt: new Date() }, ...(email ? { email: normalizeEmail(email) } : {}) });
+  return await db
+    .collection("sessions")
+    .countDocuments({
+      expiresAt: { $gt: new Date() },
+      ...(email ? { email: normalizeEmail(email) } : {}),
+    });
 }

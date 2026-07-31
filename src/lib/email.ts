@@ -20,14 +20,34 @@ export async function sendAdminVerificationCode(to: string, code: string) {
   });
 }
 
-export async function sendSecurityAlert(subject: string, message: string, to = serverEnv.SECURITY_ALERT_EMAIL || serverEnv.ADMIN_EMAIL || serverEnv.GMAIL_USER) {
+export async function sendSecurityAlert(
+  subject: string,
+  message: string,
+  to = serverEnv.SECURITY_ALERT_EMAIL ||
+    serverEnv.ADMIN_EMAIL ||
+    serverEnv.GMAIL_USER,
+) {
   const user = serverEnv.GMAIL_USER || "prosumit999@gmail.com";
   const appPassword = serverEnv.GMAIL_APP_PASSWORD;
   if (!to || !appPassword) {
-    console.warn(JSON.stringify({ event: "security_alert_email_unavailable", subject, at: new Date().toISOString() }));
+    console.warn(
+      JSON.stringify({
+        event: "security_alert_email_unavailable",
+        subject,
+        at: new Date().toISOString(),
+      }),
+    );
     return false;
   }
-  const transporter = nodemailer.createTransport({ service: "gmail", auth: { user, pass: appPassword } });
-  await transporter.sendMail({ from: `TextShare Security <${user}>`, to, subject: `[TextShare Security] ${subject}`, text: `${message}\n\nTime: ${new Date().toISOString()}` });
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass: appPassword },
+  });
+  await transporter.sendMail({
+    from: `TextShare Security <${user}>`,
+    to,
+    subject: `[TextShare Security] ${subject}`,
+    text: `${message}\n\nTime: ${new Date().toISOString()}`,
+  });
   return true;
 }

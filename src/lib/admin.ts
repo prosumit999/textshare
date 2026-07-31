@@ -148,23 +148,48 @@ export async function recordAudit(entry: Omit<AuditEntry, "id" | "createdAt">) {
   auditLog.unshift(document);
   if (auditLog.length > 10_000) auditLog.length = 10_000;
   const keys = (serverEnv.AUDIT_LOG_KEYS || serverEnv.AUDIT_LOG_SECRET || "")
-    .split(",").map((key) => key.trim()).filter(Boolean);
-  if (!keys.length && import.meta.env.PROD) throw new Error("AUDIT_LOG_KEYS is required in production.");
-  const signingKey = keys[0] || serverEnv.ADMIN_PASSWORD || "textshare-development-audit-key";
-  const keyId = createHash("sha256").update(signingKey).digest("hex").slice(0, 12);
+    .split(",")
+    .map((key) => key.trim())
+    .filter(Boolean);
+  if (!keys.length && import.meta.env.PROD)
+    throw new Error("AUDIT_LOG_KEYS is required in production.");
+  const signingKey =
+    keys[0] || serverEnv.ADMIN_PASSWORD || "textshare-development-audit-key";
+  const keyId = createHash("sha256")
+    .update(signingKey)
+    .digest("hex")
+    .slice(0, 12);
   const { db } = await getMongo();
-  const counter = await db.collection("counters").findOneAndUpdate(
-    { _id: "auditLog" }, { $inc: { value: 1 } }, { upsert: true, returnDocument: "after" },
-  );
+  const counter = await db
+    .collection("counters")
+    .findOneAndUpdate(
+      { _id: "auditLog" },
+      { $inc: { value: 1 } },
+      { upsert: true, returnDocument: "after" },
+    );
   const sequence = Number(counter?.value || 1);
-  const canonical = JSON.stringify({ sequence, keyId, ...document, createdAt: document.createdAt.toISOString() });
-  const signature = createHmac("sha256", signingKey).update(canonical).digest("hex");
-  await db.collection("auditLogs").insertOne({ sequence, keyId, ...document, signature });
+  const canonical = JSON.stringify({
+    sequence,
+    keyId,
+    ...document,
+    createdAt: document.createdAt.toISOString(),
+  });
+  const signature = createHmac("sha256", signingKey)
+    .update(canonical)
+    .digest("hex");
+  await db
+    .collection("auditLogs")
+    .insertOne({ sequence, keyId, ...document, signature });
 }
 
 export async function getAuditLog(limit = 100) {
   const { db } = await getMongo();
-  return db.collection<AuditEntry>("auditLogs").find({}, { projection: { signature: 0 } }).sort({ sequence: -1 }).limit(Math.min(1000, Math.max(1, limit))).toArray();
+  return db
+    .collection<AuditEntry>("auditLogs")
+    .find({}, { projection: { signature: 0 } })
+    .sort({ sequence: -1 })
+    .limit(Math.min(1000, Math.max(1, limit)))
+    .toArray();
 }
 
 export function categorizePath(path: string) {
@@ -178,14 +203,30 @@ export function categorizePath(path: string) {
 
 let operationsReady: Promise<void> | null = null;
 function ensureOperationalRecords() {
-  if (!operationsReady) operationsReady = (async () => {
-    const { db } = await getMongo();
-    for (const entry of blocklist.values())
-      await db.collection<BlockEntry>("ipBlocks").updateOne({ ip: entry.ip }, { $setOnInsert: entry }, { upsert: true });
-    if (trafficLog.length) await db.collection<TrafficEvent>("trafficEvents").insertMany(trafficLog.splice(0), { ordered: false });
-    if (securitySignals.length) await db.collection<SecuritySignal>("securitySignals").insertMany(securitySignals.splice(0), { ordered: false });
-    blocklist.clear();
-  })().catch((error) => { operationsReady = null; throw error; });
+  if (!operationsReady)
+    operationsReady = (async () => {
+      const { db } = await getMongo();
+      for (const entry of blocklist.values())
+        await db
+          .collection<BlockEntry>("ipBlocks")
+          .updateOne(
+            { ip: entry.ip },
+            { $setOnInsert: entry },
+            { upsert: true },
+          );
+      if (trafficLog.length)
+        await db
+          .collection<TrafficEvent>("trafficEvents")
+          .insertMany(trafficLog.splice(0), { ordered: false });
+      if (securitySignals.length)
+        await db
+          .collection<SecuritySignal>("securitySignals")
+          .insertMany(securitySignals.splice(0), { ordered: false });
+      blocklist.clear();
+    })().catch((error) => {
+      operationsReady = null;
+      throw error;
+    });
   return operationsReady;
 }
 
@@ -204,7 +245,12 @@ export async function recordTraffic(
 export async function getTrafficEvents(since: Date) {
   await ensureOperationalRecords();
   const { db } = await getMongo();
-  return db.collection<TrafficEvent>("trafficEvents").find({ createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(50_000).toArray();
+  return db
+    .collection<TrafficEvent>("trafficEvents")
+    .find({ createdAt: { $gte: since } })
+    .sort({ createdAt: -1 })
+    .limit(50_000)
+    .toArray();
 }
 
 export async function recordSecuritySignal(
@@ -214,19 +260,33 @@ export async function recordSecuritySignal(
 ) {
   await ensureOperationalRecords();
   const { db } = await getMongo();
-  await db.collection<SecuritySignal>("securitySignals").insertOne({ event, ip, details, createdAt: new Date() });
+  await db
+    .collection<SecuritySignal>("securitySignals")
+    .insertOne({ event, ip, details, createdAt: new Date() });
 }
 
 export async function getSecuritySignals(since: Date) {
   await ensureOperationalRecords();
   const { db } = await getMongo();
-  return db.collection<SecuritySignal>("securitySignals").find({ createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(20_000).toArray();
+  return db
+    .collection<SecuritySignal>("securitySignals")
+    .find({ createdAt: { $gte: since } })
+    .sort({ createdAt: -1 })
+    .limit(20_000)
+    .toArray();
 }
 
 export async function isIpBlocked(ip: string) {
   await ensureOperationalRecords();
   const { db } = await getMongo();
-  return Boolean(await db.collection<BlockEntry>("ipBlocks").findOne({ ip, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }, { projection: { _id: 1 } }));
+  return Boolean(
+    await db
+      .collection<BlockEntry>("ipBlocks")
+      .findOne(
+        { ip, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] },
+        { projection: { _id: 1 } },
+      ),
+  );
 }
 
 export async function blockIp(
@@ -246,7 +306,9 @@ export async function blockIp(
   };
   await ensureOperationalRecords();
   const { db } = await getMongo();
-  await db.collection<BlockEntry>("ipBlocks").replaceOne({ ip }, entry, { upsert: true });
+  await db
+    .collection<BlockEntry>("ipBlocks")
+    .replaceOne({ ip }, entry, { upsert: true });
   return entry;
 }
 
@@ -259,28 +321,45 @@ export async function unblockIp(ip: string) {
 export async function getBlockedIps() {
   await ensureOperationalRecords();
   const { db } = await getMongo();
-  return db.collection<BlockEntry>("ipBlocks").find({ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }).sort({ createdAt: -1 }).limit(10_000).toArray();
+  return db
+    .collection<BlockEntry>("ipBlocks")
+    .find({ $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] })
+    .sort({ createdAt: -1 })
+    .limit(10_000)
+    .toArray();
 }
 
 let blogReady: Promise<void> | null = null;
 
 function ensureBlogPosts() {
-  if (!blogReady) blogReady = (async () => {
-    const { db } = await getMongo();
-    const collection = db.collection<BlogPost>("blogPosts");
-    // Migrate anything still present in the legacy process cache, including
-    // admin-created posts retained by Astro HMR, without overwriting MongoDB.
-    for (const post of blogPosts.values()) {
-      await collection.updateOne({ id: post.id }, { $setOnInsert: post }, { upsert: true });
-    }
-  })().catch((error) => { blogReady = null; throw error; });
+  if (!blogReady)
+    blogReady = (async () => {
+      const { db } = await getMongo();
+      const collection = db.collection<BlogPost>("blogPosts");
+      // Migrate anything still present in the legacy process cache, including
+      // admin-created posts retained by Astro HMR, without overwriting MongoDB.
+      for (const post of blogPosts.values()) {
+        await collection.updateOne(
+          { id: post.id },
+          { $setOnInsert: post },
+          { upsert: true },
+        );
+      }
+    })().catch((error) => {
+      blogReady = null;
+      throw error;
+    });
   return blogReady;
 }
 
 export async function getBlogPosts() {
   await ensureBlogPosts();
   const { db } = await getMongo();
-  return db.collection<BlogPost>("blogPosts").find({}).sort({ updatedAt: -1 }).toArray();
+  return db
+    .collection<BlogPost>("blogPosts")
+    .find({})
+    .sort({ updatedAt: -1 })
+    .toArray();
 }
 
 export async function getBlogPost(id: string) {
@@ -292,16 +371,26 @@ export async function getBlogPost(id: string) {
 export async function getPublishedBlogPosts(now = new Date()) {
   await ensureBlogPosts();
   const { db } = await getMongo();
-  return db.collection<BlogPost>("blogPosts").find({
-    status: "published", publishDate: { $ne: null, $lte: now },
-  }).sort({ publishDate: -1 }).toArray();
+  return db
+    .collection<BlogPost>("blogPosts")
+    .find({
+      status: "published",
+      publishDate: { $ne: null, $lte: now },
+    })
+    .sort({ publishDate: -1 })
+    .toArray();
 }
 
-export async function getPublishedBlogPostBySlug(slug: string, now = new Date()) {
+export async function getPublishedBlogPostBySlug(
+  slug: string,
+  now = new Date(),
+) {
   await ensureBlogPosts();
   const { db } = await getMongo();
   return db.collection<BlogPost>("blogPosts").findOne({
-    slug, status: "published", publishDate: { $ne: null, $lte: now },
+    slug,
+    status: "published",
+    publishDate: { $ne: null, $lte: now },
   });
 }
 
@@ -326,7 +415,10 @@ export async function saveBlogPost(
 export async function deleteBlogPost(id: string) {
   await ensureBlogPosts();
   const { db } = await getMongo();
-  return (await db.collection<BlogPost>("blogPosts").deleteOne({ id })).deletedCount > 0;
+  return (
+    (await db.collection<BlogPost>("blogPosts").deleteOne({ id }))
+      .deletedCount > 0
+  );
 }
 
 export function slugify(value: string) {

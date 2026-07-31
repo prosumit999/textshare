@@ -20,12 +20,17 @@ export async function sanitizeImage(
   const input = Buffer.from(await file.arrayBuffer());
   const scan = await scanUpload(input);
   if (scan.status === "infected") {
-    await quarantineUpload(input, `Malware detected: ${scan.signature || "unknown"}`);
+    await quarantineUpload(
+      input,
+      `Malware detected: ${scan.signature || "unknown"}`,
+    );
     throw new UnsafeImageError("The image failed the security scan.");
   }
   if (scan.status === "unavailable" && serverEnv.CLAMAV_REQUIRED === "true") {
     await quarantineUpload(input, "Malware scanner unavailable");
-    throw new UnsafeImageError("Image security scanning is temporarily unavailable.");
+    throw new UnsafeImageError(
+      "Image security scanning is temporarily unavailable.",
+    );
   }
   const detected = await fileTypeFromBuffer(input);
   if (!detected || !ALLOWED_TYPES.has(detected.mime)) {

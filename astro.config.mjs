@@ -21,7 +21,9 @@ export default defineConfig({
         "report-uri /api/csp-report",
         "upgrade-insecure-requests",
       ],
-      scriptDirective: { resources: ["'self'", "https://challenges.cloudflare.com"] },
+      scriptDirective: {
+        resources: ["'self'", "https://challenges.cloudflare.com"],
+      },
       styleDirective: { resources: ["'self'"] },
     },
   },

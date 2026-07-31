@@ -14,13 +14,20 @@ export function calculateExpiry(option: ExpiryOption, now = new Date()) {
   return expiry;
 }
 
-export async function generateAvailableSlug(format: "string" | "number", exists: (slug: string) => Promise<boolean>) {
+export async function generateAvailableSlug(
+  format: "string" | "number",
+  exists: (slug: string) => Promise<boolean>,
+) {
   const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    const slug = format === "number"
-      ? Array.from({ length: 6 }, () => randomInt(0, 10)).join("")
-      : Array.from({ length: 6 }, () => chars[randomInt(0, chars.length)]).join("");
-    if (!await exists(slug)) return slug;
+    const slug =
+      format === "number"
+        ? Array.from({ length: 6 }, () => randomInt(0, 10)).join("")
+        : Array.from(
+            { length: 6 },
+            () => chars[randomInt(0, chars.length)],
+          ).join("");
+    if (!(await exists(slug))) return slug;
   }
   throw new Error("Unable to allocate a unique share slug.");
 }

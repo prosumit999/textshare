@@ -8,6 +8,10 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 20_000,
     hookTimeout: 20_000,
-    coverage: { provider: "v8", reporter: ["text", "html"], include: ["src/lib/**/*.ts"] },
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: ["src/lib/**/*.ts"],
+    },
   },
 });

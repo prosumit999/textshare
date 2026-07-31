@@ -1,5 +1,9 @@
 import { defineMiddleware } from "astro:middleware";
-import { checkRateLimit, logSecurityEvent, rateLimitResponse } from "./lib/security";
+import {
+  checkRateLimit,
+  logSecurityEvent,
+  rateLimitResponse,
+} from "./lib/security";
 import { getClientIp } from "./lib/security";
 import { getCurrentUser, isAdminSessionVerified } from "./lib/auth";
 import { isIpBlocked, recordTraffic } from "./lib/admin";
@@ -30,7 +34,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
   };
 
   if (await isIpBlocked(clientIp)) {
-    await logSecurityEvent("blocked_ip_rejected", request, { path: url.pathname });
+    await logSecurityEvent("blocked_ip_rejected", request, {
+      path: url.pathname,
+    });
     return new Response(JSON.stringify({ error: "Access denied." }), {
       status: 403,
       headers: {
@@ -51,7 +57,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
       60,
     );
     if (!adminLimit.allowed) {
-      await logSecurityEvent("admin_rate_limit_exceeded", request, { path: url.pathname });
+      await logSecurityEvent("admin_rate_limit_exceeded", request, {
+        path: url.pathname,
+      });
       return rateLimitResponse(adminLimit.retryAfter);
     }
     const user = await getCurrentUser(context.cookies);
@@ -71,13 +79,20 @@ export const onRequest = defineMiddleware(async (context, next) => {
     return renderUnavailable();
   }
 
-  const requestLimit = request.method !== "POST" ? MAX_REQUEST_BYTES
-    : url.pathname === "/" ? MAX_SHARE_REQUEST_BYTES
-    : ["/login", "/signup", "/admin-verify", "/join"].includes(url.pathname) ? 64 * 1024
-    : url.pathname === "/api/csp-report" ? 64 * 1024
-    : url.pathname === "/api/admin/blog-image" ? 6 * 1024 * 1024
-    : isOwnerRoute ? 1024 * 1024
-    : MAX_REQUEST_BYTES;
+  const requestLimit =
+    request.method !== "POST"
+      ? MAX_REQUEST_BYTES
+      : url.pathname === "/"
+        ? MAX_SHARE_REQUEST_BYTES
+        : ["/login", "/signup", "/admin-verify", "/join"].includes(url.pathname)
+          ? 64 * 1024
+          : url.pathname === "/api/csp-report"
+            ? 64 * 1024
+            : url.pathname === "/api/admin/blog-image"
+              ? 6 * 1024 * 1024
+              : isOwnerRoute
+                ? 1024 * 1024
+                : MAX_REQUEST_BYTES;
   if (contentLength > requestLimit) {
     await logSecurityEvent("request_body_rejected", request, {
       bytes: contentLength,
@@ -113,7 +128,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
       (!origin && import.meta.env.PROD) ||
       (origin && origin !== expectedOrigin)
     ) {
-      await logSecurityEvent("csrf_origin_rejected", request, { path: url.pathname });
+      await logSecurityEvent("csrf_origin_rejected", request, {
+        path: url.pathname,
+      });
       return new Response(
         JSON.stringify({ error: "Request origin was rejected." }),
         {

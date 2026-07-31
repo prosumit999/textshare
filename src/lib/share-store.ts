@@ -30,8 +30,14 @@ export type StoredShare = {
 };
 
 function encryptionKeys() {
-  const configured = (serverEnv.SHARE_ENCRYPTION_KEYS || serverEnv.SHARE_ENCRYPTION_KEY || "")
-    .split(",").map((key) => key.trim()).filter(Boolean);
+  const configured = (
+    serverEnv.SHARE_ENCRYPTION_KEYS ||
+    serverEnv.SHARE_ENCRYPTION_KEY ||
+    ""
+  )
+    .split(",")
+    .map((key) => key.trim())
+    .filter(Boolean);
   if (!configured.length && import.meta.env.PROD)
     throw new Error("SHARE_ENCRYPTION_KEYS is required in production.");
   const developmentFallback =
@@ -63,12 +69,23 @@ function decryptPayload(payload: Buffer) {
     try {
       const decipher = createDecipheriv("aes-256-gcm", key, iv);
       decipher.setAuthTag(tag);
-      return JSON.parse(Buffer.concat([
-        decipher.update(payload.subarray(28)), decipher.final(),
-      ]).toString("utf8")) as { textContent: string; imageSrc: string | null; imageSrcs?: string[] };
-    } catch { /* try the previous rotation key */ }
+      return JSON.parse(
+        Buffer.concat([
+          decipher.update(payload.subarray(28)),
+          decipher.final(),
+        ]).toString("utf8"),
+      ) as {
+        textContent: string;
+        imageSrc: string | null;
+        imageSrcs?: string[];
+      };
+    } catch {
+      /* try the previous rotation key */
+    }
   }
-  throw new Error("Unable to decrypt share payload with the configured keyring.");
+  throw new Error(
+    "Unable to decrypt share payload with the configured keyring.",
+  );
 }
 
 async function streamToBuffer(stream: NodeJS.ReadableStream) {
@@ -166,13 +183,21 @@ export async function incrementPersistentShareViews(slug: string) {
 
 let guestMigrationReady: Promise<void> | null = null;
 function ensureGuestShareMigration() {
-  if (!guestMigrationReady) guestMigrationReady = (async () => {
-    const legacy = (globalThis.textSharesStore ??= new Map<string, StoredShare>());
-    for (const [slug, share] of legacy) {
-      if (!await hasPersistentShare(slug)) await savePersistentShare(slug, share);
-      legacy.delete(slug);
-    }
-  })().catch((error) => { guestMigrationReady = null; throw error; });
+  if (!guestMigrationReady)
+    guestMigrationReady = (async () => {
+      const legacy = (globalThis.textSharesStore ??= new Map<
+        string,
+        StoredShare
+      >());
+      for (const [slug, share] of legacy) {
+        if (!(await hasPersistentShare(slug)))
+          await savePersistentShare(slug, share);
+        legacy.delete(slug);
+      }
+    })().catch((error) => {
+      guestMigrationReady = null;
+      throw error;
+    });
   return guestMigrationReady;
 }
 
