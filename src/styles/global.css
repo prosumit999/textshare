@@ -432,7 +432,7 @@ a.btn-primary:active {
 .image-grid-slot img { width:100%; height:100%; object-fit:cover; }
 .image-grid-add { display:flex; width:100%; height:100%; flex-direction:column; align-items:center; justify-content:center; gap:5px; border:0; background:transparent; color:var(--color-text-muted); cursor:pointer; transition:color .15s ease,background-color .15s ease; }
 .image-grid-add span { display:grid; width:28px; height:28px; place-items:center; border:1px solid var(--color-border); border-radius:9px; background:var(--color-bg-surface); color:var(--color-accent); font-size:20px; line-height:1; }
-.image-grid-add small { font-size:9px; font-weight:650; }
+.image-grid-add small { color:var(--color-text-base); font-size:9px; font-weight:650; }
 .image-grid-add:hover,.image-grid-add:focus-visible { background:color-mix(in srgb,var(--color-accent) 7%,transparent); color:var(--color-accent); }
 .image-grid-remove { position:absolute; top:6px; right:6px; display:grid; width:25px; height:25px; place-items:center; border:1px solid rgba(255,255,255,.55); border-radius:8px; background:rgba(15,23,42,.78); color:#fff; font-size:17px; line-height:1; cursor:pointer; backdrop-filter:blur(6px); }
 .image-grid-remove:hover,.image-grid-remove:focus-visible { background:var(--color-danger); }
@@ -1408,9 +1408,9 @@ footer {
   --color-text-base: #17202f;
   --color-text-muted: #667085;
   --color-border: #e2e7ef;
-  --color-border-focus: #008f68;
-  --color-accent: #008f68;
-  --color-accent-hover: #00785a;
+  --color-border-focus: #007054;
+  --color-accent: #007054;
+  --color-accent-hover: #005f47;
   --color-accent-text: #ffffff;
 }
 
@@ -1511,8 +1511,8 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
 }
 
 .badge-pro {
-  background: color-mix(in srgb, currentColor 12%, transparent);
-  color: inherit;
+  background: #005f47;
+  color: #ffffff;
   padding: 2px 5px;
 }
 

@@ -86,7 +86,7 @@ export async function checkRateLimit(
     };
   }
 
-  if (import.meta.env.PROD) {
+  if (import.meta.env.PROD && serverEnv.RATE_LIMIT_ALLOW_MEMORY !== "true") {
     console.error(
       JSON.stringify({
         event: "rate_limit_store_unavailable",

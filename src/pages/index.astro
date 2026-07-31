@@ -387,7 +387,7 @@ if (Astro.request.method === "POST") {
         <!-- Main image upload area (hidden until selected) -->
         <div id="image-input-section" style="display: none;">
             <div class="image-upload-wrapper" id="image-drag-area">
-              <input type="file" name="imageFile" id="image-file-input" accept="image/png, image/jpeg, image/webp" multiple={hasPaidPlan} style="display: none;" />
+              <input type="file" name="imageFile" id="image-file-input" aria-label="Select images to share" accept="image/png, image/jpeg, image/webp" multiple={hasPaidPlan} style="display: none;" />
               <div class="image-upload-heading">
                 <svg class="icon-svg icon-svg-lg" viewBox="0 0 24 24" style="width:48px; height:48px; color:var(--color-text-muted);">
                   <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -416,7 +416,7 @@ if (Astro.request.method === "POST") {
                 <input type="checkbox" name="syntaxHighlightEnabled" id="syntax-highlight-toggle" class="checkbox-input" />
                 <span>Syntax highlighting</span>
               </label>
-              <select name="language" id="language-select" class="select-input" style="display: none;">
+              <select name="language" id="language-select" class="select-input" aria-label="Code language" style="display: none;">
                 <option value="plaintext">Plain Text</option>
                 <option value="javascript">JavaScript</option>
                 <option value="typescript">TypeScript</option>
