@@ -1,5 +1,6 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import AuthFrame from '../components/AuthFrame.astro';
 import { consumeEmailVerification, issueEmailVerification } from '../lib/account-tokens';
 import { normalizeEmail } from '../lib/auth';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
@@ -36,14 +37,17 @@ if (state === 'invalid') message = 'This verification link is invalid, expired, 
 ---
 
 <Layout title="Verify Email — TextShare" description="Verify your TextShare email address.">
-  <div class="auth-card">
-    <h2>Verify your email</h2>
-    <p class="subtitle">Confirm that this email belongs to you before accessing your account.</p>
-    {message && <div class:list={["banner", state === 'verified' ? 'banner-success' : 'banner-warning']} role="status">{message}</div>}
-    {state === 'verified' ? <a class="btn btn-primary auth-submit" href="/login">Continue to sign in</a> : <form method="POST" class="auth-form">
-      <div class="input-label-pair"><label for="verification-email">Email address</label><input id="verification-email" class="text-input" type="email" name="email" maxlength="254" required autocomplete="email" /></div>
-      <button class="btn btn-primary auth-submit" type="submit">Send verification link</button>
+  <AuthFrame eyebrow="One quick step" title="Verify your email" subtitle="Email verification protects your account and unlocks sign-in and billing." asideTitle="A small check that keeps your account yours.">
+    {state !== 'idle' && <div class:list={["verification-state", `is-${state}`]} role="status">
+      <span class="verification-state-icon" aria-hidden="true">{state === 'verified' ? '✓' : state === 'sent' ? '✉' : '!'}</span>
+      <div><strong>{state === 'verified' ? 'Email confirmed' : state === 'sent' ? 'Check your inbox' : 'Link unavailable'}</strong><p>{message}</p></div>
+    </div>}
+    {state === 'sent' && <div class="verification-tips"><span>1</span><p>Open the message from TextShare.</p><span>2</span><p>Click the single-use verification button within 30 minutes.</p><span>3</span><p>Return here and sign in.</p></div>}
+    {state === 'verified' ? <a class="btn btn-primary auth-submit" href="/login">Continue to sign in <span aria-hidden="true">→</span></a> : <form method="POST" class="auth-form auth-resend-form">
+      <div class="auth-divider"><span>{state === 'sent' ? 'Need another link?' : 'Send a verification link'}</span></div>
+      <div class="input-label-pair"><label for="verification-email">Email address</label><div class="auth-input-wrap"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m3 7 9 6 9-6"></path></svg><input id="verification-email" class="text-input" type="email" name="email" maxlength="254" required autocomplete="email" placeholder="you@example.com" /></div></div>
+      <button class="btn btn-primary auth-submit" type="submit">{state === 'sent' ? 'Resend verification email' : 'Send verification email'} <span aria-hidden="true">→</span></button>
     </form>}
-    <div class="auth-footer"><a href="/login">Back to sign in</a></div>
-  </div>
+    <Fragment slot="footer"><p>Already verified? <a href="/login">Back to sign in</a></p><p>Entered the wrong address? <a href="/signup">Create another account</a></p></Fragment>
+  </AuthFrame>
 </Layout>
