@@ -13,6 +13,7 @@ export type User = {
   plan: "free" | "plus" | "pro";
   isAdmin: boolean;
   disabled: boolean;
+  emailVerified: boolean;
   billing?: {
     provider?: "stripe";
     customerId?: string | null;
@@ -72,6 +73,10 @@ function ensureBootstrapAdmin() {
     adminReady = (async () => {
       if (!bootstrapAdminEmail || !bootstrapAdminHash) return;
       const { db } = await getMongo();
+      await db.collection<User>("users").updateMany(
+        { emailVerified: { $exists: false } },
+        { $set: { emailVerified: true } },
+      );
       await db.collection<User>("users").updateOne(
         { email: bootstrapAdminEmail },
         {
@@ -81,6 +86,7 @@ function ensureBootstrapAdmin() {
             plan: "pro",
             isAdmin: true,
             disabled: false,
+            emailVerified: true,
           },
           $setOnInsert: { email: bootstrapAdminEmail, createdAt: new Date() },
         },
@@ -133,6 +139,7 @@ export async function registerUser(
     plan: "free",
     isAdmin: false,
     disabled: false,
+    emailVerified: false,
   };
   try {
     await db.collection<User>("users").insertOne(user);

@@ -1,0 +1,49 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { consumeEmailVerification, issueEmailVerification } from '../lib/account-tokens';
+import { normalizeEmail } from '../lib/auth';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+
+let state: 'sent' | 'verified' | 'invalid' | 'idle' = Astro.url.searchParams.get('sent') === '1' ? 'sent' : 'idle';
+let message = '';
+const token = Astro.url.searchParams.get('token') || '';
+if (Astro.request.method === 'GET' && token) {
+  const email = await consumeEmailVerification(token);
+  if (email) {
+    state = 'verified';
+    await logSecurityEvent('email_verified', Astro.request);
+  } else state = 'invalid';
+}
+
+if (Astro.request.method === 'POST') {
+  const ip = getClientIp(Astro.request);
+  const limit = await checkRateLimit('auth:verification-resend', ip, 5, 60 * 60);
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
+  const form = await Astro.request.formData();
+  const email = normalizeEmail(form.get('email')?.toString() || '');
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    const accountLimit = await checkRateLimit('auth:verification-email', email, 3, 60 * 60);
+    if (!accountLimit.allowed) return rateLimitResponse(accountLimit.retryAfter);
+    try { await issueEmailVerification(email, Astro.url.origin); }
+    catch { await logSecurityEvent('verification_email_failed', Astro.request); }
+  }
+  state = 'sent';
+}
+
+if (state === 'sent') message = 'If an unverified account exists for that address, a new verification link has been sent.';
+if (state === 'verified') message = 'Your email is verified. You can now sign in.';
+if (state === 'invalid') message = 'This verification link is invalid, expired, or has already been used.';
+---
+
+<Layout title="Verify Email — TextShare" description="Verify your TextShare email address.">
+  <div class="auth-card">
+    <h2>Verify your email</h2>
+    <p class="subtitle">Confirm that this email belongs to you before accessing your account.</p>
+    {message && <div class:list={["banner", state === 'verified' ? 'banner-success' : 'banner-warning']} role="status">{message}</div>}
+    {state === 'verified' ? <a class="btn btn-primary auth-submit" href="/login">Continue to sign in</a> : <form method="POST" class="auth-form">
+      <div class="input-label-pair"><label for="verification-email">Email address</label><input id="verification-email" class="text-input" type="email" name="email" maxlength="254" required autocomplete="email" /></div>
+      <button class="btn btn-primary auth-submit" type="submit">Send verification link</button>
+    </form>}
+    <div class="auth-footer"><a href="/login">Back to sign in</a></div>
+  </div>
+</Layout>

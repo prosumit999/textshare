@@ -10,3 +10,4 @@ process.env.STRIPE_SECRET_KEY ||= "sk_test_51TextShareAutomatedTestKey0000000000
 process.env.STRIPE_WEBHOOK_SECRET ||= "whsec_textshare_test_secret";
 process.env.STRIPE_MONTHLY_PRICE_ID ||= "price_textshare_monthly";
 process.env.STRIPE_ANNUAL_PRICE_ID ||= "price_textshare_annual";
+process.env.EMAIL_DELIVERY_DISABLED = "true";

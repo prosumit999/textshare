@@ -75,7 +75,7 @@ export async function createPortal(user: User, origin: string) {
   if (!customerId) throw new Error("No Stripe billing account exists for this user.");
   return stripe.billingPortal.sessions.create({
     customer: customerId,
-    return_url: `${serverEnv.APP_ORIGIN || origin}/profile`,
+    return_url: `${serverEnv.APP_ORIGIN || origin}/profile?billing=updated`,
   });
 }
 
@@ -100,13 +100,8 @@ export async function syncSubscription(subscription: Stripe.Subscription) {
   const plan = planForPriceId(priceId);
   if (!plan)
     throw new Error(`Stripe subscription ${subscription.id} uses an unrecognized price.`);
-  const lookup = email
-    ? { email }
-    : customerId
-      ? { "billing.customerId": customerId }
-      : { "billing.subscriptionId": subscription.id };
-
-  await db.collection("users").updateOne(lookup, {
+  // Customer IDs remain stable when a user changes their TextShare email.
+  const billingUpdate = {
     $set: {
       plan: active ? "pro" : "free",
       "billing.provider": "stripe",
@@ -120,7 +115,15 @@ export async function syncSubscription(subscription: Stripe.Subscription) {
       "billing.cancelAtPeriodEnd": subscription.cancel_at_period_end,
       "billing.updatedAt": new Date(),
     },
-  });
+  };
+  const lookup = customerId
+    ? { "billing.customerId": customerId }
+    : email
+      ? { email }
+      : { "billing.subscriptionId": subscription.id };
+  const result = await db.collection("users").updateOne(lookup, billingUpdate);
+  if (!result.matchedCount && customerId && email)
+    await db.collection("users").updateOne({ email }, billingUpdate);
 }
 
 export async function processStripeEvent(event: Stripe.Event) {

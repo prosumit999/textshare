@@ -7,6 +7,8 @@ export const POST: APIRoute = async ({ cookies, request, url }) => {
   const user = await getCurrentUser(cookies);
   if (!user)
     return Response.json({ error: "Sign in before upgrading." }, { status: 401 });
+  if (!user.emailVerified)
+    return Response.json({ error: "Verify your email before upgrading." }, { status: 403 });
   const limit = await checkRateLimit("billing:checkout", user.email, 10, 10 * 60);
   if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
 

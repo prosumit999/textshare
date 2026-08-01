@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { consumeEmailChange } from '../lib/account-tokens';
+import { logSecurityEvent } from '../lib/security';
+const token = Astro.url.searchParams.get('token') || '';
+const changed = token ? await consumeEmailChange(token) : null;
+if (changed) await logSecurityEvent('account_email_changed', Astro.request);
+---
+<Layout title="Confirm Email Change — TextShare"><div class="auth-card"><h2>{changed ? 'Email updated' : 'Link unavailable'}</h2><p class="subtitle">{changed ? `Your TextShare account now uses ${changed.newEmail}.` : 'This confirmation link is invalid, expired, already used, or the address is unavailable.'}</p>{changed ? <a class="btn btn-primary auth-submit" href="/account?email=changed">Continue to account</a> : <a class="btn btn-secondary auth-submit" href="/account">Back to account settings</a>}</div></Layout>

@@ -9,6 +9,7 @@ if (!user) return Astro.redirect('/login');
 let message = '';
 if (Astro.url.searchParams.get('checkout') === 'success') message = 'Payment received. Your Pro access will appear as soon as Stripe confirms the subscription.';
 if (Astro.url.searchParams.get('billing') === 'unavailable') message = 'Billing management is temporarily unavailable. Please try again shortly.';
+if (Astro.url.searchParams.get('billing') === 'updated') message = 'Billing changes are being synchronized from Stripe.';
 if (Astro.request.method === 'POST') {
   const limit = await checkRateLimit('share:delete', user.email, 30, 10 * 60);
   if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
@@ -37,7 +38,7 @@ const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, byte
     <section class="profile-hero">
       <div class="profile-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div>
       <div class="profile-identity"><span class="eyebrow">Your TextShare account</span><h1>{user.name}</h1><p>{user.email}<span></span>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'short', year:'numeric' })}</p></div>
-      <div class="profile-account-actions"><span class:list={["profile-plan-badge", { pro: isPro }]}>{planName}</span><form action="/api/logout" method="POST"><button type="submit" class="btn btn-secondary"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Sign out</button></form></div>
+      <div class="profile-account-actions"><span class:list={["profile-plan-badge", { pro: isPro }]}>{planName}</span><a href="/account" class="btn btn-secondary">Settings</a><form action="/api/logout" method="POST"><button type="submit" class="btn btn-secondary"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Sign out</button></form></div>
     </section>
 
     {message && <div class="profile-message">{message}</div>}
@@ -81,9 +82,11 @@ const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, byte
         </ul>
         {isPro ? <>
           <a href="/" class="btn btn-primary">Create a Pro share</a>
-          {user.billing?.customerId && <form method="POST" action="/api/billing/portal"><button class="btn btn-secondary" type="submit">Manage billing</button></form>}
+          {user.billing?.customerId && <form method="POST" action="/api/billing/portal"><button class="btn btn-secondary" type="submit">Billing & invoices</button></form>}
         </> : <a href="/pricing" class="btn btn-primary">Explore Pro</a>}
-        {billingStatus && <small>Billing: {billingStatus}{billingPeriodEnd ? ` · through ${billingPeriodEnd.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : ''}</small>}
+        {billingStatus && <small class:list={{ 'billing-warning': ['past_due','unpaid','incomplete'].includes(billingStatus) }}>Billing: {billingStatus.replaceAll('_', ' ')}{billingPeriodEnd ? ` · ${user.billing?.cancelAtPeriodEnd ? 'cancels' : 'renews'} ${billingPeriodEnd.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : ''}</small>}
+        {user.billing?.cancelAtPeriodEnd && <small>Your plan remains active through the cancellation date.</small>}
+        {['past_due','unpaid','incomplete'].includes(billingStatus || '') && <small>Payment needs attention. Open Billing & invoices to retry or update your card.</small>}
         <small>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'long', year:'numeric' })}</small>
       </aside>
     </div>

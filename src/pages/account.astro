@@ -1,0 +1,75 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { destroySession, getCurrentUser, normalizeEmail, validatePasswordStrength } from '../lib/auth';
+import { changeAccountName, changeAccountPassword, deleteAccount, verifyUserPassword } from '../lib/account-management';
+import { issueEmailChange } from '../lib/account-tokens';
+import { breachedPasswordCount } from '../lib/password-security';
+import { checkRateLimit, logSecurityEvent, rateLimitResponse } from '../lib/security';
+
+const user = await getCurrentUser(Astro.cookies);
+if (!user) return Astro.redirect('/login');
+let message = Astro.url.searchParams.get('email') === 'changed' ? 'Your email address has been updated.' : '';
+let error = '';
+if (Astro.request.method === 'POST') {
+  const limit = await checkRateLimit('account:mutation', user.email, 15, 60 * 60);
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  try {
+    if (action === 'name') {
+      message = await changeAccountName(user, form.get('name')?.toString() || '') ? 'Your display name has been updated.' : '';
+      if (!message) error = 'Enter a name between 2 and 80 characters.';
+    } else if (action === 'password') {
+      const current = form.get('currentPassword')?.toString() || '';
+      const next = form.get('newPassword')?.toString() || '';
+      const confirm = form.get('confirmPassword')?.toString() || '';
+      error = validatePasswordStrength(next) || '';
+      if (!error && next !== confirm) error = 'New passwords do not match.';
+      if (!error) {
+        const breached = await breachedPasswordCount(next);
+        if (breached === null && import.meta.env.PROD) error = 'Password safety verification is temporarily unavailable.';
+        else if (breached && breached > 0) error = 'This password appears in known data breaches.';
+      }
+      if (!error && !(await changeAccountPassword(user, current, next))) error = 'Your current password is incorrect.';
+      if (!error) {
+        await destroySession(Astro.cookies);
+        await logSecurityEvent('account_password_changed', Astro.request);
+        return Astro.redirect('/login?password=changed', 303);
+      }
+    } else if (action === 'email') {
+      const nextEmail = normalizeEmail(form.get('newEmail')?.toString() || '');
+      const current = form.get('currentPassword')?.toString() || '';
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextEmail) || nextEmail.length > 254) error = 'Enter a valid new email address.';
+      else if (!(await verifyUserPassword(user, current))) error = 'Your current password is incorrect.';
+      else if (!(await issueEmailChange(user.email, nextEmail, Astro.url.origin))) error = 'That email cannot be used.';
+      else message = `A confirmation link was sent to ${nextEmail}. Your current email remains active until confirmed.`;
+    } else if (action === 'delete') {
+      const confirmation = form.get('confirmation')?.toString();
+      const password = form.get('password')?.toString() || '';
+      if (confirmation !== 'DELETE') error = 'Type DELETE exactly to confirm account deletion.';
+      else if (!(await deleteAccount(user, password))) error = 'The password was incorrect or the account could not be deleted.';
+      else {
+        await destroySession(Astro.cookies);
+        await logSecurityEvent('account_deleted', Astro.request);
+        return Astro.redirect('/?account=deleted', 303);
+      }
+    }
+  } catch (cause) {
+    console.error('Account mutation failed', cause);
+    error = action === 'delete' ? 'Account deletion stopped safely. Confirm billing is available and try again.' : 'The account change could not be completed.';
+  }
+}
+---
+<Layout title="Account Settings — TextShare" description="Manage your TextShare identity, security and account data.">
+  <section class="settings-page">
+    <header class="settings-hero"><div><span class="eyebrow">Account controls</span><h1>Your account, under your control.</h1><p>Update your identity, strengthen security, or manage your TextShare data.</p></div><a class="btn btn-secondary" href="/profile">Back to profile</a></header>
+    {message && <div class="banner banner-success" role="status">{message}</div>}{error && <div class="banner banner-warning" role="alert">{error}</div>}{user.isAdmin && <div class="banner banner-warning">Owner credentials are managed through deployment secrets and cannot be changed here.</div>}
+    <div class="settings-grid">
+      <section class="settings-card"><span class="settings-icon">Aa</span><div class="settings-card-heading"><h2>Profile name</h2><p>This name appears in your account area.</p></div><form method="POST"><input type="hidden" name="action" value="name"/><label>Display name<input class="text-input" name="name" value={user.name} minlength="2" maxlength="80" required disabled={user.isAdmin}/></label><button class="btn btn-primary" disabled={user.isAdmin}>Save name</button></form></section>
+      <section class="settings-card"><span class="settings-icon">@</span><div class="settings-card-heading"><h2>Change email</h2><p>We verify the new address before moving your account.</p></div><form method="POST"><input type="hidden" name="action" value="email"/><label>New email<input class="text-input" type="email" name="newEmail" maxlength="254" required disabled={user.isAdmin}/></label><label>Current password<input class="text-input" type="password" name="currentPassword" autocomplete="current-password" required disabled={user.isAdmin}/></label><button class="btn btn-primary" disabled={user.isAdmin}>Send confirmation</button></form></section>
+      <section class="settings-card"><span class="settings-icon">••</span><div class="settings-card-heading"><h2>Change password</h2><p>Changing it signs out every device, including this one.</p></div><form method="POST"><input type="hidden" name="action" value="password"/><label>Current password<input class="text-input" type="password" name="currentPassword" autocomplete="current-password" required disabled={user.isAdmin}/></label><label>New password<input class="text-input" type="password" name="newPassword" autocomplete="new-password" minlength="8" maxlength="128" required disabled={user.isAdmin}/></label><label>Confirm new password<input class="text-input" type="password" name="confirmPassword" autocomplete="new-password" minlength="8" maxlength="128" required disabled={user.isAdmin}/></label><button class="btn btn-primary" disabled={user.isAdmin}>Update password</button></form></section>
+      <section class="settings-card"><span class="settings-icon">↓</span><div class="settings-card-heading"><h2>Export your data</h2><p>Download account, billing, session and share metadata as JSON. Passwords and encrypted content are excluded.</p></div><a class="btn btn-secondary" href="/api/account/export">Download my data</a></section>
+      <section class="settings-card settings-danger"><span class="settings-icon">!</span><div class="settings-card-heading"><h2>Delete account</h2><p>Permanently removes your shares and encrypted payloads. An active Stripe subscription is cancelled first.</p></div><form method="POST" onsubmit="return confirm('Permanently delete your account and every share? This cannot be undone.')"><input type="hidden" name="action" value="delete"/><label>Current password<input class="text-input" type="password" name="password" autocomplete="current-password" required disabled={user.isAdmin}/></label><label>Type DELETE<input class="text-input" name="confirmation" pattern="DELETE" required disabled={user.isAdmin}/></label><button class="btn btn-danger" disabled={user.isAdmin}>Delete account permanently</button></form></section>
+    </div>
+  </section>
+</Layout>

@@ -1,0 +1,12 @@
+---
+import Layout from '../layouts/Layout.astro'; import PolicyPage from '../components/PolicyPage.astro';
+---
+<Layout title="Privacy Policy — TextShare" description="How TextShare handles account and shared data."><PolicyPage eyebrow="Privacy" title="Privacy Policy" summary="What we collect, why we need it, how long it stays, and the controls you have.">
+<section><h2>Information we process</h2><p>We process account name, email, password hash, subscription status, security/session records, share metadata and encrypted share payloads. We also record limited IP, request and abuse signals needed for security and rate limiting.</p></section>
+<section><h2>Why we process it</h2><p>Data is used to provide sharing, authenticate users, process subscriptions, prevent abuse, deliver support and meet legal obligations. We do not sell personal information.</p></section>
+<section><h2>Storage and retention</h2><p>Share payloads are encrypted at rest and removed after expiry, burn-after-view, user deletion or administrative abuse action. Account and billing records remain while the account exists and as required for fraud, tax, dispute and legal records. Security logs have limited retention.</p></section>
+<section><h2>Service providers</h2><p>MongoDB stores application records, Stripe processes payments, email infrastructure delivers account messages, and hosting/network providers deliver the service. Each receives only the information required for its role.</p></section>
+<section><h2>Your choices</h2><p>Account Settings lets you correct your name or email, export account metadata and delete your account. You may also contact us to request access, correction or deletion where applicable.</p></section>
+<section><h2>International processing and security</h2><p>Providers may process information in other countries under their safeguards. No system is perfectly secure, but TextShare uses encryption, hashed credentials, short-lived tokens, access controls and monitoring to reduce risk.</p></section>
+<section><h2>Contact</h2><p>Use the <a href="/contact">contact page</a> for privacy requests. We may need to verify your identity before acting.</p></section>
+</PolicyPage></Layout>

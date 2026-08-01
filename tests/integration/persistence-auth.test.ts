@@ -122,6 +122,7 @@ describe("authorization and admin verification", () => {
     plan: "pro",
     isAdmin: true,
     disabled: false,
+    emailVerified: true,
   };
   it("distinguishes normal and recently step-up verified sessions", async () => {
     const normal = new CookieJar();

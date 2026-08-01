@@ -1,0 +1,10 @@
+---
+import Layout from '../layouts/Layout.astro'; import PolicyPage from '../components/PolicyPage.astro';
+---
+<Layout title="Refund and Cancellation Policy — TextShare"><PolicyPage eyebrow="Billing" title="Refund & cancellation" summary="Simple subscription terms with clear control over renewal.">
+<section><h2>Cancel anytime</h2><p>You can cancel from Profile → Billing & invoices. Cancellation normally takes effect at the end of the paid billing period, and Pro remains available until that date.</p></section>
+<section><h2>Refund requests</h2><p>Subscription charges are generally non-refundable once a billing period begins. If you were charged because of a technical error, duplicate payment, or service failure, contact us within 7 days. We review eligible requests individually and do not limit mandatory consumer rights.</p></section>
+<section><h2>Renewals and failed payments</h2><p>Subscriptions renew automatically using the payment method held by Stripe. Failed payments may place the subscription into a pending or past-due state and restrict Pro access until payment succeeds.</p></section>
+<section><h2>Account deletion</h2><p>Deleting an account cancels an active Stripe subscription before application data is removed. Deletion does not itself create a refund for the current period.</p></section>
+<section><h2>How to request help</h2><p>Use our <a href="/contact">support form</a> and include the account email, charge date and a short explanation. Never send full card details.</p></section>
+</PolicyPage></Layout>

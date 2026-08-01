@@ -81,6 +81,15 @@ export function getMongo() {
         db.collection("securitySignals").createIndex({ ip: 1, createdAt: -1 }),
         db.collection("users").createIndex({ "billing.customerId": 1 }, { sparse: true }),
         db.collection("users").createIndex({ "billing.subscriptionId": 1 }, { sparse: true }),
+        db.collection("emailVerificationTokens").createIndex({ tokenHash: 1 }, { unique: true }),
+        db.collection("emailVerificationTokens").createIndex({ email: 1, createdAt: -1 }),
+        db.collection("emailVerificationTokens").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+        db.collection("passwordResetTokens").createIndex({ tokenHash: 1 }, { unique: true }),
+        db.collection("passwordResetTokens").createIndex({ email: 1, createdAt: -1 }),
+        db.collection("passwordResetTokens").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+        db.collection("emailChangeTokens").createIndex({ tokenHash: 1 }, { unique: true }),
+        db.collection("emailChangeTokens").createIndex({ oldEmail: 1, createdAt: -1 }),
+        db.collection("emailChangeTokens").createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
         db.collection("stripeEvents").createIndex({ eventId: 1 }, { unique: true }),
         db.collection("stripeEvents").createIndex({ receivedAt: -1 }),
         db
@@ -104,6 +113,7 @@ export function getMongo() {
             plan: { enum: ["free", "plus", "pro"] },
             isAdmin: { bsonType: "bool" },
             disabled: { bsonType: "bool" },
+            emailVerified: { bsonType: "bool" },
           },
         },
         sessions: {
