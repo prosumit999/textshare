@@ -4,7 +4,6 @@ const { eyebrow, title, subtitle } = Astro.props;
 ---
 <section class="auth-experience">
   <div class="auth-form-panel">
-    <a href="/" class="auth-panel-brand" aria-label="TextShare home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M9 13h6M9 17h6"></path></svg><span>Text<strong>Share</strong></span></a>
     <header class="auth-form-heading"><span class="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p></header>
     <slot />
     <footer class="auth-panel-footer"><slot name="footer" /></footer>
