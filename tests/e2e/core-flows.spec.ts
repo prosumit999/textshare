@@ -67,7 +67,21 @@ test("guest burn-after-read share is removed after first recipient", async ({
   await expect(later.getByText(/expired/i).first()).toBeVisible();
 });
 
-for (const path of ["/", "/join", "/blog", "/login", "/signup", "/forgot-password", "/verify-email", "/reset-password", "/terms", "/privacy", "/refund-policy", "/acceptable-use", "/contact"])
+for (const path of [
+  "/",
+  "/join",
+  "/blog",
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/verify-email",
+  "/reset-password",
+  "/terms",
+  "/privacy",
+  "/refund-policy",
+  "/acceptable-use",
+  "/contact",
+])
   test(`has no serious accessibility violations: ${path}`, async ({ page }) => {
     await page.goto(path);
     const results = await new AxeBuilder({ page }).analyze();

@@ -26,7 +26,10 @@ export async function sendAdminVerificationCode(to: string, code: string) {
   });
 }
 
-export async function sendEmailVerification(to: string, verificationUrl: string) {
+export async function sendEmailVerification(
+  to: string,
+  verificationUrl: string,
+) {
   const { user, transporter } = mailTransport();
   await transporter.sendMail({
     from: `TextShare <${user}>`,
@@ -48,7 +51,10 @@ export async function sendPasswordReset(to: string, resetUrl: string) {
   });
 }
 
-export async function sendEmailChangeVerification(to: string, verificationUrl: string) {
+export async function sendEmailChangeVerification(
+  to: string,
+  verificationUrl: string,
+) {
   const { user, transporter } = mailTransport();
   await transporter.sendMail({
     from: `TextShare Security <${user}>`,
@@ -59,9 +65,17 @@ export async function sendEmailChangeVerification(to: string, verificationUrl: s
   });
 }
 
-export async function sendSupportMessage(fromName: string, fromEmail: string, message: string) {
+export async function sendSupportMessage(
+  fromName: string,
+  fromEmail: string,
+  message: string,
+) {
   const { user, transporter } = mailTransport();
-  const to = serverEnv.SUPPORT_EMAIL || serverEnv.SECURITY_ALERT_EMAIL || serverEnv.ADMIN_EMAIL || user;
+  const to =
+    serverEnv.SUPPORT_EMAIL ||
+    serverEnv.SECURITY_ALERT_EMAIL ||
+    serverEnv.ADMIN_EMAIL ||
+    user;
   await transporter.sendMail({
     from: `TextShare Support <${user}>`,
     replyTo: fromEmail,

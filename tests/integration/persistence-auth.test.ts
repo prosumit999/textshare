@@ -139,16 +139,14 @@ describe("authorization and admin verification", () => {
     const code = "123456";
     cookies.set("admin_challenge", token);
     const { db } = await getMongo();
-    await db
-      .collection("adminChallenges")
-      .insertOne({
-        tokenHash: createHash("sha256").update(token).digest("hex"),
-        email: admin.email,
-        codeHash: await bcrypt.hash(code, 4),
-        expiresAt: Date.now() + 60_000,
-        attempts: 0,
-        createdAt: new Date(),
-      });
+    await db.collection("adminChallenges").insertOne({
+      tokenHash: createHash("sha256").update(token).digest("hex"),
+      email: admin.email,
+      codeHash: await bcrypt.hash(code, 4),
+      expiresAt: Date.now() + 60_000,
+      attempts: 0,
+      createdAt: new Date(),
+    });
     expect(
       await completeAdminVerification(cookies as any, code, async () => admin),
     ).toBe(true);
@@ -165,16 +163,14 @@ describe("authorization and admin verification", () => {
     const token = "recovery-challenge";
     const cookies = new CookieJar();
     cookies.set("admin_challenge", token);
-    await db
-      .collection("adminChallenges")
-      .insertOne({
-        tokenHash: createHash("sha256").update(token).digest("hex"),
-        email: admin.email,
-        codeHash: await bcrypt.hash("000000", 4),
-        expiresAt: Date.now() + 60_000,
-        attempts: 0,
-        createdAt: new Date(),
-      });
+    await db.collection("adminChallenges").insertOne({
+      tokenHash: createHash("sha256").update(token).digest("hex"),
+      email: admin.email,
+      codeHash: await bcrypt.hash("000000", 4),
+      expiresAt: Date.now() + 60_000,
+      attempts: 0,
+      createdAt: new Date(),
+    });
     expect(
       await completeAdminVerification(cookies as any, code, async () => admin),
     ).toBe(true);

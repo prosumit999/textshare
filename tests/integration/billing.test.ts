@@ -11,7 +11,10 @@ import { POST as stripeWebhook } from "../../src/pages/api/webhooks/stripe";
 
 const email = "billing-test@example.com";
 
-function subscription(status: Stripe.Subscription.Status, id = "sub_textshare") {
+function subscription(
+  status: Stripe.Subscription.Status,
+  id = "sub_textshare",
+) {
   return {
     id,
     object: "subscription",
@@ -20,7 +23,12 @@ function subscription(status: Stripe.Subscription.Status, id = "sub_textshare") 
     cancel_at_period_end: false,
     metadata: { textshareUserEmail: email, textsharePlan: "annual" },
     items: {
-      data: [{ price: { id: process.env.STRIPE_ANNUAL_PRICE_ID }, current_period_end: 1893456000 }],
+      data: [
+        {
+          price: { id: process.env.STRIPE_ANNUAL_PRICE_ID },
+          current_period_end: 1893456000,
+        },
+      ],
     },
   } as unknown as Stripe.Subscription;
 }
@@ -71,11 +79,13 @@ describe("Stripe billing persistence", () => {
       items: { data: Array<{ price: { id: string } }> };
     };
     unknown.items.data[0].price.id = "price_attacker_controlled";
-    await expect(syncSubscription(unknown as unknown as Stripe.Subscription)).rejects.toThrow(
-      "unrecognized price",
-    );
+    await expect(
+      syncSubscription(unknown as unknown as Stripe.Subscription),
+    ).rejects.toThrow("unrecognized price");
     const { db } = await getMongo();
-    expect((await db.collection("users").findOne({ email }))?.plan).toBe("free");
+    expect((await db.collection("users").findOne({ email }))?.plan).toBe(
+      "free",
+    );
   });
 
   it("processes a webhook event idempotently", async () => {

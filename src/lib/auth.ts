@@ -73,10 +73,12 @@ function ensureBootstrapAdmin() {
     adminReady = (async () => {
       if (!bootstrapAdminEmail || !bootstrapAdminHash) return;
       const { db } = await getMongo();
-      await db.collection<User>("users").updateMany(
-        { emailVerified: { $exists: false } },
-        { $set: { emailVerified: true } },
-      );
+      await db
+        .collection<User>("users")
+        .updateMany(
+          { emailVerified: { $exists: false } },
+          { $set: { emailVerified: true } },
+        );
       await db.collection<User>("users").updateOne(
         { email: bootstrapAdminEmail },
         {
@@ -234,16 +236,14 @@ export async function isAdminSessionVerified(cookies: AstroCookies) {
   if (!token) return false;
   const { db } = await getMongo();
   return Boolean(
-    await db
-      .collection<Session>("sessions")
-      .findOne(
-        {
-          tokenHash: sessionKey(token),
-          adminVerified: true,
-          expiresAt: { $gt: new Date() },
-        },
-        { projection: { _id: 1 } },
-      ),
+    await db.collection<Session>("sessions").findOne(
+      {
+        tokenHash: sessionKey(token),
+        adminVerified: true,
+        expiresAt: { $gt: new Date() },
+      },
+      { projection: { _id: 1 } },
+    ),
   );
 }
 
@@ -257,13 +257,11 @@ export async function getCurrentUser(
   const tokenHash = sessionKey(token);
   const now = new Date();
   const idleCutoff = new Date(now.getTime() - SESSION_IDLE_SECONDS * 1000);
-  const session = await db
-    .collection<Session>("sessions")
-    .findOne({
-      tokenHash,
-      expiresAt: { $gt: now },
-      lastSeenAt: { $gt: idleCutoff },
-    });
+  const session = await db.collection<Session>("sessions").findOne({
+    tokenHash,
+    expiresAt: { $gt: now },
+    lastSeenAt: { $gt: idleCutoff },
+  });
   if (!session) return null;
   if (now.getTime() - new Date(session.lastSeenAt).getTime() > 5 * 60_000)
     await db
@@ -372,10 +370,8 @@ export async function invalidateUserSessions(email: string) {
 
 export async function countActiveSessions(email?: string) {
   const { db } = await getMongo();
-  return await db
-    .collection("sessions")
-    .countDocuments({
-      expiresAt: { $gt: new Date() },
-      ...(email ? { email: normalizeEmail(email) } : {}),
-    });
+  return await db.collection("sessions").countDocuments({
+    expiresAt: { $gt: new Date() },
+    ...(email ? { email: normalizeEmail(email) } : {}),
+  });
 }

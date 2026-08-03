@@ -46,16 +46,26 @@ beforeEach(async () => {
 describe("account email verification", () => {
   it("verifies a valid token exactly once", async () => {
     const token = "v".repeat(43);
-    await insertToken("emailVerificationTokens", token, new Date(Date.now() + 60_000));
+    await insertToken(
+      "emailVerificationTokens",
+      token,
+      new Date(Date.now() + 60_000),
+    );
     expect(await consumeEmailVerification(token)).toBe(email);
     expect(await consumeEmailVerification(token)).toBeNull();
     const { db } = await getMongo();
-    expect((await db.collection("users").findOne({ email }))?.emailVerified).toBe(true);
+    expect(
+      (await db.collection("users").findOne({ email }))?.emailVerified,
+    ).toBe(true);
   });
 
   it("rejects expired verification tokens", async () => {
     const token = "x".repeat(43);
-    await insertToken("emailVerificationTokens", token, new Date(Date.now() - 1_000));
+    await insertToken(
+      "emailVerificationTokens",
+      token,
+      new Date(Date.now() - 1_000),
+    );
     expect(await consumeEmailVerification(token)).toBeNull();
   });
 });
@@ -65,16 +75,58 @@ describe("account email changes", () => {
     const token = "c".repeat(43);
     const nextEmail = "recovery-new@example.com";
     const { db } = await getMongo();
-    await db.collection("emailChangeTokens").deleteMany({ $or: [{ oldEmail: email }, { newEmail: nextEmail }] });
-    await db.collection("emailChangeTokens").insertOne({ oldEmail: email, newEmail: nextEmail, tokenHash: hashAccountToken(token), createdAt: new Date(), expiresAt: new Date(Date.now() + 60_000), usedAt: null });
-    await db.collection("sessions").insertOne({ sessionId: "c".repeat(32), tokenHash: "d".repeat(64), email, expiresAt: new Date(Date.now() + 60_000), lastSeenAt: new Date(), adminVerified: false, createdAt: new Date() });
-    await db.collection("shares").insertOne({ slug: "mail01", contentType: "text", expiryDate: new Date(Date.now() + 60_000), createdAt: new Date(), sizeBytes: 1, owner: email });
+    await db
+      .collection("emailChangeTokens")
+      .deleteMany({ $or: [{ oldEmail: email }, { newEmail: nextEmail }] });
+    await db
+      .collection("emailChangeTokens")
+      .insertOne({
+        oldEmail: email,
+        newEmail: nextEmail,
+        tokenHash: hashAccountToken(token),
+        createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 60_000),
+        usedAt: null,
+      });
+    await db
+      .collection("sessions")
+      .insertOne({
+        sessionId: "c".repeat(32),
+        tokenHash: "d".repeat(64),
+        email,
+        expiresAt: new Date(Date.now() + 60_000),
+        lastSeenAt: new Date(),
+        adminVerified: false,
+        createdAt: new Date(),
+      });
+    await db
+      .collection("shares")
+      .insertOne({
+        slug: "mail01",
+        contentType: "text",
+        expiryDate: new Date(Date.now() + 60_000),
+        createdAt: new Date(),
+        sizeBytes: 1,
+        owner: email,
+      });
     expect((await consumeEmailChange(token))?.newEmail).toBe(nextEmail);
     expect(await consumeEmailChange(token)).toBeNull();
-    expect(await db.collection("users").findOne({ email: nextEmail })).toBeTruthy();
-    expect(await db.collection("sessions").findOne({ email: nextEmail })).toBeTruthy();
-    expect(await db.collection("shares").findOne({ slug: "mail01", owner: nextEmail })).toBeTruthy();
-    await Promise.all([db.collection("users").deleteMany({ email: nextEmail }), db.collection("sessions").deleteMany({ email: nextEmail }), db.collection("shares").deleteMany({ slug: "mail01" })]);
+    expect(
+      await db.collection("users").findOne({ email: nextEmail }),
+    ).toBeTruthy();
+    expect(
+      await db.collection("sessions").findOne({ email: nextEmail }),
+    ).toBeTruthy();
+    expect(
+      await db
+        .collection("shares")
+        .findOne({ slug: "mail01", owner: nextEmail }),
+    ).toBeTruthy();
+    await Promise.all([
+      db.collection("users").deleteMany({ email: nextEmail }),
+      db.collection("sessions").deleteMany({ email: nextEmail }),
+      db.collection("shares").deleteMany({ slug: "mail01" }),
+    ]);
   });
 });
 
@@ -82,8 +134,14 @@ describe("password reset", () => {
   it("changes the password, consumes the token, and revokes all sessions", async () => {
     const token = "r".repeat(43);
     const { db } = await getMongo();
-    await db.collection("users").updateOne({ email }, { $set: { emailVerified: true } });
-    await insertToken("passwordResetTokens", token, new Date(Date.now() + 60_000));
+    await db
+      .collection("users")
+      .updateOne({ email }, { $set: { emailVerified: true } });
+    await insertToken(
+      "passwordResetTokens",
+      token,
+      new Date(Date.now() + 60_000),
+    );
     await db.collection("sessions").insertOne({
       sessionId: "a".repeat(32),
       tokenHash: "b".repeat(64),
@@ -95,18 +153,28 @@ describe("password reset", () => {
     });
 
     expect(await resetPasswordWithToken(token, "NewPassword456")).toBe(email);
-    expect(await resetPasswordWithToken(token, "AnotherPassword789")).toBeNull();
+    expect(
+      await resetPasswordWithToken(token, "AnotherPassword789"),
+    ).toBeNull();
     const user = await db.collection("users").findOne({ email });
-    expect(await bcrypt.compare("NewPassword456", user!.passwordHash)).toBe(true);
+    expect(await bcrypt.compare("NewPassword456", user!.passwordHash)).toBe(
+      true,
+    );
     expect(await db.collection("sessions").countDocuments({ email })).toBe(0);
   });
 
   it("rejects expired reset tokens without changing the password", async () => {
     const token = "e".repeat(43);
-    await insertToken("passwordResetTokens", token, new Date(Date.now() - 1_000));
+    await insertToken(
+      "passwordResetTokens",
+      token,
+      new Date(Date.now() - 1_000),
+    );
     expect(await resetPasswordWithToken(token, "NewPassword456")).toBeNull();
     const { db } = await getMongo();
     const user = await db.collection("users").findOne({ email });
-    expect(await bcrypt.compare("OldPassword123", user!.passwordHash)).toBe(true);
+    expect(await bcrypt.compare("OldPassword123", user!.passwordHash)).toBe(
+      true,
+    );
   });
 });

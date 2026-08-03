@@ -84,17 +84,28 @@ export const onRequest = defineMiddleware(async (context, next) => {
       ? MAX_REQUEST_BYTES
       : url.pathname === "/"
         ? MAX_SHARE_REQUEST_BYTES
-        : ["/login", "/signup", "/verify-email", "/forgot-password", "/reset-password", "/confirm-email-change", "/account", "/contact", "/admin-verify", "/join"].includes(url.pathname)
+        : [
+              "/login",
+              "/signup",
+              "/verify-email",
+              "/forgot-password",
+              "/reset-password",
+              "/confirm-email-change",
+              "/account",
+              "/contact",
+              "/admin-verify",
+              "/join",
+            ].includes(url.pathname)
           ? 64 * 1024
           : url.pathname === "/api/csp-report"
             ? 64 * 1024
             : url.pathname === "/api/webhooks/stripe"
               ? 1024 * 1024
-            : url.pathname === "/api/admin/blog-image"
-              ? 6 * 1024 * 1024
-              : isOwnerRoute
-                ? 1024 * 1024
-                : MAX_REQUEST_BYTES;
+              : url.pathname === "/api/admin/blog-image"
+                ? 6 * 1024 * 1024
+                : isOwnerRoute
+                  ? 1024 * 1024
+                  : MAX_REQUEST_BYTES;
   if (contentLength > requestLimit) {
     await logSecurityEvent("request_body_rejected", request, {
       bytes: contentLength,
