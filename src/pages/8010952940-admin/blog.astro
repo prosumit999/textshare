@@ -24,6 +24,9 @@ if (Astro.request.method === 'POST') {
   } else if (action === 'save') {
     const title = form.get('title')?.toString().trim() || '';
     const manualSlug = form.get('slug')?.toString().trim() || '';
+    const category = form.get('category')?.toString().trim().slice(0, 60) || 'TextShare';
+    const tags = [...new Set((form.get('tags')?.toString() || '').split(',').map((tag) => tag.trim().slice(0, 30)).filter(Boolean))].slice(0, 8);
+    const excerpt = form.get('excerpt')?.toString().trim().slice(0, 320) || '';
     const rawContent = form.get('content')?.toString() || '';
     const content = sanitizeBlogHtml(rawContent);
     const coverImage = form.get('coverImage')?.toString().trim() || '';
@@ -34,7 +37,7 @@ if (Astro.request.method === 'POST') {
     else if ((await getBlogPosts()).some((post) => post.slug === slug && post.id !== id)) error = 'That slug is already in use.';
     else {
       const previousCoverImage = id ? (await getBlogPost(id))?.coverImage : '';
-      const post = await saveBlogPost({ id, title, slug, content, coverImage, status, publishDate: status === 'published' ? new Date() : null });
+      const post = await saveBlogPost({ id, title, slug, category, tags, excerpt, content, coverImage, status, publishDate: status === 'published' ? new Date() : null });
       if (previousCoverImage && previousCoverImage !== coverImage) await deleteBlogImageFromUrl(previousCoverImage);
       await recordAudit({ actor: admin.email, action: id ? 'update' : 'create', resourceType: 'blog_post', resourceId: post.id, details: `${post.title} (${status})` });
       message = 'Post saved.';
@@ -55,7 +58,7 @@ const previewHtml = previewPost ? sanitizeBlogHtml(previewPost.content) : '';
 const showEditor = Astro.url.searchParams.get('view') === 'create' || Astro.url.searchParams.has('edit') || Astro.url.searchParams.has('preview');
 ---
 
-<AdminLayout title={showEditor ? (editPost ? 'Edit blog post' : previewPost ? 'Preview blog post' : 'Create blog post') : 'All blog posts'}>
+<AdminLayout title={showEditor ? (editPost ? 'Edit post' : previewPost ? 'Preview post' : 'Create post') : 'All blog posts'}>
   {message && <div class="admin-alert success">{message}</div>}{error && <div class="admin-alert danger">{error}</div>}
   <div class="admin-blog-stack">
     {!showEditor ? <section class="admin-panel">
@@ -68,10 +71,34 @@ const showEditor = Astro.url.searchParams.get('view') === 'create' || Astro.url.
       <div class="admin-pagination"><a aria-disabled={page<=1} href={`?q=${search}&status=${statusFilter}&page=${page-1}`}>Previous</a><span>Page {page} of {totalPages}</span><a aria-disabled={page>=totalPages} href={`?q=${search}&status=${statusFilter}&page=${page+1}`}>Next</a></div>
     </section> :
 
-    <section class="admin-panel admin-editor-panel" id="blog-editor">
-      {previewPost ? <><div class="admin-panel-heading"><div><h2>Post preview</h2><p>/{previewPost.slug}</p></div><a href="/8010952940-admin/blog">Back to all posts</a></div>{previewPost.coverImage && <img class="admin-cover-preview" src={previewPost.coverImage} alt=""/>}<h1 class="admin-preview-title">{previewPost.title}</h1><div class="admin-rich-preview" set:html={previewHtml}></div></> : <>
-        <div class="admin-panel-heading"><div><h2>{editPost ? 'Edit post' : 'Create post'}</h2><p>Format your article, insert images, lists, links, code, and tables.</p></div></div>
-        <form method="POST" class="admin-editor-form rich-post-form"><input type="hidden" name="action" value="save"/><input type="hidden" name="id" value={editPost?.id || ''}/><div class="admin-editor-grid"><label>Title<input class="text-input" name="title" maxlength="160" required value={editPost?.title || ''}/></label><label>Slug<input class="text-input" name="slug" maxlength="80" placeholder="Generated from title" value={editPost?.slug || ''}/></label></div><div class="featured-image-field"><label>Featured image<input id="featured-image-url" class="text-input" name="coverImage" type="text" readonly placeholder="Leave empty to use the generated TextShare visual" value={editPost?.coverImage || ''}/></label><div class="featured-upload-row"><input id="featured-image-file" type="file" accept="image/png,image/jpeg,image/webp"/><button id="upload-featured-image" type="button" class="btn btn-secondary">Upload image</button><span id="featured-upload-status" aria-live="polite">Stored in MongoDB · PNG, JPG or WEBP · max 5 MB</span></div><img id="featured-image-preview" class:list={["featured-image-preview", { visible: editPost?.coverImage }]} src={editPost?.coverImage || ''} alt="Featured image preview"/></div><label>Content</label><div class="rich-editor-shell"><div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting"><button type="button" data-block="h2">H2</button><button type="button" data-block="h3">H3</button><button type="button" data-command="bold"><strong>B</strong></button><button type="button" data-command="italic"><em>I</em></button><button type="button" data-command="underline"><u>U</u></button><span></span><button type="button" data-command="insertUnorderedList">• List</button><button type="button" data-command="insertOrderedList">1. List</button><button type="button" data-block="blockquote">Quote</button><button type="button" data-block="pre">Code</button><span></span><button type="button" data-action="link">Link</button><button type="button" data-action="image">Image</button><button type="button" data-action="table">Table</button><button type="button" data-command="undo">Undo</button></div><div id="rich-post-editor" class="rich-post-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Start writing your article…" set:html={editPost?.content || '<p></p>'}></div><textarea id="rich-post-content" name="content" hidden>{editPost?.content || ''}</textarea></div><div class="admin-editor-footer"><label>Status<select class="select-input" name="status"><option value="draft">Draft</option><option value="published" selected={editPost?.status==='published'}>Published</option></select></label><button class="btn btn-primary">Save post</button></div></form>
+    <section class:list={["admin-editor-workspace", { "is-preview": previewPost }]} id="blog-editor">
+      {previewPost ? <section class="admin-panel admin-editor-panel"><div class="admin-panel-heading"><div><h2>Post preview</h2><p>/{previewPost.slug}</p></div><a href="/8010952940-admin/blog">Back to all posts</a></div>{previewPost.coverImage && <img class="admin-cover-preview" src={previewPost.coverImage} alt=""/>}<h1 class="admin-preview-title">{previewPost.title}</h1><div class="admin-rich-preview" set:html={previewHtml}></div></section> : <>
+        <div class="blog-editor-heading">
+          <p>{editPost ? `Last updated ${editPost.updatedAt.toLocaleString()}` : 'Create a new article for the TextShare journal.'}</p>
+          <a href="/8010952940-admin/blog" class="btn btn-secondary">Back to posts</a>
+        </div>
+        <form method="POST" class="admin-panel admin-editor-form rich-post-form">
+          <input type="hidden" name="action" value="save"/><input type="hidden" name="id" value={editPost?.id || ''}/>
+          <div class="admin-editor-grid">
+            <label>Title<input class="text-input" name="title" maxlength="160" required value={editPost?.title || ''}/></label>
+            <label>Slug<input class="text-input" name="slug" maxlength="80" placeholder="Generated from title" value={editPost?.slug || ''}/></label>
+          </div>
+          <div class="admin-editor-grid admin-taxonomy-grid">
+            <label>Category<input class="text-input" name="category" maxlength="60" placeholder="e.g. Privacy" value={editPost?.category || ''}/></label>
+            <label>Tags <small>Comma-separated</small><input class="text-input" name="tags" maxlength="255" placeholder="Security, Developer tools" value={editPost?.tags?.join(', ') || ''}/></label>
+          </div>
+          <label>Excerpt<textarea class="text-input admin-excerpt-input" name="excerpt" maxlength="320" rows="3" placeholder="A short summary shown on blog cards and in search results.">{editPost?.excerpt || ''}</textarea></label>
+          <div class="editor-field-heading"><div><strong>Content</strong><small>Rich text · images, lists, links, code and tables supported</small></div></div>
+          <div class="rich-editor-shell">
+            <div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting"><button type="button" data-block="h2">H2</button><button type="button" data-block="h3">H3</button><button type="button" data-command="bold"><strong>B</strong></button><button type="button" data-command="italic"><em>I</em></button><button type="button" data-command="underline"><u>U</u></button><span></span><button type="button" data-command="insertUnorderedList">• List</button><button type="button" data-command="insertOrderedList">1. List</button><button type="button" data-block="blockquote">Quote</button><button type="button" data-block="pre">Code</button><span></span><button type="button" data-action="link">Link</button><button type="button" data-action="image">Image</button><button type="button" data-action="table">Table</button><button type="button" data-command="undo">Undo</button></div>
+            <div id="rich-post-editor" class="rich-post-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Start writing your article…" set:html={editPost?.content || '<p></p>'}></div><textarea id="rich-post-content" name="content" hidden>{editPost?.content || ''}</textarea>
+          </div>
+          <details class="featured-image-disclosure" open={Boolean(editPost?.coverImage)}>
+            <summary><span>Featured image</span><small>Optional · a TextShare visual is generated when empty</small></summary>
+            <div class="featured-image-field"><label>Image URL<input id="featured-image-url" class="text-input" name="coverImage" type="text" readonly placeholder="No custom image selected" value={editPost?.coverImage || ''}/></label><div class="featured-upload-row"><input id="featured-image-file" type="file" accept="image/png,image/jpeg,image/webp"/><button id="upload-featured-image" type="button" class="btn btn-secondary">Upload image</button><span id="featured-upload-status" aria-live="polite">Stored in MongoDB · PNG, JPG or WEBP · max 5 MB</span></div><img id="featured-image-preview" class:list={["featured-image-preview", { visible: editPost?.coverImage }]} src={editPost?.coverImage || ''} alt="Featured image preview"/></div>
+          </details>
+          <div class="admin-editor-footer"><label>Status<select class="select-input" name="status"><option value="draft">Draft</option><option value="published" selected={editPost?.status==='published'}>Published</option></select></label><div class="editor-save-actions">{editPost?.status === 'published' && <a class="btn btn-secondary" href={`/blog/${editPost.slug}`} target="_blank">View post</a>}<button class="btn btn-primary">Save post</button></div></div>
+        </form>
       </>}
     </section>}
   </div>

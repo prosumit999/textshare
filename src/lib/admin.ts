@@ -25,6 +25,9 @@ export type BlogPost = {
   id: string;
   title: string;
   slug: string;
+  category?: string;
+  tags?: string[];
+  excerpt?: string;
   content: string;
   coverImage: string;
   status: "draft" | "published";

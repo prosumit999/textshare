@@ -71,11 +71,9 @@ export async function deleteAccount(user: User, password: string) {
     db.collection("sessions").deleteMany({ email: user.email }),
     db.collection("passwordResetTokens").deleteMany({ email: user.email }),
     db.collection("emailVerificationTokens").deleteMany({ email: user.email }),
-    db
-      .collection("emailChangeTokens")
-      .deleteMany({
-        $or: [{ oldEmail: user.email }, { newEmail: user.email }],
-      }),
+    db.collection("emailChangeTokens").deleteMany({
+      $or: [{ oldEmail: user.email }, { newEmail: user.email }],
+    }),
   ]);
   return (
     (

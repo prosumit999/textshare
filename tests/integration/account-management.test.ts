@@ -35,17 +35,15 @@ describe("account management", () => {
   it("changes the name and changes password while revoking sessions", async () => {
     const { db } = await getMongo();
     expect(await changeAccountName(user, "New Name")).toBe(true);
-    await db
-      .collection("sessions")
-      .insertOne({
-        sessionId: "e".repeat(32),
-        tokenHash: "f".repeat(64),
-        email,
-        expiresAt: new Date(Date.now() + 60_000),
-        lastSeenAt: new Date(),
-        adminVerified: false,
-        createdAt: new Date(),
-      });
+    await db.collection("sessions").insertOne({
+      sessionId: "e".repeat(32),
+      tokenHash: "f".repeat(64),
+      email,
+      expiresAt: new Date(Date.now() + 60_000),
+      lastSeenAt: new Date(),
+      adminVerified: false,
+      createdAt: new Date(),
+    });
     expect(await changeAccountPassword(user, "wrong", "NextPassword456")).toBe(
       false,
     );

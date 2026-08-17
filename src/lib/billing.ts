@@ -53,17 +53,15 @@ export async function createCheckout(
       metadata: { textshareUserEmail: user.email },
     });
     customerId = customer.id;
-    await db
-      .collection("users")
-      .updateOne(
-        { email: user.email },
-        {
-          $set: {
-            "billing.provider": "stripe",
-            "billing.customerId": customerId,
-          },
+    await db.collection("users").updateOne(
+      { email: user.email },
+      {
+        $set: {
+          "billing.provider": "stripe",
+          "billing.customerId": customerId,
         },
-      );
+      },
+    );
   }
 
   return stripe.checkout.sessions.create({

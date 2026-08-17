@@ -201,35 +201,31 @@ export async function consumeEmailChange(token: string) {
   if (!/^[A-Za-z0-9_-]{40,64}$/.test(token)) return null;
   const { db } = await getMongo();
   const now = new Date();
-  const claimed = await db
-    .collection("emailChangeTokens")
-    .findOneAndUpdate(
-      {
-        tokenHash: hashAccountToken(token),
-        usedAt: null,
-        expiresAt: { $gt: now },
-      },
-      { $set: { usedAt: now } },
-      { returnDocument: "after" },
-    );
+  const claimed = await db.collection("emailChangeTokens").findOneAndUpdate(
+    {
+      tokenHash: hashAccountToken(token),
+      usedAt: null,
+      expiresAt: { $gt: now },
+    },
+    { $set: { usedAt: now } },
+    { returnDocument: "after" },
+  );
   if (!claimed) return null;
   if (await db.collection("users").findOne({ email: claimed.newEmail }))
     return null;
   const existing = await db
     .collection<User>("users")
     .findOne({ email: claimed.oldEmail });
-  const result = await db
-    .collection("users")
-    .updateOne(
-      { email: claimed.oldEmail, disabled: false, isAdmin: false },
-      {
-        $set: {
-          email: claimed.newEmail,
-          emailVerified: true,
-          emailChangedAt: now,
-        },
+  const result = await db.collection("users").updateOne(
+    { email: claimed.oldEmail, disabled: false, isAdmin: false },
+    {
+      $set: {
+        email: claimed.newEmail,
+        emailVerified: true,
+        emailChangedAt: now,
       },
-    );
+    },
+  );
   if (!result.modifiedCount) return null;
   await Promise.all([
     db

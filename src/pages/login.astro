@@ -1,8 +1,9 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import AuthFrame from '../components/AuthFrame.astro';
-import { createSession, destroySession, normalizeEmail, verifyCredentials } from '../lib/auth';
+import { destroySession, normalizeEmail, verifyCredentials } from '../lib/auth';
 import { beginAdminVerification } from '../lib/admin-auth';
+import { beginLoginVerification } from '../lib/login-otp';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
 import { sendSecurityAlert } from '../lib/email';
 import { serverEnv } from '../lib/env';
@@ -28,19 +29,29 @@ if (Astro.request.method === "POST") {
     } else {
       if (!user.emailVerified) {
         error = 'Verify your email address before signing in.';
-      } else if (user.isAdmin) {
-        try {
-          await destroySession(Astro.cookies);
-          await beginAdminVerification(Astro.cookies, user);
-          return Astro.redirect('/admin-verify');
-        } catch {
-          await logSecurityEvent('admin_verification_email_failed', Astro.request);
-          error = 'Admin verification email could not be sent. Check the mail configuration.';
-        }
       } else {
-        await createSession(Astro.cookies, user, { request: Astro.request });
-        Astro.cookies.delete("guest_share_active", { path: "/" });
-        return Astro.redirect('/');
+        const otpLimit = await checkRateLimit('auth:otp-send', `${getClientIp(Astro.request)}:${user.email}`, 5, 15 * 60);
+        if (!otpLimit.allowed) return rateLimitResponse(otpLimit.retryAfter, 'Too many sign-in code requests. Try again later.');
+        if (user.isAdmin) {
+          try {
+            await destroySession(Astro.cookies);
+            await beginAdminVerification(Astro.cookies, user);
+            return Astro.redirect('/admin-verify');
+          } catch {
+            await logSecurityEvent('admin_verification_email_failed', Astro.request);
+            error = 'Admin verification email could not be sent. Check the mail configuration.';
+          }
+        } else {
+          try {
+            await destroySession(Astro.cookies);
+            await beginLoginVerification(Astro.cookies, user);
+            await logSecurityEvent('login_otp_sent', Astro.request);
+            return Astro.redirect('/login-verify');
+          } catch {
+            await logSecurityEvent('login_otp_email_failed', Astro.request);
+            error = 'Your sign-in code could not be sent. Check the mail configuration and try again.';
+          }
+        }
       }
     }
   } catch (err) {
@@ -50,7 +61,7 @@ if (Astro.request.method === "POST") {
 ---
 
 <Layout title="Sign In — TextShare">
-  <AuthFrame eyebrow="Welcome back" title="Sign in to TextShare" subtitle="Your shares, devices, and Pro controls are waiting for you." asideTitle="Pick up exactly where you left off.">
+  <AuthFrame eyebrow="Welcome back" title="Sign in to TextShare" subtitle="Enter your password first. We’ll email a single-use code before opening your account.">
 
     {error && (
       <div class="banner banner-warning" role="alert">
@@ -90,7 +101,7 @@ if (Astro.request.method === "POST") {
       </div>
 
       <button type="submit" class="btn btn-primary auth-submit">
-        Sign in <span aria-hidden="true">→</span>
+        Continue securely <span aria-hidden="true">→</span>
       </button>
     </form>
 

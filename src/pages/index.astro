@@ -584,6 +584,13 @@ if (Astro.request.method === "POST") {
           sizeFeedback.lastElementChild!.textContent = oversized ? 'Text exceeds the 50 MB limit' : '50 MB maximum';
         };
         shareText?.addEventListener('input', updateTextSize);
+        const extensionShare = new URLSearchParams(window.location.hash.slice(1)).get('share');
+        if (shareText && extensionShare) {
+          shareText.value = extensionShare;
+          updateTextSize();
+          shareText.focus();
+          window.history.replaceState({}, document.title, `${window.location.pathname}${window.location.search}`);
+        }
         shareForm?.addEventListener('submit', (event) => {
           if (contentTypeInput?.value === 'text' && shareText && new TextEncoder().encode(shareText.value).byteLength > maxShareBytes) {
             event.preventDefault();

@@ -78,37 +78,31 @@ describe("account email changes", () => {
     await db
       .collection("emailChangeTokens")
       .deleteMany({ $or: [{ oldEmail: email }, { newEmail: nextEmail }] });
-    await db
-      .collection("emailChangeTokens")
-      .insertOne({
-        oldEmail: email,
-        newEmail: nextEmail,
-        tokenHash: hashAccountToken(token),
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 60_000),
-        usedAt: null,
-      });
-    await db
-      .collection("sessions")
-      .insertOne({
-        sessionId: "c".repeat(32),
-        tokenHash: "d".repeat(64),
-        email,
-        expiresAt: new Date(Date.now() + 60_000),
-        lastSeenAt: new Date(),
-        adminVerified: false,
-        createdAt: new Date(),
-      });
-    await db
-      .collection("shares")
-      .insertOne({
-        slug: "mail01",
-        contentType: "text",
-        expiryDate: new Date(Date.now() + 60_000),
-        createdAt: new Date(),
-        sizeBytes: 1,
-        owner: email,
-      });
+    await db.collection("emailChangeTokens").insertOne({
+      oldEmail: email,
+      newEmail: nextEmail,
+      tokenHash: hashAccountToken(token),
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 60_000),
+      usedAt: null,
+    });
+    await db.collection("sessions").insertOne({
+      sessionId: "c".repeat(32),
+      tokenHash: "d".repeat(64),
+      email,
+      expiresAt: new Date(Date.now() + 60_000),
+      lastSeenAt: new Date(),
+      adminVerified: false,
+      createdAt: new Date(),
+    });
+    await db.collection("shares").insertOne({
+      slug: "mail01",
+      contentType: "text",
+      expiryDate: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+      sizeBytes: 1,
+      owner: email,
+    });
     expect((await consumeEmailChange(token))?.newEmail).toBe(nextEmail);
     expect(await consumeEmailChange(token)).toBeNull();
     expect(

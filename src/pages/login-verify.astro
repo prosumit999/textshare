@@ -1,0 +1,56 @@
+---
+import Layout from '../layouts/Layout.astro';
+import AuthFrame from '../components/AuthFrame.astro';
+import { completeLoginVerification, pendingLoginEmail, resendLoginVerification } from '../lib/login-otp';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+
+const pendingEmail = await pendingLoginEmail(Astro.cookies);
+if (!pendingEmail) return Astro.redirect('/login');
+const [local, domain] = pendingEmail.split('@');
+const maskedEmail = `${local.slice(0, 2)}${'•'.repeat(Math.min(5, Math.max(2, local.length - 2)))}@${domain}`;
+let error = '';
+let notice = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString() || 'verify';
+  const ip = getClientIp(Astro.request);
+  if (action === 'resend') {
+    const limit = await checkRateLimit('auth:login-otp-resend', ip, 3, 10 * 60);
+    if (!limit.allowed) return rateLimitResponse(limit.retryAfter, 'Too many code requests. Try again later.');
+    try {
+      if (await resendLoginVerification(Astro.cookies)) notice = 'A new code has been sent. Only the newest code will work.';
+      else error = 'Your sign-in attempt expired. Return to sign in.';
+    } catch {
+      error = 'The new code could not be sent. Try again shortly.';
+    }
+  } else {
+    const limit = await checkRateLimit('auth:login-otp-verify', ip, 6, 10 * 60);
+    if (!limit.allowed) return rateLimitResponse(limit.retryAfter, 'Too many verification attempts. Try again later.');
+    const code = form.get('code')?.toString() || '';
+    if (await completeLoginVerification(Astro.cookies, code, Astro.request)) {
+      Astro.cookies.delete('guest_share_active', { path: '/' });
+      await logSecurityEvent('login_otp_verified', Astro.request);
+      return Astro.redirect('/');
+    }
+    await logSecurityEvent('login_otp_failed', Astro.request);
+    error = 'That code is incorrect or expired.';
+  }
+}
+---
+
+<Layout title="Confirm Sign In — TextShare">
+  <AuthFrame eyebrow="Secure sign-in" title="Check your email" subtitle={`We sent a six-digit code to ${maskedEmail}. It expires in 10 minutes.`}>
+    {error && <div class="banner banner-warning" role="alert">{error}</div>}
+    {notice && <div class="banner banner-success" role="status">{notice}</div>}
+    <form method="POST" class="auth-form">
+      <div class="input-label-pair">
+        <label for="login-code">Verification code</label>
+        <input id="login-code" class="text-input login-code-input" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="000000" required autofocus />
+      </div>
+      <button class="btn btn-primary auth-submit" type="submit" name="action" value="verify">Verify and sign in <span aria-hidden="true">→</span></button>
+    </form>
+    <Fragment slot="footer"><p>Code didn’t arrive? <button class="auth-link-button" type="submit" name="action" value="resend" form="resend-login-code">Send another</button></p><p><a href="/login">Use another account</a></p></Fragment>
+  </AuthFrame>
+  <form method="POST" id="resend-login-code" hidden></form>
+</Layout>

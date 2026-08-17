@@ -18,7 +18,7 @@ const publicContent = post ? sanitizeBlogHtml(post.content) : '';
 const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 100000).split(/\s+/).length / 220)) : 0;
 ---
 
-<Layout title={post ? `${post.title} — TextShare` : 'Article unavailable — TextShare'} description={post ? blogTextExcerpt(post.content, 155) : 'This article is unavailable.'}>
+<Layout title={post ? `${post.title} — TextShare` : 'Article unavailable — TextShare'} description={post ? post.excerpt || blogTextExcerpt(post.content, 155) : 'This article is unavailable.'}>
   <style is:global>
     body {
       background-image: none;
@@ -31,9 +31,10 @@ const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 1000
         <a href="/blog">Blog</a><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4 6 6-6 6"></path></svg>
         <span aria-current="page">{post.title}</span>
       </nav>
-      <div class="article-meta"><span>TextShare editorial</span><span>{publishedOn}</span><span>{readTime} min read</span></div>
+      <span class="article-kicker">{post.category || 'TextShare journal'}</span>
       <h1>{post.title}</h1>
-      <p class="article-deck">{blogTextExcerpt(post.content, 190)}</p>
+      <p class="article-deck">{post.excerpt || blogTextExcerpt(post.content, 190)}</p>
+      <div class="article-meta"><span>TextShare editorial</span><span>{publishedOn}</span><span>{readTime} min read</span></div>
     </header>
     <figure class:list={["public-article-feature", { generated: !post.coverImage }]}>{post.coverImage ? <img class="public-article-cover" src={post.coverImage} alt={`Featured image for ${post.title}`} /> : <div class="generated-article-visual" aria-hidden="true"><span>Aa</span></div>}</figure>
     <div class="public-article-content" set:html={publicContent}></div>

@@ -23,7 +23,7 @@ node -e "import('bcryptjs').then(async b => console.log(await b.default.hash('US
 
 Set `ADMIN_EMAIL` (defaults to `prosumit999@gmail.com`) and either `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` in Coolify, then redeploy. For easy setup, `ADMIN_PASSWORD` is bcrypt-hashed with cost 12 in memory at process startup. Keep it only in Coolify secrets or an ignored local `.env`; never commit it. A precomputed `ADMIN_PASSWORD_HASH` is preferred and takes precedence when both are configured. Admin mutations are written to the audit log store.
 
-Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_USER` and `GMAIL_APP_PASSWORD` in Coolify. The normal Gmail password must never be used. Admin login fails closed if the verification message cannot be sent.
+Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_USER` and `GMAIL_APP_PASSWORD` in Coolify. The normal Gmail password must never be used. Every sign-in requires a short-lived email OTP after password verification, and login fails closed if the message cannot be sent. Admin OTPs are always delivered to `GMAIL_USER`; the challenged admin identity remains the account configured through `ADMIN_EMAIL`. Admin accounts continue to support the separate recovery-code flow.
 
 ## Implemented controls
 

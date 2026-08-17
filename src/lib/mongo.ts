@@ -38,6 +38,13 @@ export function getMongo() {
           .collection("adminChallenges")
           .createIndex({ createdAt: 1 }, { expireAfterSeconds: 600 }),
         db
+          .collection("loginChallenges")
+          .createIndex({ tokenHash: 1 }, { unique: true }),
+        db.collection("loginChallenges").createIndex({ email: 1 }),
+        db
+          .collection("loginChallenges")
+          .createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }),
+        db
           .collection("adminRecoveryCodes")
           .createIndex({ email: 1, codeHash: 1 }, { unique: true }),
         db
@@ -157,6 +164,25 @@ export function getMongo() {
             adminVerified: { bsonType: "bool" },
           },
         },
+        loginChallenges: {
+          bsonType: "object",
+          required: [
+            "tokenHash",
+            "email",
+            "codeHash",
+            "attempts",
+            "expiresAt",
+            "createdAt",
+          ],
+          properties: {
+            tokenHash: { bsonType: "string", minLength: 64, maxLength: 64 },
+            email: { bsonType: "string", maxLength: 254 },
+            codeHash: { bsonType: "string" },
+            attempts: { bsonType: ["int", "long", "double"], minimum: 0 },
+            expiresAt: { bsonType: "date" },
+            createdAt: { bsonType: "date" },
+          },
+        },
         blogPosts: {
           bsonType: "object",
           required: [
@@ -171,6 +197,13 @@ export function getMongo() {
           properties: {
             title: { bsonType: "string", minLength: 3, maxLength: 160 },
             slug: { bsonType: "string", pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+            category: { bsonType: "string", maxLength: 60 },
+            tags: {
+              bsonType: "array",
+              maxItems: 8,
+              items: { bsonType: "string", maxLength: 30 },
+            },
+            excerpt: { bsonType: "string", maxLength: 320 },
             status: { enum: ["draft", "published"] },
             content: { bsonType: "string", maxLength: 200000 },
           },

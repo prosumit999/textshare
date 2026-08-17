@@ -5,6 +5,7 @@ import { createSession, type User } from "./auth";
 import { sendAdminVerificationCode } from "./email";
 import { secureCookieOptions } from "./security";
 import { getMongo } from "./mongo";
+import { serverEnv } from "./env";
 
 type Challenge = {
   email: string;
@@ -38,7 +39,8 @@ export async function beginAdminVerification(
       createdAt: new Date(),
     });
   try {
-    await sendAdminVerificationCode(user.email, code);
+    const verificationRecipient = serverEnv.GMAIL_USER?.trim() || user.email;
+    await sendAdminVerificationCode(verificationRecipient, code);
     cookies.set("admin_challenge", token, secureCookieOptions(10 * 60));
   } catch (error) {
     await db.collection("adminChallenges").deleteOne({ tokenHash: key });

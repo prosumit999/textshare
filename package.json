@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "start": "node ./dist/server/entry.mjs",
     "preview": "astro preview",
     "cleanup": "node scripts/run-cleanup.mjs",
     "audit:verify": "node scripts/verify-audit.mjs",
