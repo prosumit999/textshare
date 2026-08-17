@@ -7,6 +7,10 @@ export default defineConfig({
   output: "server",
   markdown: { syntaxHighlight: false },
   security: {
+    // Coolify terminates TLS at Traefik and forwards the public host to this
+    // container. Trust that forwarded host so Astro can compare form origins
+    // against the real public URL instead of the container's localhost URL.
+    allowedDomains: [{ hostname: "**" }],
     csp: {
       algorithm: "SHA-256",
       directives: [
@@ -19,20 +23,19 @@ export default defineConfig({
         "connect-src 'self' https://challenges.cloudflare.com",
         "frame-src https://challenges.cloudflare.com",
         "report-uri /api/csp-report",
-        "upgrade-insecure-requests",
       ],
       scriptDirective: {
         resources: ["'self'", "https://challenges.cloudflare.com"],
       },
       styleDirective: {
-  resources: [
-    "'self'",
-    {
-      resource: "'unsafe-inline'",
-      kind: "attribute",
-    },
-  ],
-},
+        resources: [
+          "'self'",
+          {
+            resource: "'unsafe-inline'",
+            kind: "attribute",
+          },
+        ],
+      },
     },
   },
   adapter: node({
