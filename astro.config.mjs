@@ -24,7 +24,15 @@ export default defineConfig({
       scriptDirective: {
         resources: ["'self'", "https://challenges.cloudflare.com"],
       },
-      styleDirective: { resources: ["'self'"] },
+      styleDirective: {
+  resources: [
+    "'self'",
+    {
+      resource: "'unsafe-inline'",
+      kind: "attribute",
+    },
+  ],
+},
     },
   },
   adapter: node({
