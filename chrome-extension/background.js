@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = "http://localhost:4321";
+const DEFAULT_SITE_URL = "http://textshare.pro/";
 const MENU_ID = "textshare-selected-text";
 
 function normalizeSiteUrl(value) {

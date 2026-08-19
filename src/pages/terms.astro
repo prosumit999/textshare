@@ -1,12 +1,13 @@
 ---
-import Layout from '../layouts/Layout.astro'; import PolicyPage from '../components/PolicyPage.astro';
+import Layout from '../layouts/Layout.astro';
+import PolicyPage from '../components/PolicyPage.astro';
+import { getPageBySlug } from '../lib/page-store';
+
+const page = (await getPageBySlug('terms'))!;
+const updatedStr = page.updatedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 ---
-<Layout title="Terms of Service — TextShare" description="Terms governing use of TextShare."><PolicyPage eyebrow="Legal" title="Terms of Service" summary="The rules that keep TextShare useful, temporary, and safe for everyone.">
-<section><h2>1. Agreement and eligibility</h2><p>By using TextShare, you agree to these Terms and our Acceptable Use and Privacy policies. You must be legally able to enter this agreement and provide accurate account information.</p></section>
-<section><h2>2. The service</h2><p>TextShare provides temporary links for text, code and supported images. Expiry and burn-after-view reduce availability but do not guarantee that a recipient has not copied content. Keep your own backups of anything important.</p></section>
-<section><h2>3. Accounts and security</h2><p>You are responsible for your credentials, activity and recipients. Notify us through the contact page if you suspect unauthorized access. We may suspend accounts that threaten the service or other users.</p></section>
-<section><h2>4. Paid subscriptions</h2><p>Pro subscriptions renew monthly or annually until cancelled. Prices and the billing interval are shown before checkout. Stripe processes payments; TextShare does not store complete card details. Cancellation and refund rules are described in our Refund Policy.</p></section>
-<section><h2>5. Your content</h2><p>You retain ownership of your content and grant TextShare the limited rights required to encrypt, store, transmit and delete it as requested. You confirm that you have permission to share it.</p></section>
-<section><h2>6. Availability and liability</h2><p>The service is provided on an “as available” basis. To the extent permitted by law, TextShare is not liable for indirect or consequential loss, lost copies, recipient actions or interruption. Nothing here excludes rights that cannot legally be excluded.</p></section>
-<section><h2>7. Changes and contact</h2><p>Material changes will be posted with a new effective date. Continued use after changes means acceptance. Questions can be sent through our <a href="/contact">support page</a>.</p></section>
-</PolicyPage></Layout>
+<Layout title={`${page.title} — TextShare`} description={page.summary}>
+  <PolicyPage eyebrow={page.eyebrow} title={page.title} summary={page.summary} updated={updatedStr}>
+    <div set:html={page.content}></div>
+  </PolicyPage>
+</Layout>

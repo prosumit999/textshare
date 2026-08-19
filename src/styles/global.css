@@ -1962,6 +1962,14 @@ table.dashboard-table tbody tr:last-child td {
   text-align: center;
 }
 
+.admin-code-input::placeholder,
+.login-code-input::placeholder {
+  letter-spacing: normal;
+  font-size: 14px;
+  font-weight: normal;
+  opacity: 0.55;
+}
+
 .auth-link-button {
   padding: 0;
   border: 0;
@@ -4462,6 +4470,37 @@ body.drawer-open {
 .room-details .view-meta span + span::before {
   content: "·";
   margin-right: 14px;
+}
+
+.room-burn-notice {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 13px;
+  padding: 7px 10px 7px 7px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  color: var(--color-text-base);
+}
+.room-burn-notice .burn-flame {
+  width: 28px;
+  height: 28px;
+}
+.room-burn-notice > span:last-child {
+  display: grid;
+  gap: 1px;
+}
+.room-burn-notice strong {
+  color: var(--color-accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.room-burn-notice small {
+  color: var(--color-text-muted);
+  font-size: 11px;
 }
 
 .room-details .view-actions {

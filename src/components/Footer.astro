@@ -1,11 +1,16 @@
 ---
 import { getPublishedBlogPosts } from '../lib/admin';
+import { getSiteSettings } from '../lib/site-settings-store';
 
 const currentYear = new Date().getFullYear();
 const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
   title: post.title,
   href: `/blog/${post.slug}`
 }));
+
+const siteSettings = await getSiteSettings();
+const socials = siteSettings.socials;
+const pages = siteSettings.pages;
 ---
 
 <footer>
@@ -22,16 +27,31 @@ const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
             </svg>
             <span>Text<span class="logo-accent">Share</span></span>
           </a>
-          <p>Fast, private, and thoughtfully designed sharing for developers. Built to keep your workflow moving.</p>
+          <p>{siteSettings.footerDescription}</p>
           <div class="footer-socials" aria-label="Social links">
-            <a href="#" aria-label="LinkedIn">in</a>
-            <a href="#" aria-label="Instagram">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1"></circle></svg>
-            </a>
-            <a href="#" aria-label="GitHub">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.3-.4 6.8-1.6 6.8-7A5.4 5.4 0 0 0 19.3 4 5 5 0 0 0 19.2.5S18 0 15 2a13.4 13.4 0 0 0-7 0C5-.1 3.8.5 3.8.5A5 5 0 0 0 3.7 4a5.4 5.4 0 0 0-1.5 3.7c0 5.4 3.5 6.6 6.8 7A4.8 4.8 0 0 0 8 18v4"></path><path d="M8 19c-3 .9-3-1.5-4-2"></path></svg>
-            </a>
-            <a href="#" aria-label="X">𝕏</a>
+            {socials.filter(s => s.enabled).map(social => {
+              if (social.platform === 'linkedin') {
+                return <a href={social.url} aria-label="LinkedIn">in</a>;
+              }
+              if (social.platform === 'instagram') {
+                return (
+                  <a href={social.url} aria-label="Instagram">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><circle cx="17.5" cy="6.5" r="1"></circle></svg>
+                  </a>
+                );
+              }
+              if (social.platform === 'github') {
+                return (
+                  <a href={social.url} aria-label="GitHub">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3.3-.4 6.8-1.6 6.8-7A5.4 5.4 0 0 0 19.3 4 5 5 0 0 0 19.2.5S18 0 15 2a13.4 13.4 0 0 0-7 0C5-.1 3.8.5 3.8.5A5 5 0 0 0 3.7 4a5.4 5.4 0 0 0-1.5 3.7c0 5.4 3.5 6.6 6.8 7A4.8 4.8 0 0 0 8 18v4"></path><path d="M8 19c-3 .9-3-1.5-4-2"></path></svg>
+                  </a>
+                );
+              }
+              if (social.platform === 'x') {
+                return <a href={social.url} aria-label="X">𝕏</a>;
+              }
+              return null;
+            })}
           </div>
         </section>
 
@@ -44,7 +64,7 @@ const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
 
         <section class="footer-column footer-extension" aria-labelledby="footer-extension-title">
           <h2 id="footer-extension-title">Get the extension</h2>
-          <p>Share text from any page in one click, right from Chrome.</p>
+          <p>{siteSettings.extensionDescription}</p>
           <a href="#" class="extension-badge" aria-label="Get TextShare from the Chrome Web Store">
             <span class="chrome-mark" aria-hidden="true"></span>
             <span><small>Available on the</small><strong>Chrome Web Store</strong></span>
@@ -55,11 +75,9 @@ const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
       <div class="footer-bottom">
         <span>&copy; {currentYear} TextShare. All rights reserved.</span>
         <nav class="footer-legal" aria-label="Legal links">
-          <a href="/acceptable-use">Acceptable use</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-          <a href="/refund-policy">Refunds</a>
-          <a href="/contact">Contact</a>
+          {pages.filter(p => p.enabled).map(page => (
+            <a href={page.url}>{page.label}</a>
+          ))}
         </nav>
       </div>
     </div>

@@ -123,14 +123,14 @@ const starterPosts: Array<Omit<BlogPost, "createdAt" | "updatedAt">> = [
       "<p>A hard-to-guess URL is useful, but it is not the same as authentication. Password protection adds another check before content is revealed.</p><h2>Use a password when</h2><ul><li>The link contains private or customer information.</li><li>It may be forwarded outside the intended group.</li><li>The sharing channel stores link previews or history.</li></ul><p>Send the password separately from the room link and avoid reusing an account password.</p>",
   },
   {
-    id: "starter-qr-sharing",
-    slug: "qr-sharing",
-    title: "Faster sharing across devices with QR codes",
+    id: "starter-convert-json-to-yaml",
+    slug: "convert-json-to-yaml",
+    title: "Convert JSON to YAML instantly",
     coverImage: "",
     status: "published",
-    publishDate: new Date("2026-06-21T09:00:00Z"),
+    publishDate: new Date("2026-08-19T12:00:00Z"),
     content:
-      "<p>A QR code is a quick bridge between devices. Scan the room code to open a share on a phone or tablet without typing the URL.</p><h2>Useful scenarios</h2><p>QR sharing works well for moving a snippet to a test device, opening setup instructions, or sharing a temporary room during an in-person session.</p><p>Check the destination shown by your scanner before opening unfamiliar codes.</p>",
+      "<p>jsontoyaml.net is a free browser-based tool that turns JSON into clean, readable YAML. Paste, type, or upload your JSON and the converted YAML appears immediately—no account or installation required.</p><h2>How to convert JSON to YAML</h2><ul><li><strong>Add your JSON.</strong> Paste it into the editor or select a JSON file from your device.</li><li><strong>Review the result.</strong> The tool validates your input and creates YAML automatically.</li><li><strong>Use your YAML.</strong> Copy the result or download it for your project.</li></ul><h2>Everything you need in one simple tool</h2><ul><li><strong>Upload JSON:</strong> Select a local file and load it directly into the editor.</li><li><strong>Format JSON:</strong> Make compressed JSON easier to read and debug.</li><li><strong>Copy YAML:</strong> Copy the converted output with one click.</li></ul><h2>Private and practical</h2><p>Your conversion runs locally in your browser, so the JSON you enter is not uploaded to our servers.</p>",
   },
 ];
 

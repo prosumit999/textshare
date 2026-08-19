@@ -1,9 +1,13 @@
 ---
-import Layout from '../layouts/Layout.astro'; import PolicyPage from '../components/PolicyPage.astro';
+import Layout from '../layouts/Layout.astro';
+import PolicyPage from '../components/PolicyPage.astro';
+import { getPageBySlug } from '../lib/page-store';
+
+const page = (await getPageBySlug('acceptable-use'))!;
+const updatedStr = page.updatedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 ---
-<Layout title="Acceptable Use Policy — TextShare"><PolicyPage eyebrow="Trust & safety" title="Acceptable Use Policy" summary="Share useful things—not harm, exploitation, malware or abuse.">
-<section><h2>Prohibited content and conduct</h2><p>Do not use TextShare for illegal material, sexual exploitation, credible threats, harassment, non-consensual intimate material, stolen credentials, doxxing, fraud, phishing, spam, malware, command-and-control infrastructure, or content that infringes another person’s rights.</p></section>
-<section><h2>Security boundaries</h2><p>Do not probe, scrape, overload, enumerate links, bypass access controls or interfere with other users. Authorized security research requires prior written permission.</p></section>
-<section><h2>Enforcement</h2><p>We may remove shares, rate-limit traffic, block addresses, suspend accounts, preserve evidence or report activity when reasonably necessary to protect users, comply with law or enforce this policy.</p></section>
-<section><h2>Reporting abuse</h2><p>Report a room through the <a href="/contact">contact page</a> with the link and reason. Do not include passwords or reproduce harmful content in the report.</p></section>
-</PolicyPage></Layout>
+<Layout title={`${page.title} — TextShare`} description={page.summary}>
+  <PolicyPage eyebrow={page.eyebrow} title={page.title} summary={page.summary} updated={updatedStr}>
+    <div set:html={page.content}></div>
+  </PolicyPage>
+</Layout>

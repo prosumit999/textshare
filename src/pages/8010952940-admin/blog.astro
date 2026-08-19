@@ -90,7 +90,7 @@ const showEditor = Astro.url.searchParams.get('view') === 'create' || Astro.url.
           <label>Excerpt<textarea class="text-input admin-excerpt-input" name="excerpt" maxlength="320" rows="3" placeholder="A short summary shown on blog cards and in search results.">{editPost?.excerpt || ''}</textarea></label>
           <div class="editor-field-heading"><div><strong>Content</strong><small>Rich text · images, lists, links, code and tables supported</small></div></div>
           <div class="rich-editor-shell">
-            <div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting"><button type="button" data-block="h2">H2</button><button type="button" data-block="h3">H3</button><button type="button" data-command="bold"><strong>B</strong></button><button type="button" data-command="italic"><em>I</em></button><button type="button" data-command="underline"><u>U</u></button><span></span><button type="button" data-command="insertUnorderedList">• List</button><button type="button" data-command="insertOrderedList">1. List</button><button type="button" data-block="blockquote">Quote</button><button type="button" data-block="pre">Code</button><span></span><button type="button" data-action="link">Link</button><button type="button" data-action="image">Image</button><button type="button" data-action="table">Table</button><button type="button" data-command="undo">Undo</button></div>
+            <div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting"><button type="button" data-block="h2">H2</button><button type="button" data-block="h3">H3</button><button type="button" data-command="bold"><strong>B</strong></button><button type="button" data-command="italic"><em>I</em></button><button type="button" data-command="underline"><u>U</u></button><span></span><button type="button" data-command="insertUnorderedList">• List</button><button type="button" data-command="insertOrderedList">1. List</button><button type="button" data-block="blockquote">Quote</button><button type="button" data-block="pre">Code</button><span></span><button type="button" data-action="link">Link</button><button type="button" data-action="image-url">Image URL</button><button type="button" data-action="image-upload">Upload Image</button><button type="button" data-action="table">Table</button><button type="button" data-command="undo">Undo</button></div>
             <div id="rich-post-editor" class="rich-post-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Start writing your article…" set:html={editPost?.content || '<p></p>'}></div><textarea id="rich-post-content" name="content" hidden>{editPost?.content || ''}</textarea>
           </div>
           <details class="featured-image-disclosure" open={Boolean(editPost?.coverImage)}>
@@ -122,7 +122,28 @@ const showEditor = Astro.url.searchParams.get('view') === 'create' || Astro.url.
     if (command) document.execCommand(command, false);
     if (block) document.execCommand('formatBlock', false, block);
     if (action === 'link') { const url = window.prompt('Paste the link URL'); if (url) document.execCommand('createLink', false, url); }
-    if (action === 'image') { const url = window.prompt('Paste an HTTPS image URL'); if (url?.startsWith('https://')) document.execCommand('insertImage', false, url); }
+    if (action === 'image-url') { const url = window.prompt('Paste an HTTPS image URL'); if (url?.startsWith('https://')) document.execCommand('insertImage', false, url); }
+    if (action === 'image-upload') {
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/png,image/jpeg,image/webp';
+      fileInput.onchange = async () => {
+        const file = fileInput.files?.[0];
+        if (file) {
+          const body = new FormData();
+          body.set('image', file);
+          try {
+            const response = await fetch('/api/admin/blog-image', { method: 'POST', body });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Upload failed.');
+            document.execCommand('insertImage', false, result.url);
+          } catch (err) {
+            alert(err instanceof Error ? err.message : 'Upload failed.');
+          }
+        }
+      };
+      fileInput.click();
+    }
     if (action === 'table') document.execCommand('insertHTML', false, '<table><thead><tr><th>Heading 1</th><th>Heading 2</th></tr></thead><tbody><tr><td>Cell</td><td>Cell</td></tr></tbody></table><p><br></p>');
   }));
   form?.addEventListener('submit', () => { if (editor && content) content.value = editor.innerHTML; });

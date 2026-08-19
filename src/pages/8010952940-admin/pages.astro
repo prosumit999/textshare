@@ -1,0 +1,366 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { recordAudit } from '../../lib/admin';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
+import { deletePage, getPage, listPages, savePage } from '../../lib/page-store';
+import { slugify } from '../../lib/admin';
+
+const admin = (await getCurrentUser(Astro.cookies))!;
+let message = '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  const id = form.get('id')?.toString();
+
+  if (action === 'delete' && id) {
+    if (!await hasRecentAdminStepUp(Astro.cookies)) {
+      return Astro.redirect('/login?stepup=1');
+    }
+    const page = await getPage(id);
+    if (page && await deletePage(id)) {
+      await recordAudit({
+        actor: admin.email,
+        action: 'delete_page',
+        resourceType: 'custom_page',
+        resourceId: id,
+        details: `Deleted page: ${page.title} (/${page.slug})`
+      });
+      message = 'Page deleted successfully.';
+    }
+  } else if (action === 'save') {
+    const title = form.get('title')?.toString().trim() || '';
+    const manualSlug = form.get('slug')?.toString().trim() || '';
+    const eyebrow = form.get('eyebrow')?.toString().trim() || '';
+    const summary = form.get('summary')?.toString().trim() || '';
+    const content = form.get('content')?.toString() || '';
+    const slug = slugify(manualSlug || title);
+
+    if (title.length < 3 || title.length > 160 || !slug || !content.trim()) {
+      error = 'Please fill out all required fields and ensure the title is between 3 and 160 characters.';
+    } else {
+      const allPages = await listPages();
+      const duplicateSlug = allPages.some((p) => p.slug === slug && p.id !== id);
+      if (duplicateSlug) {
+        error = 'A page with that slug already exists.';
+      } else {
+        const page = await savePage({
+          id,
+          title,
+          slug,
+          eyebrow,
+          summary,
+          content
+        });
+        await recordAudit({
+          actor: admin.email,
+          action: id ? 'update_page' : 'create_page',
+          resourceType: 'custom_page',
+          resourceId: page.id,
+          details: `${id ? 'Updated' : 'Created'} page: ${page.title} (/${page.slug})`
+        });
+        message = 'Page saved successfully.';
+      }
+    }
+  }
+}
+
+const search = Astro.url.searchParams.get('q')?.trim().toLowerCase() || '';
+const page = Math.max(1, Number(Astro.url.searchParams.get('page')) || 1);
+const perPage = 15;
+
+const allPagesList = await listPages();
+const filtered = allPagesList.filter((p) => 
+  !search || `${p.title} ${p.slug} ${p.eyebrow}`.toLowerCase().includes(search)
+);
+const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+const pages = filtered.slice((page - 1) * perPage, page * perPage);
+
+const editPage = Astro.url.searchParams.get('edit') ? await getPage(Astro.url.searchParams.get('edit')!) : null;
+const showEditor = Astro.url.searchParams.get('view') === 'create' || Astro.url.searchParams.has('edit');
+---
+
+<AdminLayout title={showEditor ? (editPage ? 'Edit page' : 'Create page') : 'Custom pages'}>
+  {message && <div class="admin-alert success">{message}</div>}
+  {error && <div class="admin-alert danger">{error}</div>}
+
+  <div class="admin-blog-stack">
+    {!showEditor ? (
+      <section class="admin-panel">
+        <div class="admin-panel-heading">
+          <div>
+            <h2>All custom pages</h2>
+            <p>{filtered.length} matching pages</p>
+          </div>
+          <a href="/8010952940-admin/pages?view=create" class="btn btn-primary">New page</a>
+        </div>
+        
+        <form method="GET" class="admin-filter-bar">
+          <input class="text-input" name="q" value={search} placeholder="Search title, eyebrow or slug" />
+          <button class="btn btn-secondary">Filter</button>
+        </form>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Page name</th>
+                <th>Eyebrow</th>
+                <th>Slug</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pages.map((p) => (
+                <tr>
+                  <td>
+                    <strong>{p.title}</strong>
+                    <small style="color: var(--color-text-muted); display: block; font-size: 11px; margin-top: 2px;">
+                      {p.summary || 'No summary'}
+                    </small>
+                  </td>
+                  <td>
+                    <span class="admin-tag">{p.eyebrow}</span>
+                  </td>
+                  <td>
+                    <code>/{p.slug}</code>
+                  </td>
+                  <td>
+                    <div class="admin-row-actions">
+                      <a class="admin-view-link" href={`/${p.slug}`} target="_blank">View</a>
+                      <a href={`/8010952940-admin/pages?view=create&edit=${p.id}`}>Edit</a>
+                      <form method="POST" onsubmit="return confirm('Delete this custom page permanently?')">
+                        <input type="hidden" name="action" value="delete" />
+                        <input type="hidden" name="id" value={p.id} />
+                        <button class="danger-link">Delete</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {pages.length === 0 && (
+                <tr>
+                  <td colspan="4" class="admin-empty">No pages found.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="admin-pagination">
+          <a aria-disabled={page <= 1} href={`?q=${search}&page=${page - 1}`}>Previous</a>
+          <span>Page {page} of {totalPages}</span>
+          <a aria-disabled={page >= totalPages} href={`?q=${search}&page=${page + 1}`}>Next</a>
+        </div>
+      </section>
+    ) : (
+      <section class="admin-editor-workspace">
+        <div class="blog-editor-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div>
+            <h2>{editPage ? `Edit: ${editPage.title}` : 'Create a new dynamic page'}</h2>
+            <p style="color: var(--color-text-muted); font-size: 12px; margin-top: 4px;">
+              {editPage ? `Last updated ${editPage.updatedAt.toLocaleString()}` : 'Define custom documents or policy pages.'}
+            </p>
+          </div>
+          <a href="/8010952940-admin/pages" class="btn btn-secondary">Back to all pages</a>
+        </div>
+
+        <form method="POST" class="admin-panel admin-editor-form rich-post-form">
+          <input type="hidden" name="action" value="save" />
+          <input type="hidden" name="id" value={editPage?.id || ''} />
+
+          <div class="admin-editor-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+            <label class="form-field-label">
+              Title
+              <input class="text-input" name="title" id="page-title-input" maxlength="160" required value={editPage?.title || ''} />
+            </label>
+            <label class="form-field-label">
+              Slug
+              <input class="text-input" name="slug" id="page-slug-input" maxlength="80" placeholder="Generated from title" value={editPage?.slug || ''} />
+            </label>
+          </div>
+
+          <div class="admin-editor-grid" style="display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px;">
+            <label class="form-field-label">
+              Eyebrow / Kicker
+              <input class="text-input" name="eyebrow" placeholder="e.g. Legal, Trust & Safety" required value={editPage?.eyebrow || ''} />
+            </label>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label class="form-field-label">
+              Summary
+              <textarea class="text-input" name="summary" maxlength="320" rows="3" placeholder="A short description of this page..." style="width: 100%; resize: vertical;" required>{editPage?.summary || ''}</textarea>
+            </label>
+          </div>
+
+          <div class="editor-field-heading" style="margin-bottom: 8px;">
+            <div>
+              <strong>Page Content</strong>
+              <small style="display: block; color: var(--color-text-muted); font-size: 11px; margin-top: 2px;">
+                Rich text layout. Standard sections (`&lt;section&gt;`), headers (`&lt;h2&gt;`), lists, links and blocks are supported.
+              </small>
+            </div>
+          </div>
+
+          <div class="rich-editor-shell" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-base); overflow: hidden; margin-bottom: 24px;">
+            <div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-surface);">
+              <button type="button" data-block="section" class="toolbar-btn">Section</button>
+              <button type="button" data-block="h2" class="toolbar-btn">H2</button>
+              <button type="button" data-block="h3" class="toolbar-btn">H3</button>
+              <button type="button" data-block="p" class="toolbar-btn">Paragraph</button>
+              <span class="toolbar-separator" style="width: 1px; background: var(--color-border); margin: 2px 4px;"></span>
+              <button type="button" data-command="bold" class="toolbar-btn"><strong>B</strong></button>
+              <button type="button" data-command="italic" class="toolbar-btn"><em>I</em></button>
+              <button type="button" data-command="underline" class="toolbar-btn"><u>U</u></button>
+              <span class="toolbar-separator" style="width: 1px; background: var(--color-border); margin: 2px 4px;"></span>
+              <button type="button" data-command="insertUnorderedList" class="toolbar-btn">• List</button>
+              <button type="button" data-command="insertOrderedList" class="toolbar-btn">1. List</button>
+              <button type="button" data-block="blockquote" class="toolbar-btn">Quote</button>
+              <span class="toolbar-separator" style="width: 1px; background: var(--color-border); margin: 2px 4px;"></span>
+              <button type="button" data-action="link" class="toolbar-btn">Link</button>
+              <button type="button" data-action="image-url" class="toolbar-btn">Image URL</button>
+              <button type="button" data-action="image-upload" class="toolbar-btn">Upload Image</button>
+              <button type="button" data-command="undo" class="toolbar-btn">Undo</button>
+            </div>
+            <div 
+              id="rich-page-editor" 
+              class="rich-post-editor" 
+              contenteditable="true" 
+              role="textbox" 
+              aria-multiline="true" 
+              data-placeholder="Start writing the page content..." 
+              style="padding: 16px; min-height: 280px; outline: none; background: var(--color-bg-surface); line-height: 1.6;"
+              set:html={editPage?.content || '<section><h2>First Section</h2><p></p></section>'}
+            ></div>
+            <textarea id="rich-page-content" name="content" hidden>{editPage?.content || ''}</textarea>
+          </div>
+
+          <div class="admin-editor-footer" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+            <button class="btn btn-primary" type="submit">Save page</button>
+          </div>
+        </form>
+      </section>
+    )}
+  </div>
+</AdminLayout>
+
+<style>
+  .form-field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .toolbar-btn {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--color-text-base);
+    transition: all 0.15s ease;
+  }
+  .toolbar-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  .rich-post-editor section {
+    margin-bottom: 20px;
+    padding: 12px;
+    border: 1px dashed var(--color-border);
+    border-radius: 6px;
+  }
+  .rich-post-editor h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+  .rich-post-editor p {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+</style>
+
+<script>
+  const editor = document.querySelector<HTMLElement>('#rich-page-editor');
+  const content = document.querySelector<HTMLTextAreaElement>('#rich-page-content');
+  const form = document.querySelector<HTMLFormElement>('.rich-post-form');
+  const titleInput = document.querySelector<HTMLInputElement>('#page-title-input');
+  const slugInput = document.querySelector<HTMLInputElement>('#page-slug-input');
+
+  const focusEditor = () => editor?.focus();
+
+  document.querySelectorAll<HTMLButtonElement>('.rich-editor-toolbar button').forEach((button) => {
+    button.addEventListener('click', () => {
+      focusEditor();
+      const command = button.dataset.command;
+      const block = button.dataset.block;
+      const action = button.dataset.action;
+
+      if (command) {
+        document.execCommand(command, false);
+      }
+      if (block) {
+        if (block === 'section') {
+          // Insert a section block with headers and paragraphs inside
+          document.execCommand('insertHTML', false, '<section><h2>Section Heading</h2><p>Write content here...</p></section><p><br></p>');
+        } else {
+          document.execCommand('formatBlock', false, block);
+        }
+      }
+      if (action === 'link') {
+        const url = window.prompt('Paste the link URL');
+        if (url) document.execCommand('createLink', false, url);
+      }
+      if (action === 'image-url') {
+        const url = window.prompt('Paste an HTTPS image URL');
+        if (url?.startsWith('https://')) document.execCommand('insertImage', false, url);
+      }
+      if (action === 'image-upload') {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/png,image/jpeg,image/webp';
+        fileInput.onchange = async () => {
+          const file = fileInput.files?.[0];
+          if (file) {
+            const body = new FormData();
+            body.set('image', file);
+            try {
+              const response = await fetch('/api/admin/blog-image', { method: 'POST', body });
+              const result = await response.json();
+              if (!response.ok) throw new Error(result.error || 'Upload failed.');
+              document.execCommand('insertImage', false, result.url);
+            } catch (err) {
+              alert(err instanceof Error ? err.message : 'Upload failed.');
+            }
+          }
+        };
+        fileInput.click();
+      }
+    });
+  });
+
+  form?.addEventListener('submit', () => {
+    if (editor && content) {
+      content.value = editor.innerHTML;
+    }
+  });
+
+  // Auto-slugification client side
+  titleInput?.addEventListener('input', () => {
+    if (slugInput && !slugInput.value) {
+      // Slugify helper inline
+      const slugVal = titleInput.value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 80);
+      slugInput.placeholder = slugVal;
+    }
+  });
+</script>

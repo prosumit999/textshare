@@ -1,0 +1,591 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { recordAudit } from '../../lib/admin';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
+import { getSiteSettings, saveSiteSettings } from '../../lib/site-settings-store';
+
+const admin = (await getCurrentUser(Astro.cookies))!;
+let message = '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  if (!await hasRecentAdminStepUp(Astro.cookies)) {
+    return Astro.redirect('/login?stepup=1');
+  }
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  if (action === 'save') {
+    try {
+      const heroEyebrow = form.get('heroEyebrow')?.toString().trim() || '';
+      const heroTitle = form.get('heroTitle')?.toString().trim() || '';
+      const heroSubtitle = form.get('heroSubtitle')?.toString().trim() || '';
+      const footerDescription = form.get('footerDescription')?.toString().trim() || '';
+      const extensionDescription = form.get('extensionDescription')?.toString().trim() || '';
+      const socialsJson = form.get('socialsJson')?.toString() || '[]';
+      const pagesJson = form.get('pagesJson')?.toString() || '[]';
+      
+      const seoTitle = form.get('seoTitle')?.toString().trim() || '';
+      const seoParagraph = form.get('seoParagraph')?.toString().trim() || '';
+      const seoList = form.get('seoList')?.toString().split('\n').map(s => s.trim()).filter(Boolean) || [];
+      const seoImage = form.get('seoImage')?.toString().trim() || '';
+      
+      const socials = JSON.parse(socialsJson);
+      const pages = JSON.parse(pagesJson);
+      
+      const cleanSocials = socials.map((s: any) => ({
+        platform: String(s.platform),
+        url: String(s.url || '').trim(),
+        enabled: Boolean(s.enabled)
+      }));
+      
+      const cleanPages = pages.map((p: any) => ({
+        label: String(p.label || '').trim(),
+        url: String(p.url || '').trim(),
+        enabled: Boolean(p.enabled)
+      })).filter((p: any) => p.label !== '');
+      
+      await saveSiteSettings({
+        heroEyebrow,
+        heroTitle,
+        heroSubtitle,
+        footerDescription,
+        extensionDescription,
+        socials: cleanSocials,
+        pages: cleanPages,
+        seoTitle,
+        seoParagraph,
+        seoList,
+        seoImage
+      });
+      
+      await recordAudit({
+        actor: admin.email,
+        action: 'update_site_settings',
+        resourceType: 'system_settings',
+        resourceId: 'global',
+        details: 'Updated landing page hero, footer contents, socials, custom links, and SEO optimization section'
+      });
+      message = 'Site settings saved successfully.';
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to save settings.';
+    }
+  }
+}
+
+const settings = await getSiteSettings();
+---
+
+<AdminLayout title="Site settings">
+  {message && <div class="admin-alert success">{message}</div>}
+  {error && <div class="admin-alert danger">{error}</div>}
+
+  <section class="admin-panel">
+    <div class="admin-panel-heading">
+      <div>
+        <h2>Site-wide configuration</h2>
+        <p>Edit hero section text, footer descriptions, social icons, and SEO homepage modules.</p>
+      </div>
+    </div>
+
+    <form id="site-settings-form" method="POST">
+      <input type="hidden" name="action" value="save" />
+      <input type="hidden" id="socials-json-input" name="socialsJson" value="" />
+      <input type="hidden" id="pages-json-input" name="pagesJson" value="" />
+
+      <!-- Hero Section Content -->
+      <h3 class="section-heading">Hero section content</h3>
+      <div class="settings-form-grid">
+        <label class="form-field-label">
+          Eyebrow text
+          <input 
+            type="text" 
+            class="text-input" 
+            name="heroEyebrow" 
+            value={settings.heroEyebrow} 
+            placeholder="e.g. Private by default · No account required" 
+            style="width: 100%;" 
+            required 
+          />
+        </label>
+        
+        <label class="form-field-label">
+          Title
+          <input 
+            type="text" 
+            class="text-input" 
+            name="heroTitle" 
+            value={settings.heroTitle} 
+            placeholder="e.g. Share text and code without the clutter." 
+            style="width: 100%;" 
+            required 
+          />
+        </label>
+
+        <label class="form-field-label">
+          Subtitle
+          <textarea 
+            class="text-input" 
+            name="heroSubtitle" 
+            rows="2" 
+            placeholder="e.g. Paste anything, choose when it expires, and send one simple link." 
+            style="width: 100%; resize: vertical;" 
+            required
+          >{settings.heroSubtitle}</textarea>
+        </label>
+      </div>
+
+      <!-- SEO Homepage Section Config -->
+      <h3 class="section-heading" style="margin-top: 32px;">Homepage SEO optimization</h3>
+      <div class="settings-form-grid">
+        <label class="form-field-label">
+          SEO section heading
+          <input 
+            type="text" 
+            class="text-input" 
+            name="seoTitle" 
+            value={settings.seoTitle} 
+            placeholder="e.g. Why developers choose TextShare" 
+            style="width: 100%;" 
+            required 
+          />
+        </label>
+        
+        <label class="form-field-label">
+          SEO description paragraph
+          <textarea 
+            class="text-input" 
+            name="seoParagraph" 
+            rows="4" 
+            placeholder="Write a descriptive explanation of the tool for SEO..." 
+            style="width: 100%; resize: vertical;" 
+            required
+          >{settings.seoParagraph}</textarea>
+        </label>
+
+        <label class="form-field-label">
+          SEO bullet points (one per line)
+          <textarea 
+            class="text-input" 
+            name="seoList" 
+            rows="4" 
+            placeholder="e.g. Zero-friction workflow: no account required..." 
+            style="width: 100%; resize: vertical; font-family: inherit;" 
+            required
+          >{settings.seoList.join('\n')}</textarea>
+        </label>
+
+        <div style="margin-top: 8px;">
+          <label class="form-field-label">
+            SEO illustration image URL
+            <input 
+              id="seo-image-url" 
+              class="text-input" 
+              name="seoImage" 
+              type="text" 
+              readonly 
+              placeholder="No image selected" 
+              value={settings.seoImage || ''} 
+              style="width: 100%;"
+            />
+          </label>
+          <div style="display: flex; gap: 12px; margin-top: 10px; align-items: center; flex-wrap: wrap;">
+            <input id="seo-image-file" type="file" accept="image/png,image/jpeg,image/webp" style="font-size: 13px;" />
+            <button id="upload-seo-image" type="button" class="btn btn-secondary">Upload image</button>
+            <span id="seo-upload-status" aria-live="polite" style="font-size: 11px; color: var(--color-text-muted);">
+              PNG, JPG or WEBP · max 5 MB
+            </span>
+          </div>
+          <img 
+            id="seo-image-preview" 
+            class="featured-image-preview" 
+            src={settings.seoImage || ''} 
+            alt="SEO image preview" 
+            style={`margin-top: 12px; border-radius: 8px; border: 1px solid var(--color-border); max-height: 160px; object-fit: cover; display: ${settings.seoImage ? 'block' : 'none'};`}
+          />
+        </div>
+      </div>
+
+      <!-- Footer Descriptions -->
+      <h3 class="section-heading" style="margin-top: 32px;">Footer descriptions</h3>
+      <div class="settings-form-grid">
+        <label class="form-field-label">
+          Global footer description
+          <textarea 
+            class="text-input" 
+            name="footerDescription" 
+            rows="2" 
+            placeholder="e.g. Fast, private, and thoughtfully designed sharing for developers..." 
+            style="width: 100%; resize: vertical;" 
+            required
+          >{settings.footerDescription}</textarea>
+        </label>
+        
+        <label class="form-field-label">
+          Chrome extension footer description
+          <textarea 
+            class="text-input" 
+            name="extensionDescription" 
+            rows="2" 
+            placeholder="e.g. Share text from any page in one click, right from Chrome." 
+            style="width: 100%; resize: vertical;" 
+            required
+          >{settings.extensionDescription}</textarea>
+        </label>
+      </div>
+
+      <!-- Social Links Section -->
+      <h3 class="section-heading" style="margin-top: 32px;">Social share links</h3>
+      <div class="socials-list">
+        {settings.socials.map((social) => (
+          <div class="social-link-row" data-platform={social.platform}>
+            <span class="social-platform-name">{social.platform}</span>
+            <input 
+              type="text" 
+              class="text-input social-url-input" 
+              value={social.url} 
+              placeholder={`URL for ${social.platform}`} 
+              style="width: 100%;" 
+            />
+            <label class="checkbox-label" style="margin: 0; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;">
+              <input 
+                type="checkbox" 
+                class="social-enabled-checkbox" 
+                checked={social.enabled} 
+              />
+              Show
+            </label>
+          </div>
+        ))}
+      </div>
+
+      <!-- Page Links Section -->
+      <h3 class="section-heading" style="margin-top: 32px;">Footer page links</h3>
+      <div class="admin-table-wrap">
+        <table class="pages-table">
+          <thead>
+            <tr>
+              <th style="width: 35%;">Link text</th>
+              <th style="width: 45%;">URL path</th>
+              <th style="width: 10%; text-align: center;">Enabled</th>
+              <th style="width: 10%;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pages-tbody">
+            {settings.pages.map((page, index) => (
+              <tr class="page-row" data-index={index}>
+                <td>
+                  <input 
+                    type="text" 
+                    class="text-input page-label-input" 
+                    value={page.label} 
+                    placeholder="e.g. Terms" 
+                    style="width: 100%" 
+                    required 
+                  />
+                </td>
+                <td>
+                  <input 
+                    type="text" 
+                    class="text-input page-url-input" 
+                    value={page.url} 
+                    placeholder="e.g. /terms" 
+                    style="width: 100%" 
+                    required 
+                  />
+                </td>
+                <td style="text-align: center;">
+                  <input 
+                    type="checkbox" 
+                    class="page-enabled-checkbox" 
+                    checked={page.enabled} 
+                  />
+                </td>
+                <td>
+                  <div class="action-buttons">
+                    <button type="button" class="btn-icon move-up-btn" title="Move Up">↑</button>
+                    <button type="button" class="btn-icon move-down-btn" title="Move Down">↓</button>
+                    <button type="button" class="btn-icon btn-danger-icon delete-btn" title="Delete">×</button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="add-btn-wrap">
+        <button type="button" id="add-page-btn" class="btn btn-secondary">
+          + Add page link
+        </button>
+      </div>
+
+      <div class="form-actions-bar">
+        <button class="btn btn-primary" type="submit">
+          Save site settings
+        </button>
+      </div>
+    </form>
+  </section>
+</AdminLayout>
+
+<style>
+  .section-heading {
+    margin-top: 12px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 8px;
+    color: var(--color-text-base);
+  }
+  .settings-form-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .form-field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .socials-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .social-link-row {
+    display: grid;
+    grid-template-columns: 100px 1fr auto;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-bg-base);
+  }
+  .social-platform-name {
+    font-weight: 650;
+    text-transform: capitalize;
+    color: var(--color-text-base);
+  }
+  .pages-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .pages-table th {
+    text-align: left;
+    padding: 10px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 650;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .pages-table td {
+    padding: 10px 6px;
+    vertical-align: middle;
+  }
+  .page-row {
+    border-bottom: 1px solid var(--color-border);
+  }
+  .page-row:last-child {
+    border-bottom: none;
+  }
+  .action-buttons {
+    display: flex;
+    gap: 6px;
+  }
+  .btn-icon {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    transition: all 0.15s ease;
+  }
+  .btn-icon:hover:not(:disabled) {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+  }
+  .btn-icon:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+  .btn-danger-icon:hover {
+    border-color: var(--color-danger) !important;
+    color: var(--color-danger) !important;
+    background: color-mix(in srgb, var(--color-danger) 5%, transparent) !important;
+  }
+  .add-btn-wrap {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-start;
+  }
+  .form-actions-bar {
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    justify-content: flex-end;
+  }
+  .featured-image-preview {
+    max-height: 160px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    object-fit: cover;
+  }
+</style>
+
+<script>
+  const tbody = document.getElementById('pages-tbody')!;
+  const addBtn = document.getElementById('add-page-btn')!;
+  const form = document.getElementById('site-settings-form') as HTMLFormElement;
+  const pagesJsonInput = document.getElementById('pages-json-input') as HTMLInputElement;
+  const socialsJsonInput = document.getElementById('socials-json-input') as HTMLInputElement;
+
+  // SEO Image Upload
+  const seoImageFile = document.querySelector<HTMLInputElement>('#seo-image-file');
+  const seoImageUrl = document.querySelector<HTMLInputElement>('#seo-image-url');
+  const seoImagePreview = document.querySelector<HTMLImageElement>('#seo-image-preview');
+  const uploadSeoBtn = document.querySelector<HTMLButtonElement>('#upload-seo-image');
+  const seoUploadStatus = document.querySelector<HTMLElement>('#seo-upload-status');
+
+  seoImageUrl?.addEventListener('input', () => {
+    if (seoImagePreview) {
+      seoImagePreview.src = seoImageUrl.value;
+      seoImagePreview.style.display = seoImageUrl.value ? 'block' : 'none';
+    }
+  });
+
+  uploadSeoBtn?.addEventListener('click', async () => {
+    const file = seoImageFile?.files?.[0];
+    if (!file || !seoImageUrl || !seoUploadStatus) {
+      if (seoUploadStatus) seoUploadStatus.textContent = 'Choose an image first.';
+      return;
+    }
+    uploadSeoBtn.disabled = true;
+    seoUploadStatus.textContent = 'Uploading and optimizing…';
+    const body = new FormData();
+    body.set('image', file);
+    try {
+      const response = await fetch('/api/admin/blog-image', { method: 'POST', body });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Upload failed.');
+      seoImageUrl.value = result.url;
+      seoImageUrl.dispatchEvent(new Event('input'));
+      seoUploadStatus.textContent = 'Upload complete.';
+    } catch (error) {
+      seoUploadStatus.textContent = error instanceof Error ? error.message : 'Upload failed.';
+    } finally {
+      uploadSeoBtn.disabled = false;
+    }
+  });
+
+  function updateRowButtons() {
+    const rows = Array.from(tbody.querySelectorAll('.page-row'));
+    rows.forEach((row, index) => {
+      const upBtn = row.querySelector('.move-up-btn') as HTMLButtonElement;
+      const downBtn = row.querySelector('.move-down-btn') as HTMLButtonElement;
+      upBtn.disabled = index === 0;
+      downBtn.disabled = index === rows.length - 1;
+    });
+  }
+
+  tbody.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    const row = target.closest('.page-row') as HTMLTableRowElement;
+    if (!row) return;
+
+    if (target.classList.contains('delete-btn')) {
+      if (confirm('Are you sure you want to delete this page link?')) {
+        row.remove();
+        updateRowButtons();
+      }
+    } else if (target.classList.contains('move-up-btn')) {
+      const prev = row.previousElementSibling;
+      if (prev) {
+        tbody.insertBefore(row, prev);
+        updateRowButtons();
+      }
+    } else if (target.classList.contains('move-down-btn')) {
+      const next = row.nextElementSibling;
+      if (next) {
+        tbody.insertBefore(next, row);
+        updateRowButtons();
+      }
+    }
+  });
+
+  addBtn.addEventListener('click', () => {
+    const tr = document.createElement('tr');
+    tr.className = 'page-row';
+    tr.innerHTML = `
+      <td>
+        <input 
+          type="text" 
+          class="text-input page-label-input" 
+          value="" 
+          placeholder="New Page" 
+          style="width: 100%" 
+          required 
+        />
+      </td>
+      <td>
+        <input 
+          type="text" 
+          class="text-input page-url-input" 
+          value="" 
+          placeholder="/new-page" 
+          style="width: 100%" 
+          required 
+        />
+      </td>
+      <td style="text-align: center;">
+        <input 
+          type="checkbox" 
+          class="page-enabled-checkbox" 
+          checked 
+        />
+      </td>
+      <td>
+        <div class="action-buttons">
+          <button type="button" class="btn-icon move-up-btn" title="Move Up">↑</button>
+          <button type="button" class="btn-icon move-down-btn" title="Move Down">↓</button>
+          <button type="button" class="btn-icon btn-danger-icon delete-btn" title="Delete">×</button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(tr);
+    updateRowButtons();
+  });
+
+  form.addEventListener('submit', () => {
+    const socialsRows = Array.from(document.querySelectorAll('.social-link-row'));
+    const socialsData = socialsRows.map(row => {
+      const platform = (row as HTMLElement).dataset.platform;
+      const url = (row.querySelector('.social-url-input') as HTMLInputElement).value;
+      const enabled = (row.querySelector('.social-enabled-checkbox') as HTMLInputElement).checked;
+      return { platform, url, enabled };
+    });
+    socialsJsonInput.value = JSON.stringify(socialsData);
+
+    const pageRows = Array.from(tbody.querySelectorAll('.page-row'));
+    const pagesData = pageRows.map(row => {
+      const label = (row.querySelector('.page-label-input') as HTMLInputElement).value;
+      const url = (row.querySelector('.page-url-input') as HTMLInputElement).value;
+      const enabled = (row.querySelector('.page-enabled-checkbox') as HTMLInputElement).checked;
+      return { label, url, enabled };
+    });
+    pagesJsonInput.value = JSON.stringify(pagesData);
+  });
+
+  updateRowButtons();
+</script>

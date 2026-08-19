@@ -8,6 +8,9 @@ import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secur
 import { MAX_SHARE_BYTES, pruneOversizedShares } from '../lib/shares';
 import { deleteShare, hasShare, listShares, saveShare } from '../lib/share-store';
 import { calculateExpiry, generateAvailableSlug, type ExpiryOption } from '../lib/share-policy';
+import { getSiteSettings } from '../lib/site-settings-store';
+
+const siteSettings = await getSiteSettings();
 
 // SSR Check Authentication & Guest Limit
 const currentUser = await getCurrentUser(Astro.cookies);
@@ -227,10 +230,11 @@ if (Astro.request.method === "POST") {
 
 <Layout>
   <div class="creator-container">
+    <div id="copy-notification" class="copy-notification" role="status" aria-live="polite" aria-atomic="true"></div>
     <div class="hero-section">
-      <span class="eyebrow">Private by default · No account required</span>
-      <h1>Share text and code without the clutter.</h1>
-      <p>Paste anything, choose when it expires, and send one simple link.</p>
+      <span class="eyebrow">{siteSettings.heroEyebrow}</span>
+      <h1>{siteSettings.heroTitle}</h1>
+      <p>{siteSettings.heroSubtitle}</p>
     </div>
 
     <!-- Active guest share recovery and replacement notice -->
@@ -330,6 +334,14 @@ if (Astro.request.method === "POST") {
         const urlVal = document.getElementById("url-text-val")?.textContent;
         const copyIcon = document.getElementById("copy-icon");
         const copyText = document.getElementById("copy-btn-text");
+        const showCopyToast = (message, isError = false) => {
+          const toast = document.getElementById('copy-notification');
+          if (!toast) return;
+          toast.textContent = message;
+          toast.classList.toggle('is-error', isError);
+          toast.classList.add('is-visible');
+          window.setTimeout(() => toast.classList.remove('is-visible'), 2600);
+        };
 
         copyBtn?.addEventListener("click", async () => {
           if (urlVal) {
@@ -339,8 +351,10 @@ if (Astro.request.method === "POST") {
               setTimeout(() => {
                 if (copyText) copyText.textContent = "Copy";
               }, 2000);
+              showCopyToast('Room link copied to clipboard.');
             } catch (err) {
               console.error("Failed to copy text: ", err);
+              showCopyToast('Could not copy the room link.', true);
             }
           }
         });
@@ -770,11 +784,119 @@ if (Astro.request.method === "POST") {
       </script>
     )}
   </div>
+
+  <!-- SEO Section -->
+  <section class="home-seo-section">
+    <header class="seo-header">
+      <h2>{siteSettings.seoTitle}</h2>
+    </header>
+    <div class="seo-grid">
+      <div class="seo-content-column">
+        <p class="seo-paragraph">{siteSettings.seoParagraph}</p>
+        <ul class="seo-benefits-list">
+          {siteSettings.seoList.map(item => (
+            <li>
+              <svg class="icon-svg check-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      {siteSettings.seoImage && (
+        <div class="seo-image-column">
+          <img src={siteSettings.seoImage} alt={siteSettings.seoTitle} class="seo-showcase-image" />
+        </div>
+      )}
+    </div>
+  </section>
 </Layout>
+
+<style>
+  .home-seo-section {
+    margin-top: 48px;
+    margin-bottom: 32px;
+    padding: 32px;
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    background: var(--color-bg-surface);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--color-text-base) 3%, transparent);
+  }
+  .seo-header h2 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    margin-bottom: 20px;
+    color: var(--color-text-base);
+  }
+  .seo-grid {
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 32px;
+    align-items: center;
+  }
+  @media (max-width: 768px) {
+    .seo-grid {
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+    .home-seo-section {
+      padding: 20px;
+    }
+  }
+  .seo-paragraph {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+  .seo-benefits-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .seo-benefits-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--color-text-base);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .check-icon {
+    width: 16px;
+    height: 16px;
+    stroke: var(--color-accent);
+    stroke-width: 3;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .seo-showcase-image {
+    width: 100%;
+    height: auto;
+    border-radius: 12px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+    object-fit: cover;
+    max-height: 240px;
+  }
+</style>
 
 {activeGuestUrl && (
   <script>
     const guestCopyButton = document.getElementById('copy-guest-share');
+    const showCopyToast = (message, isError = false) => {
+      const toast = document.getElementById('copy-notification');
+      if (!toast) return;
+      toast.textContent = message;
+      toast.classList.toggle('is-error', isError);
+      toast.classList.add('is-visible');
+      window.setTimeout(() => toast.classList.remove('is-visible'), 2600);
+    };
     guestCopyButton?.addEventListener('click', async () => {
       const url = guestCopyButton.getAttribute('data-url');
       if (!url) return;
@@ -783,6 +905,7 @@ if (Astro.request.method === "POST") {
         await navigator.clipboard.writeText(url);
         guestCopyButton.textContent = 'Copied!';
         window.setTimeout(() => guestCopyButton.textContent = 'Copy link', 2000);
+        showCopyToast('Room link copied to clipboard.');
       } catch {
         const urlElement = document.getElementById('guest-share-url');
         const selection = window.getSelection();
@@ -792,6 +915,7 @@ if (Astro.request.method === "POST") {
           selection.removeAllRanges();
           selection.addRange(range);
         }
+        showCopyToast('Could not copy the room link.', true);
       }
     });
   </script>

@@ -7,14 +7,19 @@ const { title, description = 'TextShare owner administration' } = Astro.props;
 const pathname = Astro.url.pathname;
 const blogView = Astro.url.searchParams.get('view');
 const isBlogEditor = pathname === `${ADMIN_BASE_PATH}/blog` && (blogView === 'create' || Astro.url.searchParams.has('edit') || Astro.url.searchParams.has('preview'));
+const pageView = Astro.url.searchParams.get('view');
+const isPageEditor = pathname === `${ADMIN_BASE_PATH}/pages` && (pageView === 'create' || Astro.url.searchParams.has('edit'));
 const links = [
   { href: ADMIN_BASE_PATH, label: 'Overview', active: pathname === ADMIN_BASE_PATH },
   { href: `${ADMIN_BASE_PATH}/blog`, label: 'All blog posts', active: pathname === `${ADMIN_BASE_PATH}/blog` && !isBlogEditor },
   { href: `${ADMIN_BASE_PATH}/blog?view=create`, label: 'Create blog post', active: isBlogEditor },
+  { href: `${ADMIN_BASE_PATH}/pages`, label: 'All pages', active: pathname === `${ADMIN_BASE_PATH}/pages` && !isPageEditor },
+  { href: `${ADMIN_BASE_PATH}/pages?view=create`, label: 'Create page', active: isPageEditor },
   { href: `${ADMIN_BASE_PATH}/shares`, label: 'Shares & storage', active: pathname === `${ADMIN_BASE_PATH}/shares` },
   { href: `${ADMIN_BASE_PATH}/traffic`, label: 'Traffic & abuse', active: pathname === `${ADMIN_BASE_PATH}/traffic` },
-  { href: `${ADMIN_BASE_PATH}/users`, label: 'Users', active: pathname === `${ADMIN_BASE_PATH}/users` }
-  ,{ href: `${ADMIN_BASE_PATH}/security`, label: 'Security', active: pathname === `${ADMIN_BASE_PATH}/security` }
+  { href: `${ADMIN_BASE_PATH}/users`, label: 'Users', active: pathname === `${ADMIN_BASE_PATH}/users` },
+  { href: `${ADMIN_BASE_PATH}/security`, label: 'Security', active: pathname === `${ADMIN_BASE_PATH}/security` },
+  { href: `${ADMIN_BASE_PATH}/settings`, label: 'Site settings', active: pathname === `${ADMIN_BASE_PATH}/settings` }
 ];
 ---
 
