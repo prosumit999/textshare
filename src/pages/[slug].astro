@@ -6,7 +6,7 @@ import { Code } from 'astro:components';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
-import { getShare, incrementShareViews } from '../lib/share-store';
+import { claimBurnShare, getShare, incrementShareViews } from '../lib/share-store';
 
 const { slug } = Astro.params;
 const resolutionLimit = await checkRateLimit('share:resolve', getClientIp(Astro.request), 100, 60);
@@ -108,11 +108,16 @@ if (isLocked && Astro.cookies.has(`unlocked_${slug}`)) {
 const isCreatorBurnPreview = Astro.cookies.get("burn_creator_preview")?.value === slug;
 if (isCreatorBurnPreview) Astro.cookies.delete("burn_creator_preview", { path: "/" });
 
-// The recipient receives one complete render. Once the page has painted, the
-// browser claims the burn endpoint; refreshing or revisiting then shows expiry.
-const burnAfterInitialView = Boolean(
-  isStoredShare && share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview && slug,
-);
+// Claim the share before rendering it. This request retains the payload for
+// the first reader's response, but makes every concurrent/reload request
+// unavailable immediately. Client-side cleanup removes the claimed payload
+// only after that first page has had a chance to paint.
+let burnAfterInitialView = false;
+let burnAlreadyClaimed = false;
+if (isStoredShare && share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview && slug) {
+  burnAfterInitialView = await claimBurnShare(slug);
+  burnAlreadyClaimed = !burnAfterInitialView;
+}
 
 const roomUrl = Astro.url.origin + Astro.url.pathname;
 const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
@@ -122,7 +127,7 @@ const sharedImages = share.contentType === 'image'
 ---
 
 <Layout title={`View Share: ${slug} — TextShare`}>
-  {isExpired ? (
+  {isExpired || burnAlreadyClaimed ? (
     <UnavailableShare />
   ) : isLocked ? (
     /* Password Gate Component */
@@ -214,16 +219,21 @@ const sharedImages = share.contentType === 'image'
   };
 
   if (burnAfterInitialView && slug) {
-    // Give the first reader a chance to see the rendered room before removing
-    // its backing record. The request is same-origin and intentionally does
-    // not block the content from appearing.
-    window.setTimeout(() => {
-      fetch(`/api/shares/${encodeURIComponent(slug)}/burn`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "X-TextShare-Burn": "1" },
-      }).catch(() => undefined);
-    }, 250);
+    const removeBurnedShare = () => {
+      // Two animation frames ensure the first reader receives a painted room
+      // before its backing payload is cleared.
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          fetch(`/api/shares/${encodeURIComponent(slug)}/burn`, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "X-TextShare-Burn": "1" },
+          }).catch(() => undefined);
+        }, 600);
+      }));
+    };
+    if (document.readyState === "complete") removeBurnedShare();
+    else window.addEventListener("load", removeBurnedShare, { once: true });
   }
 
   const roomLinkButton = document.getElementById("copy-room-link");

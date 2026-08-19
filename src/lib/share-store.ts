@@ -27,6 +27,7 @@ export type StoredShare = {
   sizeBytes: number;
   createdAt: Date;
   viewCount: number;
+  burnClaimedAt?: Date;
 };
 
 function encryptionKeys() {
@@ -136,7 +137,12 @@ export async function getPersistentShare(
   slug: string,
 ): Promise<StoredShare | null> {
   const { db, bucket } = await getMongo();
-  const document = await db.collection("shares").findOne({ slug });
+  const document = await db.collection("shares").findOne({
+    slug,
+    // Once a burn share is claimed, only the already-rendering first response
+    // may display it. Every later request resolves as unavailable.
+    burnClaimedAt: { $exists: false },
+  });
   if (!document) return null;
   const payload = decryptPayload(
     await streamToBuffer(
@@ -173,12 +179,23 @@ export async function consumePersistentBurnShare(slug: string) {
   const claimed = await db.collection("shares").findOneAndDelete({
     slug,
     burnAfterReading: true,
+    burnClaimedAt: { $exists: true },
   });
   if (!claimed) return false;
   await bucket
     .delete(claimed.contentFileId as ObjectId)
     .catch(() => undefined);
   return true;
+}
+
+export async function claimPersistentBurnShare(slug: string) {
+  const { db } = await getMongo();
+  const claimed = await db.collection("shares").findOneAndUpdate(
+    { slug, burnAfterReading: true, burnClaimedAt: { $exists: false } },
+    { $set: { burnClaimedAt: new Date() } },
+    { returnDocument: "before" },
+  );
+  return Boolean(claimed);
 }
 
 export async function listPersistentShares(owner?: string) {
@@ -242,6 +259,11 @@ export async function deleteShare(slug: string, owner?: string) {
 export async function consumeBurnShare(slug: string) {
   await ensureGuestShareMigration();
   return consumePersistentBurnShare(slug);
+}
+
+export async function claimBurnShare(slug: string) {
+  await ensureGuestShareMigration();
+  return claimPersistentBurnShare(slug);
 }
 
 export async function listShares(owner?: string) {

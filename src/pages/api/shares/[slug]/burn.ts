@@ -2,11 +2,9 @@ import type { APIRoute } from "astro";
 import { consumeBurnShare } from "../../../../lib/share-store";
 import { checkRateLimit, getClientIp, rateLimitResponse } from "../../../../lib/security";
 
-export const POST: APIRoute = async ({ params, request, url }) => {
+export const POST: APIRoute = async ({ params, request }) => {
   const slug = params.slug || "";
-  const sameOrigin = request.headers.get("origin") === url.origin;
   if (
-    !sameOrigin ||
     request.headers.get("x-textshare-burn") !== "1" ||
     !/^[a-z0-9]{6}$/.test(slug)
   ) {
