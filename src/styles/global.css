@@ -424,13 +424,61 @@ a.btn-primary:active {
   cursor: default;
 }
 
-.image-upload-heading {
+.image-drop-zone {
   display: flex;
+  width: 100%;
+  max-width: 760px;
+  min-height: 156px;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
   margin-bottom: 20px;
+  padding: 22px;
+  border: 1px dashed color-mix(in srgb, var(--color-accent) 35%, var(--color-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-accent) 3%, var(--color-bg-base));
+  color: var(--color-text-base);
   text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.image-drop-zone:hover,
+.image-drop-zone:focus-visible,
+.image-drop-zone.is-dragging {
+  border-color: var(--color-accent);
+  border-style: solid;
+  background: color-mix(in srgb, var(--color-accent) 9%, var(--color-bg-base));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  outline: none;
+}
+.image-drop-zone .icon-svg {
+  width: 28px;
+  height: 28px;
+  color: var(--color-accent);
+  stroke-width: 1.8;
+}
+.image-drop-zone > span {
+  display: grid;
+  gap: 3px;
+}
+.image-drop-zone strong {
+  font-size: 14px;
+  font-weight: 700;
+}
+.image-drop-zone span span,
+.image-drop-zone small {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.image-drop-zone em {
+  color: var(--color-accent);
+  font-style: normal;
+  font-weight: 700;
+}
+.image-drop-zone small {
+  margin-top: 2px;
 }
 .image-preview-grid {
   display: grid;
@@ -464,44 +512,6 @@ a.btn-primary:active {
   height: 100%;
   object-fit: cover;
 }
-.image-grid-add {
-  display: flex;
-  width: 100%;
-  height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  transition:
-    color 0.15s ease,
-    background-color 0.15s ease;
-}
-.image-grid-add span {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: 9px;
-  background: var(--color-bg-surface);
-  color: var(--color-accent);
-  font-size: 20px;
-  line-height: 1;
-}
-.image-grid-add small {
-  color: var(--color-text-base);
-  font-size: 9px;
-  font-weight: 650;
-}
-.image-grid-add:hover,
-.image-grid-add:focus-visible {
-  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
-  color: var(--color-accent);
-}
 .image-grid-remove {
   position: absolute;
   top: 6px;
@@ -528,7 +538,7 @@ a.btn-primary:active {
   width: 100%;
   max-width: 760px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   margin-top: 14px;
 }
@@ -1492,6 +1502,49 @@ a.btn-primary:active {
   border-radius: 0;
   border-left: 1px solid var(--color-border);
   padding: 0 var(--space-4);
+}
+
+.copy-notification {
+  position: fixed;
+  z-index: 100;
+  right: 24px;
+  bottom: 24px;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 36%, var(--color-border));
+  border-radius: 10px;
+  background: var(--color-bg-surface);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--color-text-base) 16%, transparent);
+  color: var(--color-text-base);
+  font-size: 13px;
+  font-weight: 650;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+.copy-notification::before {
+  content: "✓";
+  margin-right: 8px;
+  color: var(--color-accent);
+  font-weight: 800;
+}
+.copy-notification.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.copy-notification.is-error {
+  border-color: color-mix(in srgb, var(--color-danger) 42%, var(--color-border));
+}
+.copy-notification.is-error::before {
+  content: "!";
+  color: var(--color-danger);
+}
+@media (max-width: 640px) {
+  .copy-notification {
+    right: 16px;
+    bottom: 76px;
+  }
 }
 
 .qr-code-section {
@@ -2711,8 +2764,8 @@ header {
 }
 
 .logo-tagline {
-  margin-left: 4px;
-  padding-left: 14px;
+  margin-left: 10px;
+  padding-left: 10px;
   border-left: 1px solid var(--color-border);
   color: var(--color-text-muted);
   font-size: 12px;

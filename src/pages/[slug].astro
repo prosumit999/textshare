@@ -6,7 +6,7 @@ import { Code } from 'astro:components';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
-import { deleteShare, getShare, incrementShareViews } from '../lib/share-store';
+import { getShare, incrementShareViews } from '../lib/share-store';
 
 const { slug } = Astro.params;
 const resolutionLimit = await checkRateLimit('share:resolve', getClientIp(Astro.request), 100, 60);
@@ -108,10 +108,11 @@ if (isLocked && Astro.cookies.has(`unlocked_${slug}`)) {
 const isCreatorBurnPreview = Astro.cookies.get("burn_creator_preview")?.value === slug;
 if (isCreatorBurnPreview) Astro.cookies.delete("burn_creator_preview", { path: "/" });
 
-// Quick Burn permits one creator preview, then removes the share after its first recipient view.
-if (share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview) {
-  if (slug) await deleteShare(slug);
-}
+// The recipient receives one complete render. Once the page has painted, the
+// browser claims the burn endpoint; refreshing or revisiting then shows expiry.
+const burnAfterInitialView = Boolean(
+  isStoredShare && share.burnAfterReading && !isExpired && !isLocked && !isCreatorBurnPreview && slug,
+);
 
 const roomUrl = Astro.url.origin + Astro.url.pathname;
 const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
@@ -193,11 +194,38 @@ const sharedImages = share.contentType === 'image'
       <div style="margin-top: var(--space-4); text-align: center;">
         <a href="/" class="btn btn-secondary">Create a New Share</a>
       </div>
+      <div id="copy-notification" class="copy-notification" role="status" aria-live="polite" aria-atomic="true"></div>
     </div>
   )}
 </Layout>
 
-<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired }}>
+<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired, slug, burnAfterInitialView }}>
+  const copyNotification = document.getElementById("copy-notification");
+  let notificationTimer: number | undefined;
+  const showCopyNotification = (message: string, failed = false) => {
+    if (!copyNotification) return;
+    window.clearTimeout(notificationTimer);
+    copyNotification.textContent = message;
+    copyNotification.classList.toggle("is-error", failed);
+    copyNotification.classList.add("is-visible");
+    notificationTimer = window.setTimeout(() => {
+      copyNotification.classList.remove("is-visible");
+    }, 2600);
+  };
+
+  if (burnAfterInitialView && slug) {
+    // Give the first reader a chance to see the rendered room before removing
+    // its backing record. The request is same-origin and intentionally does
+    // not block the content from appearing.
+    window.setTimeout(() => {
+      fetch(`/api/shares/${encodeURIComponent(slug)}/burn`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "X-TextShare-Burn": "1" },
+      }).catch(() => undefined);
+    }, 250);
+  }
+
   const roomLinkButton = document.getElementById("copy-room-link");
   roomLinkButton?.addEventListener("click", async () => {
     const roomUrl = roomLinkButton.getAttribute("data-url");
@@ -209,8 +237,10 @@ const sharedImages = share.contentType === 'image'
       setTimeout(() => {
         if (label) label.textContent = "Copy room link";
       }, 2000);
+      showCopyNotification("Room link copied to clipboard.");
     } catch (error) {
       console.error("Failed to copy room link", error);
+      showCopyNotification("Could not copy the room link.", true);
     }
   });
 
@@ -226,8 +256,10 @@ const sharedImages = share.contentType === 'image'
         setTimeout(() => {
           if (copyLabel) copyLabel.textContent = "Copy text";
         }, 2000);
+        showCopyNotification("Room text copied to clipboard.");
       } catch (err) {
         console.error("Failed to copy code: ", err);
+        showCopyNotification("Could not copy the room text.", true);
       }
     });
   }

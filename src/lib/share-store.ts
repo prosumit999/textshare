@@ -163,6 +163,24 @@ export async function deletePersistentShare(slug: string, owner?: string) {
   return true;
 }
 
+/**
+ * Atomically claims and removes a burn-after-reading share. The caller must
+ * already have rendered the payload before invoking this, so its first reader
+ * can finish loading while every later request finds the room unavailable.
+ */
+export async function consumePersistentBurnShare(slug: string) {
+  const { db, bucket } = await getMongo();
+  const claimed = await db.collection("shares").findOneAndDelete({
+    slug,
+    burnAfterReading: true,
+  });
+  if (!claimed) return false;
+  await bucket
+    .delete(claimed.contentFileId as ObjectId)
+    .catch(() => undefined);
+  return true;
+}
+
 export async function listPersistentShares(owner?: string) {
   const { db } = await getMongo();
   const documents = await db
@@ -219,6 +237,11 @@ export async function getShare(slug: string) {
 export async function deleteShare(slug: string, owner?: string) {
   await ensureGuestShareMigration();
   return deletePersistentShare(slug, owner);
+}
+
+export async function consumeBurnShare(slug: string) {
+  await ensureGuestShareMigration();
+  return consumePersistentBurnShare(slug);
 }
 
 export async function listShares(owner?: string) {

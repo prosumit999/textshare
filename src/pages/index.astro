@@ -388,17 +388,15 @@ if (Astro.request.method === "POST") {
         <div id="image-input-section" style="display: none;">
             <div class="image-upload-wrapper" id="image-drag-area">
               <input type="file" name="imageFile" id="image-file-input" aria-label="Select images to share" accept="image/png, image/jpeg, image/webp" multiple={hasPaidPlan} style="display: none;" />
-              <div class="image-upload-heading">
-                <svg class="icon-svg icon-svg-lg" viewBox="0 0 24 24" style="width:48px; height:48px; color:var(--color-text-muted);">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                  <polyline points="21 15 16 10 5 21"></polyline>
+              <button type="button" class="image-drop-zone" id="image-drop-zone" aria-describedby="image-expiry-hint image-selection-status">
+                <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M12 16V4"></path><path d="m8 8 4-4 4 4"></path><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"></path>
                 </svg>
-                <div style="font-weight: 500;">Click to select {hasPaidPlan ? 'up to 5 images' : 'an image'} (PNG, JPG, WEBP)</div>
-                <div id="image-expiry-hint" style="color: var(--color-text-muted); font-size:12px;">{hasPaidPlan ? 'Pro: up to 5 images · expires in 24 hours' : 'One image · expires in 3 hours'} · 5 MB per image</div>
-              </div>
-              <div id="image-preview-grid" class:list={["image-preview-grid", { single: !hasPaidPlan }]} data-max={hasPaidPlan ? 5 : 1}></div>
-              <div class="image-upload-footer"><button type="button" id="add-images-btn" class="btn btn-secondary">Add {hasPaidPlan ? 'images' : 'image'}</button><span id="image-selection-status">0 / {hasPaidPlan ? 5 : 1} selected</span></div>
+                <span><strong>Drag and drop {hasPaidPlan ? 'images' : 'an image'} here</strong><span>or <em>choose files</em> to upload · PNG, JPG, WEBP</span></span>
+                <small id="image-expiry-hint">{hasPaidPlan ? 'Pro: up to 5 images · expires in 24 hours' : 'One image · expires in 3 hours'} · 5 MB per image</small>
+              </button>
+              <div id="image-preview-grid" class:list={["image-preview-grid", { single: !hasPaidPlan }]} data-max={hasPaidPlan ? 5 : 1} hidden></div>
+              <div class="image-upload-footer"><span id="image-selection-status" aria-live="polite">0 / {hasPaidPlan ? 5 : 1} selected</span></div>
             </div>
             {errors.imageFile && (
               <span style="color:var(--color-danger); font-size:12px; padding:var(--space-2) var(--space-4); display:block;">
@@ -632,6 +630,7 @@ if (Astro.request.method === "POST") {
         // Image Drag/Click upload logic
         const imageDragArea = document.getElementById("image-drag-area");
         const imageFileInput = document.getElementById("image-file-input") as HTMLInputElement;
+        const imageDropZone = document.getElementById('image-drop-zone');
         const imageGrid = document.getElementById('image-preview-grid');
         const addImagesButton = document.getElementById('add-images-btn');
         const imageSelectionStatus = document.getElementById('image-selection-status');
@@ -649,37 +648,58 @@ if (Astro.request.method === "POST") {
           previewUrls = [];
           if (!imageGrid) return;
           imageGrid.replaceChildren();
-          for (let index = 0; index < maxImages; index += 1) {
+          imageGrid.toggleAttribute('hidden', selectedImages.length === 0);
+          selectedImages.forEach((selectedImage, index) => {
             const slot = document.createElement('div');
-            slot.className = `image-grid-slot${selectedImages[index] ? ' filled' : ''}`;
-            if (selectedImages[index]) {
-              const url = URL.createObjectURL(selectedImages[index]);
-              previewUrls.push(url);
-              const image = document.createElement('img');
-              image.src = url;
-              image.alt = `Selected image ${index + 1}`;
-              const remove = document.createElement('button');
-              remove.type = 'button';
-              remove.className = 'image-grid-remove';
-              remove.dataset.removeImage = String(index);
-              remove.setAttribute('aria-label', `Remove image ${index + 1}`);
-              remove.textContent = '×';
-              slot.append(image, remove);
-            } else {
-              const add = document.createElement('button');
-              add.type = 'button';
-              add.className = 'image-grid-add';
-              add.setAttribute('aria-label', 'Add an image');
-              add.innerHTML = '<span>+</span><small>Add image</small>';
-              slot.append(add);
-            }
+            slot.className = 'image-grid-slot filled';
+            const url = URL.createObjectURL(selectedImage);
+            previewUrls.push(url);
+            const image = document.createElement('img');
+            image.src = url;
+            image.alt = `Selected image ${index + 1}`;
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'image-grid-remove';
+            remove.dataset.removeImage = String(index);
+            remove.setAttribute('aria-label', `Remove image ${index + 1}`);
+            remove.textContent = '×';
+            slot.append(image, remove);
             imageGrid.append(slot);
-          }
+          });
           if (imageSelectionStatus) imageSelectionStatus.textContent = `${selectedImages.length} / ${maxImages} selected`;
           if (addImagesButton instanceof HTMLButtonElement) addImagesButton.disabled = selectedImages.length >= maxImages;
         };
         const openImagePicker = () => { if (selectedImages.length < maxImages) imageFileInput.click(); };
+        const addImages = (incoming: File[]) => {
+          const known = new Set(selectedImages.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+          let rejected = 0;
+          for (const file of incoming) {
+            const key = `${file.name}:${file.size}:${file.lastModified}`;
+            const supported = ['image/png', 'image/jpeg', 'image/webp'].includes(file.type);
+            if (!supported || file.size > 5 * 1024 * 1024 || known.has(key) || selectedImages.length >= maxImages) {
+              rejected += 1;
+              continue;
+            }
+            selectedImages.push(file);
+            known.add(key);
+          }
+          syncImageInput();
+          renderImageGrid();
+          if (imageSelectionStatus && rejected) imageSelectionStatus.textContent = `${selectedImages.length} / ${maxImages} selected · ${rejected} file${rejected === 1 ? '' : 's'} skipped`;
+        };
         addImagesButton?.addEventListener('click', openImagePicker);
+        imageDropZone?.addEventListener('click', openImagePicker);
+        ['dragenter', 'dragover'].forEach((eventName) => imageDropZone?.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          imageDropZone.classList.add('is-dragging');
+        }));
+        ['dragleave', 'drop'].forEach((eventName) => imageDropZone?.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          imageDropZone.classList.remove('is-dragging');
+        }));
+        imageDropZone?.addEventListener('drop', (event) => {
+          addImages(Array.from((event as DragEvent).dataTransfer?.files || []));
+        });
         imageGrid?.addEventListener('click', (event) => {
           const target = event.target as HTMLElement;
           const remove = target.closest<HTMLButtonElement>('[data-remove-image]');
@@ -687,17 +707,10 @@ if (Astro.request.method === "POST") {
             selectedImages.splice(Number(remove.dataset.removeImage), 1);
             syncImageInput();
             renderImageGrid();
-          } else if (target.closest('.image-grid-add')) openImagePicker();
+          }
         });
         imageFileInput.addEventListener('change', () => {
-          const incoming = Array.from(imageFileInput.files || []);
-          const known = new Set(selectedImages.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
-          for (const file of incoming) {
-            const key = `${file.name}:${file.size}:${file.lastModified}`;
-            if (!known.has(key) && selectedImages.length < maxImages) { selectedImages.push(file); known.add(key); }
-          }
-          syncImageInput();
-          renderImageGrid();
+          addImages(Array.from(imageFileInput.files || []));
         });
         renderImageGrid();
 
