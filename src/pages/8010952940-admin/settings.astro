@@ -24,10 +24,7 @@ if (Astro.request.method === 'POST') {
       const socialsJson = form.get('socialsJson')?.toString() || '[]';
       const pagesJson = form.get('pagesJson')?.toString() || '[]';
       
-      const seoTitle = form.get('seoTitle')?.toString().trim() || '';
-      const seoParagraph = form.get('seoParagraph')?.toString().trim() || '';
-      const seoList = form.get('seoList')?.toString().split('\n').map(s => s.trim()).filter(Boolean) || [];
-      const seoImage = form.get('seoImage')?.toString().trim() || '';
+      const existing = await getSiteSettings();
       
       const socials = JSON.parse(socialsJson);
       const pages = JSON.parse(pagesJson);
@@ -52,10 +49,8 @@ if (Astro.request.method === 'POST') {
         extensionDescription,
         socials: cleanSocials,
         pages: cleanPages,
-        seoTitle,
-        seoParagraph,
-        seoList,
-        seoImage
+        seoTitle: existing.seoTitle,
+        seoContent: existing.seoContent
       });
       
       await recordAudit({
@@ -63,7 +58,7 @@ if (Astro.request.method === 'POST') {
         action: 'update_site_settings',
         resourceType: 'system_settings',
         resourceId: 'global',
-        details: 'Updated landing page hero, footer contents, socials, custom links, and SEO optimization section'
+        details: 'Updated landing page hero, footer contents, socials, and custom links'
       });
       message = 'Site settings saved successfully.';
     } catch (err) {
@@ -134,76 +129,7 @@ const settings = await getSiteSettings();
         </label>
       </div>
 
-      <!-- SEO Homepage Section Config -->
-      <h3 class="section-heading" style="margin-top: 32px;">Homepage SEO optimization</h3>
-      <div class="settings-form-grid">
-        <label class="form-field-label">
-          SEO section heading
-          <input 
-            type="text" 
-            class="text-input" 
-            name="seoTitle" 
-            value={settings.seoTitle} 
-            placeholder="e.g. Why developers choose TextShare" 
-            style="width: 100%;" 
-            required 
-          />
-        </label>
-        
-        <label class="form-field-label">
-          SEO description paragraph
-          <textarea 
-            class="text-input" 
-            name="seoParagraph" 
-            rows="4" 
-            placeholder="Write a descriptive explanation of the tool for SEO..." 
-            style="width: 100%; resize: vertical;" 
-            required
-          >{settings.seoParagraph}</textarea>
-        </label>
 
-        <label class="form-field-label">
-          SEO bullet points (one per line)
-          <textarea 
-            class="text-input" 
-            name="seoList" 
-            rows="4" 
-            placeholder="e.g. Zero-friction workflow: no account required..." 
-            style="width: 100%; resize: vertical; font-family: inherit;" 
-            required
-          >{settings.seoList.join('\n')}</textarea>
-        </label>
-
-        <div style="margin-top: 8px;">
-          <label class="form-field-label">
-            SEO illustration image URL
-            <input 
-              id="seo-image-url" 
-              class="text-input" 
-              name="seoImage" 
-              type="text" 
-              readonly 
-              placeholder="No image selected" 
-              value={settings.seoImage || ''} 
-              style="width: 100%;"
-            />
-          </label>
-          <div style="display: flex; gap: 12px; margin-top: 10px; align-items: center; flex-wrap: wrap;">
-            <input id="seo-image-file" type="file" accept="image/png,image/jpeg,image/webp" style="font-size: 13px;" />
-            <button id="upload-seo-image" type="button" class="btn btn-secondary">Upload image</button>
-            <span id="seo-upload-status" aria-live="polite" style="font-size: 11px; color: var(--color-text-muted);">
-              PNG, JPG or WEBP · max 5 MB
-            </span>
-          </div>
-          <img 
-            id="seo-image-preview" 
-            class="featured-image-preview" 
-            src={settings.seoImage || ''} 
-            alt="SEO image preview" 
-            style={`margin-top: 12px; border-radius: 8px; border: 1px solid var(--color-border); max-height: 160px; object-fit: cover; display: ${settings.seoImage ? 'block' : 'none'};`}
-          />
-        </div>
-      </div>
 
       <!-- Footer Descriptions -->
       <h3 class="section-heading" style="margin-top: 32px;">Footer descriptions</h3>
@@ -451,43 +377,7 @@ const settings = await getSiteSettings();
   const pagesJsonInput = document.getElementById('pages-json-input') as HTMLInputElement;
   const socialsJsonInput = document.getElementById('socials-json-input') as HTMLInputElement;
 
-  // SEO Image Upload
-  const seoImageFile = document.querySelector<HTMLInputElement>('#seo-image-file');
-  const seoImageUrl = document.querySelector<HTMLInputElement>('#seo-image-url');
-  const seoImagePreview = document.querySelector<HTMLImageElement>('#seo-image-preview');
-  const uploadSeoBtn = document.querySelector<HTMLButtonElement>('#upload-seo-image');
-  const seoUploadStatus = document.querySelector<HTMLElement>('#seo-upload-status');
 
-  seoImageUrl?.addEventListener('input', () => {
-    if (seoImagePreview) {
-      seoImagePreview.src = seoImageUrl.value;
-      seoImagePreview.style.display = seoImageUrl.value ? 'block' : 'none';
-    }
-  });
-
-  uploadSeoBtn?.addEventListener('click', async () => {
-    const file = seoImageFile?.files?.[0];
-    if (!file || !seoImageUrl || !seoUploadStatus) {
-      if (seoUploadStatus) seoUploadStatus.textContent = 'Choose an image first.';
-      return;
-    }
-    uploadSeoBtn.disabled = true;
-    seoUploadStatus.textContent = 'Uploading and optimizing…';
-    const body = new FormData();
-    body.set('image', file);
-    try {
-      const response = await fetch('/api/admin/blog-image', { method: 'POST', body });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Upload failed.');
-      seoImageUrl.value = result.url;
-      seoImageUrl.dispatchEvent(new Event('input'));
-      seoUploadStatus.textContent = 'Upload complete.';
-    } catch (error) {
-      seoUploadStatus.textContent = error instanceof Error ? error.message : 'Upload failed.';
-    } finally {
-      uploadSeoBtn.disabled = false;
-    }
-  });
 
   function updateRowButtons() {
     const rows = Array.from(tbody.querySelectorAll('.page-row'));

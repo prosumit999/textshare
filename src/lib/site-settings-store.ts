@@ -20,11 +20,9 @@ export type SiteSettings = {
   heroEyebrow: string;
   heroTitle: string;
   heroSubtitle: string;
-  // SEO Section
+  // SEO Section (Rich text)
   seoTitle: string;
-  seoParagraph: string;
-  seoList: string[];
-  seoImage: string;
+  seoContent: string;
 };
 
 export const defaultSocials: SocialLink[] = [
@@ -51,14 +49,22 @@ export const defaultSiteSettings: SiteSettings = {
   heroTitle: "Share text and code without the clutter.",
   heroSubtitle: "Paste anything, choose when it expires, and send one simple link.",
   seoTitle: "Why developers choose TextShare",
-  seoParagraph: "TextShare is engineered to eliminate the friction of sharing sensitive code and logs. Chat tools index messages permanently, email chains are vulnerable to data leakage, and generic pastebins are bloated with trackers. TextShare provides an instantaneous, ad-free environment where your shared content remains strictly private, formatted perfectly, and auto-destroyed exactly when you specify.",
-  seoList: [
-    "Zero-friction workflow: no account or registration required to start sharing.",
-    "Syntax highlighting for major programming languages, styled for readability.",
-    "Strict security controls: AES-256-GCM encryption, single-use burn-after-reading rooms, and password gates.",
-    "Fully optimized for speed: light, responsive, and cross-platform."
-  ],
-  seoImage: "https://images.unsplash.com/photo-1607799279861-4dd421887fb3?q=80&w=600&auto=format&fit=crop"
+  seoContent: `<p>TextShare is engineered to eliminate the friction of sharing sensitive code and logs. Chat tools index messages permanently, email chains are vulnerable to data leakage, and generic pastebins are bloated with trackers. TextShare provides an instantaneous, ad-free environment where your shared content remains strictly private, formatted perfectly, and auto-destroyed exactly when you specify.</p>
+<h2>How to convert JSON to YAML</h2>
+<ul>
+  <li><strong>Add your JSON.</strong> Paste it into the editor or select a JSON file from your device.</li>
+  <li><strong>Review the result.</strong> The tool validates your input and creates YAML automatically.</li>
+  <li><strong>Use your YAML.</strong> Copy the result or download it for your project.</li>
+</ul>
+<h2>Everything you need in one simple tool</h2>
+<ul>
+  <li><strong>Upload JSON:</strong> Select a local file and load it directly into the editor.</li>
+  <li><strong>Format JSON:</strong> Make compressed JSON easier to read and debug.</li>
+  <li><strong>Copy YAML:</strong> Copy the converted output with one click.</li>
+</ul>
+<h2>Private and practical</h2>
+<p>Your conversion runs locally in your browser, so the JSON you enter is not uploaded to our servers.</p>
+<p><img src="https://images.unsplash.com/photo-1607799279861-4dd421887fb3?q=80&w=600&auto=format&fit=crop" alt="Coding Illustration" /></p>`
 };
 
 export async function getSiteSettings(): Promise<SiteSettings> {
@@ -76,9 +82,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     heroTitle: settings.heroTitle || defaultSiteSettings.heroTitle,
     heroSubtitle: settings.heroSubtitle || defaultSiteSettings.heroSubtitle,
     seoTitle: settings.seoTitle || defaultSiteSettings.seoTitle,
-    seoParagraph: settings.seoParagraph || defaultSiteSettings.seoParagraph,
-    seoList: settings.seoList || defaultSiteSettings.seoList,
-    seoImage: settings.seoImage || defaultSiteSettings.seoImage
+    seoContent: settings.seoContent || defaultSiteSettings.seoContent
   };
 }
 

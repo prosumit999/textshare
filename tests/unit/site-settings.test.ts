@@ -16,9 +16,7 @@ describe("site settings store", () => {
     expect(settings.heroTitle).toBe(defaultSiteSettings.heroTitle);
     expect(settings.heroSubtitle).toBe(defaultSiteSettings.heroSubtitle);
     expect(settings.seoTitle).toBe(defaultSiteSettings.seoTitle);
-    expect(settings.seoParagraph).toBe(defaultSiteSettings.seoParagraph);
-    expect(settings.seoList).toEqual(defaultSiteSettings.seoList);
-    expect(settings.seoImage).toBe(defaultSiteSettings.seoImage);
+    expect(settings.seoContent).toBe(defaultSiteSettings.seoContent);
     expect(settings.socials).toEqual(defaultSiteSettings.socials);
     expect(settings.pages).toEqual(defaultSiteSettings.pages);
   });
@@ -40,9 +38,7 @@ describe("site settings store", () => {
       heroTitle: "Custom title",
       heroSubtitle: "Custom subtitle",
       seoTitle: "Custom SEO Title",
-      seoParagraph: "Custom SEO Paragraph content goes here.",
-      seoList: ["Benefit 1", "Benefit 2"],
-      seoImage: "https://example.com/image.png"
+      seoContent: "<p>Custom SEO HTML Content</p>"
     };
     
     await saveSiteSettings(customSettings);
@@ -54,9 +50,7 @@ describe("site settings store", () => {
     expect(settings.heroTitle).toBe(customSettings.heroTitle);
     expect(settings.heroSubtitle).toBe(customSettings.heroSubtitle);
     expect(settings.seoTitle).toBe(customSettings.seoTitle);
-    expect(settings.seoParagraph).toBe(customSettings.seoParagraph);
-    expect(settings.seoList).toEqual(customSettings.seoList);
-    expect(settings.seoImage).toBe(customSettings.seoImage);
+    expect(settings.seoContent).toBe(customSettings.seoContent);
     expect(settings.socials).toEqual(customSettings.socials);
     expect(settings.pages).toEqual(customSettings.pages);
   });
