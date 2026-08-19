@@ -30,7 +30,9 @@ export async function beginLoginVerification(
   cookies: AstroCookies,
   user: User,
 ) {
-  if (user.disabled || !user.emailVerified || user.isAdmin)
+  // This challenge verifies a new account's email during its first sign-in.
+  // Established accounts sign in directly; administrators use admin-auth.ts.
+  if (user.disabled || user.emailVerified || user.isAdmin)
     throw new Error("Login verification unavailable.");
   const token = randomBytes(32).toString("base64url");
   const code = createCode();
@@ -79,7 +81,7 @@ export async function resendLoginVerification(cookies: AstroCookies) {
   const challenge = await pendingChallenge(cookies);
   if (!challenge) return false;
   const user = await getUserByEmail(challenge.email);
-  if (!user || user.disabled || user.isAdmin) return false;
+  if (!user || user.disabled || user.emailVerified || user.isAdmin) return false;
   const code = createCode();
   const { db } = await getMongo();
   await sendLoginVerificationCode(user.email, code);
@@ -128,8 +130,12 @@ export async function completeLoginVerification(
     .updateOne({ tokenHash: key }, { $inc: { attempts: 1 } });
   if (!(await bcrypt.compare(code.trim(), challenge.codeHash))) return false;
   const user = await getUserByEmail(challenge.email);
-  if (!user || user.disabled || !user.emailVerified || user.isAdmin)
+  if (!user || user.disabled || user.emailVerified || user.isAdmin)
     return false;
+  await db.collection<User>("users").updateOne(
+    { email: user.email, disabled: false, emailVerified: { $ne: true }, isAdmin: false },
+    { $set: { emailVerified: true } },
+  );
   await db.collection("loginChallenges").deleteOne({ tokenHash: key });
   cookies.delete("login_challenge", { path: "/" });
   await createSession(cookies, user, { request });

@@ -2,7 +2,6 @@
 import Layout from '../layouts/Layout.astro';
 import AuthFrame from '../components/AuthFrame.astro';
 import { normalizeEmail, registerUser, validatePasswordStrength } from '../lib/auth';
-import { issueEmailVerification } from '../lib/account-tokens';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
 import { breachedPasswordCount } from '../lib/password-security';
 
@@ -51,13 +50,12 @@ if (Astro.request.method === "POST") {
       if (!registered.ok) {
         error = "Unable to create account with those details.";
       } else {
-        await issueEmailVerification(registered.user.email, Astro.url.origin);
         await logSecurityEvent('account_created_pending_verification', Astro.request);
-        return Astro.redirect('/verify-email?sent=1');
+        return Astro.redirect('/login?created=1');
       }
     }
   } catch (err) {
-    if (!(err instanceof Error && ['VALIDATION_FAILED', 'PASSWORD_SCREENING_UNAVAILABLE'].includes(err.message))) error = "The account was created, but the verification email could not be sent. Use the verification page to resend it.";
+    if (!(err instanceof Error && ['VALIDATION_FAILED', 'PASSWORD_SCREENING_UNAVAILABLE'].includes(err.message))) error = "The account could not be created. Please try again.";
   }
 }
 ---
@@ -128,12 +126,12 @@ if (Astro.request.method === "POST") {
         /><button type="button" class="auth-password-toggle" data-password-toggle data-target="confirm-password-input" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z"></path><circle cx="12" cy="12" r="2.5"></circle></svg></button></div>
       </div>
 
-      <p class="auth-form-assurance"><span>✓</span> We’ll email a secure verification link before your first sign-in.</p>
+      <p class="auth-form-assurance"><span>✓</span> On your first sign-in, we’ll email a six-digit verification code.</p>
       <button type="submit" class="btn btn-primary auth-submit">
         Create account <span aria-hidden="true">→</span>
       </button>
     </form>
 
-    <Fragment slot="footer"><p>Already have an account? <a href="/login">Sign in</a></p><p><a href="/verify-email">Resend a verification email</a></p></Fragment>
+    <Fragment slot="footer"><p>Already have an account? <a href="/login">Sign in</a></p></Fragment>
   </AuthFrame>
 </Layout>

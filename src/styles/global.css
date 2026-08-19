@@ -1119,13 +1119,13 @@ a.btn-primary:active {
 .settings-page,
 .policy-page,
 .contact-page {
-  max-width: 1060px;
-  margin: 34px auto 90px;
+  max-width: 1080px;
+  margin: 0px auto 90px;
 }
 .settings-hero,
 .policy-hero,
 .contact-page > header {
-  padding: 34px;
+  padding: 15px;
   border: 1px solid
     color-mix(in srgb, var(--color-accent) 18%, var(--color-border));
   border-radius: 22px;
@@ -1142,30 +1142,34 @@ a.btn-primary:active {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 18px;
+  margin-bottom: 24px;
+  height: auto;
+  min-height: 120px;
+  position: unset;
 }
 .settings-hero h1,
 .policy-hero h1,
 .contact-page h1 {
-  margin: 7px 0 8px;
-  font-size: clamp(30px, 5vw, 48px);
-  letter-spacing: -0.05em;
+  margin: 7px 0 10px;
+  font-size: 19px;
+  letter-spacing: -0.04em;
 }
 .settings-hero p,
 .policy-hero p,
 .contact-page > header p {
   max-width: 680px;
   color: var(--color-text-muted);
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.6;
 }
 .settings-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 20px;
 }
 .settings-card {
   position: relative;
-  padding: 25px;
+  padding: 28px;
   border: 1px solid var(--color-border);
   border-radius: 18px;
   background: var(--color-bg-surface);
@@ -1174,15 +1178,15 @@ a.btn-primary:active {
 }
 .settings-card form {
   display: grid;
-  gap: 13px;
-  margin-top: 18px;
+  gap: 15px;
+  margin-top: 20px;
 }
 .settings-card label,
 .contact-form-card label {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 650;
 }
 .settings-card .btn {
@@ -1192,21 +1196,22 @@ a.btn-primary:active {
   padding-right: 48px;
 }
 .settings-card-heading h2 {
-  margin: 0 0 5px;
-  font-size: 19px;
+  margin: 0 0 6px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
 }
 .settings-card-heading p {
   color: var(--color-text-muted);
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.6;
 }
 .settings-icon {
   position: absolute;
-  top: 21px;
-  right: 21px;
+  top: 24px;
+  right: 24px;
   display: grid;
-  width: 37px;
-  height: 37px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   border-radius: 11px;
   background: color-mix(in srgb, var(--color-accent) 10%, transparent);
@@ -1411,7 +1416,7 @@ a.btn-primary:active {
     padding: 24px 19px;
   }
   .settings-card {
-    padding: 20px;
+    padding: 22px;
   }
   .policy-shell aside {
     position: static;
@@ -2702,7 +2707,7 @@ header {
 
 .logo {
   font-size: 17px;
-  gap: 10px;
+  gap: 0px;
 }
 
 .logo-tagline {
@@ -2768,7 +2773,7 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
 }
 
 .hero-section {
-  margin: 25px auto;
+  margin: 0px auto;
 }
 
 .eyebrow {
@@ -3109,11 +3114,11 @@ footer {
 
 @media (max-width: 639px) {
   main {
-    padding-top: 34px;
+    padding-top: 0px;
   }
 
   .hero-section {
-    margin-bottom: 26px;
+    margin-bottom: 15px;
   }
 
   .hero-section h1 {
@@ -3391,6 +3396,7 @@ footer {
     var(--color-bg-surface) 82%,
     var(--color-bg-base)
   );
+  margin-bottom: 80px;
 }
 
 .footer-panel .footer-grid {

@@ -62,7 +62,7 @@ if (Astro.request.method === 'POST') {
 ---
 <Layout title="Account Settings — TextShare" description="Manage your TextShare identity, security and account data.">
   <section class="settings-page">
-    <header class="settings-hero"><div><span class="eyebrow">Account controls</span><h1>Your account, under your control.</h1><p>Update your identity, strengthen security, or manage your TextShare data.</p></div><a class="btn btn-secondary" href="/profile">Back to profile</a></header>
+    <header class="settings-hero"><div class="left"><span class="eyebrow">Account controls</span><h1>Your account, under your control.</h1><p>Update your identity, strengthen security, or manage your TextShare data.</p></div><a class="btn btn-secondary" href="/profile">Back to profile</a></header>
     {message && <div class="banner banner-success" role="status">{message}</div>}{error && <div class="banner banner-warning" role="alert">{error}</div>}{user.isAdmin && <div class="banner banner-warning">Owner credentials are managed through deployment secrets and cannot be changed here.</div>}
     <div class="settings-grid">
       <section class="settings-card"><span class="settings-icon">Aa</span><div class="settings-card-heading"><h2>Profile name</h2><p>This name appears in your account area.</p></div><form method="POST"><input type="hidden" name="action" value="name"/><label>Display name<input class="text-input" name="name" value={user.name} minlength="2" maxlength="80" required disabled={user.isAdmin}/></label><button class="btn btn-primary" disabled={user.isAdmin}>Save name</button></form></section>

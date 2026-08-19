@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import AuthFrame from '../components/AuthFrame.astro';
-import { destroySession, normalizeEmail, verifyCredentials } from '../lib/auth';
+import { createSession, destroySession, normalizeEmail, verifyCredentials } from '../lib/auth';
 import { beginAdminVerification } from '../lib/admin-auth';
 import { beginLoginVerification } from '../lib/login-otp';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
@@ -9,7 +9,11 @@ import { sendSecurityAlert } from '../lib/email';
 import { serverEnv } from '../lib/env';
 
 let error = "";
-const success = Astro.url.searchParams.get('password') === 'changed' ? 'Password updated. Sign in with your new password.' : '';
+const success = Astro.url.searchParams.get('password') === 'changed'
+  ? 'Password updated. Sign in with your new password.'
+  : Astro.url.searchParams.get('created') === '1'
+    ? 'Account created. Sign in to receive your one-time verification code.'
+    : '';
 
 if (Astro.request.method === "POST") {
   try {
@@ -27,9 +31,7 @@ if (Astro.request.method === "POST") {
       if (!limit.allowed) return rateLimitResponse(limit.retryAfter, 'Too many failed sign-in attempts. Try again later.');
       error = "Invalid email or password.";
     } else {
-      if (!user.emailVerified) {
-        error = 'Verify your email address before signing in.';
-      } else {
+      if (user.isAdmin || !user.emailVerified) {
         const otpLimit = await checkRateLimit('auth:otp-send', `${getClientIp(Astro.request)}:${user.email}`, 5, 15 * 60);
         if (!otpLimit.allowed) return rateLimitResponse(otpLimit.retryAfter, 'Too many sign-in code requests. Try again later.');
         if (user.isAdmin) {
@@ -45,13 +47,18 @@ if (Astro.request.method === "POST") {
           try {
             await destroySession(Astro.cookies);
             await beginLoginVerification(Astro.cookies, user);
-            await logSecurityEvent('login_otp_sent', Astro.request);
+            await logSecurityEvent('initial_email_verification_code_sent', Astro.request);
             return Astro.redirect('/login-verify');
           } catch {
-            await logSecurityEvent('login_otp_email_failed', Astro.request);
-            error = 'Your sign-in code could not be sent. Check the mail configuration and try again.';
+            await logSecurityEvent('initial_email_verification_code_failed', Astro.request);
+            error = 'Your verification code could not be sent. Check the mail configuration and try again.';
           }
         }
+      } else {
+        await destroySession(Astro.cookies);
+        await createSession(Astro.cookies, user, { request: Astro.request });
+        await logSecurityEvent('login_succeeded', Astro.request);
+        return Astro.redirect('/');
       }
     }
   } catch (err) {
@@ -61,7 +68,7 @@ if (Astro.request.method === "POST") {
 ---
 
 <Layout title="Sign In — TextShare">
-  <AuthFrame eyebrow="Welcome back" title="Sign in to TextShare" subtitle="Enter your password first. We’ll email a single-use code before opening your account.">
+  <AuthFrame eyebrow="Welcome back" title="Sign in to TextShare" subtitle="Enter your email address and password to open your account.">
 
     {error && (
       <div class="banner banner-warning" role="alert">
@@ -105,6 +112,6 @@ if (Astro.request.method === "POST") {
       </button>
     </form>
 
-    <Fragment slot="footer"><p>New to TextShare? <a href="/signup">Create an account</a></p><p>Still waiting for verification? <a href="/verify-email">Resend the email</a></p></Fragment>
+    <Fragment slot="footer"><p>New to TextShare? <a href="/signup">Create an account</a></p></Fragment>
   </AuthFrame>
 </Layout>

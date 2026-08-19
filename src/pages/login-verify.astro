@@ -39,8 +39,8 @@ if (Astro.request.method === 'POST') {
 }
 ---
 
-<Layout title="Confirm Sign In — TextShare">
-  <AuthFrame eyebrow="Secure sign-in" title="Check your email" subtitle={`We sent a six-digit code to ${maskedEmail}. It expires in 10 minutes.`}>
+<Layout title="Verify Email — TextShare">
+  <AuthFrame eyebrow="One quick step" title="Verify your email" subtitle={`We sent a six-digit code to ${maskedEmail}. It expires in 10 minutes.`}>
     {error && <div class="banner banner-warning" role="alert">{error}</div>}
     {notice && <div class="banner banner-success" role="status">{notice}</div>}
     <form method="POST" class="auth-form">
