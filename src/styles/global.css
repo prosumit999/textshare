@@ -29,6 +29,12 @@ svg {
   max-width: 100%;
 }
 
+.home-seo-section img {
+  margin: 20px auto;
+  border-radius: 20px;
+  aspect-ratio: 2/1;
+}
+
 input,
 button,
 textarea,
@@ -44,6 +50,14 @@ h4,
 h5,
 h6 {
   overflow-wrap: break-word;
+  text-align: center;
+  margin: 10px auto;
+}
+
+ul {
+    margin: 0px auto;
+    text-align: center;
+    list-style-position: inside;
 }
 
 /* Base Configuration & Design Tokens */
@@ -2976,6 +2990,7 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
   min-height: 38px;
   padding: 8px 11px;
   border-radius: 8px;
+  width: 110px;
 }
 
 .create-share-btn {
@@ -3486,6 +3501,8 @@ footer {
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.7;
+  text-align: left;
+  margin: 0px auto;
 }
 
 .footer-brand-mark {
@@ -3936,7 +3953,7 @@ body.drawer-open {
   align-items: center;
   gap: 3px;
   min-width: 0;
-  padding: 3px;
+  padding: 6px 9px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
   background: var(--color-bg-input);
