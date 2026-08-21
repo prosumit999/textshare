@@ -532,9 +532,6 @@ if (Astro.request.method === "POST") {
             type="submit" 
             class="btn btn-primary create-share-btn"
           >
-            <svg class="icon-svg" viewBox="0 0 24 24">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
             Create Share
           </button>
         </div>
@@ -804,37 +801,14 @@ if (Astro.request.method === "POST") {
     background: var(--color-bg-surface);
     box-shadow: 0 8px 32px color-mix(in srgb, var(--color-text-base) 3%, transparent);
   }
-  .seo-header {
-    /* Reset the global site <header> styles so this section header is unaffected. */
-    position: static;
-    top: auto;
-    z-index: auto;
-    height: auto;
-    background-color: transparent;
-    border-bottom: none;
-    display: block;
-    align-items: normal;
-    transition: none;
-  }
   .seo-header h2 {
     font-size: 22px;
     font-weight: 800;
     letter-spacing: -0.03em;
-    margin-bottom: 10px;
+    margin: 24px;
     text-align: center;
+    width: 100%;
     color: var(--color-text-base);
-  }
-  /* Admin-editable SEO content can also contain <header> elements—neutralize the global site header styles there too. */
-  .seo-rich-content header {
-    position: static;
-    top: auto;
-    z-index: auto;
-    height: auto;
-    background-color: transparent;
-    border-bottom: none;
-    display: block;
-    align-items: normal;
-    transition: none;
   }
   .seo-rich-content {
     color: var(--color-text-muted);

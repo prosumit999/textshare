@@ -26,13 +26,10 @@ video,
 canvas,
 svg {
   display: block;
+  margin: 0px auto;
   max-width: 100%;
-}
-
-.home-seo-section img {
-  margin: 20px auto;
-  border-radius: 20px;
-  aspect-ratio: 2/1;
+   aspect-ratio: 2/1;
+  border-radius: 12px;
 }
 
 input,
@@ -40,6 +37,15 @@ button,
 textarea,
 select {
   font: inherit;
+}
+
+
+ul {
+    margin: 0px auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 500px;
 }
 
 p,
@@ -50,14 +56,11 @@ h4,
 h5,
 h6 {
   overflow-wrap: break-word;
-  text-align: center;
-  margin: 10px auto;
 }
 
-ul {
-    margin: 0px auto;
+.seo-rich-content p {
     text-align: center;
-    list-style-position: inside;
+    margin: 10px auto;
 }
 
 /* Base Configuration & Design Tokens */
@@ -189,7 +192,8 @@ h1 {
 
 h2 {
   font-size: 20px;
-  margin-bottom: var(--space-4);
+  margin: var(--space-4);
+  text-align: center;
 }
 
 a {
@@ -1047,6 +1051,7 @@ a.btn-primary:active {
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s ease;
+  width: 110px;
 }
 
 .select-input {
@@ -2990,7 +2995,6 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
   min-height: 38px;
   padding: 8px 11px;
   border-radius: 8px;
-  width: 110px;
 }
 
 .create-share-btn {
@@ -3224,7 +3228,11 @@ footer {
   }
 
   .create-share-btn {
-    width: 100%;
+    width: 95%;
+    padding: 0px;
+    margin: 0px auto;
+    font-size: 16px;
+
   }
 
   .advanced-options summary {
@@ -3248,6 +3256,8 @@ footer {
 
 header {
   height: 60px;
+  position: unset;
+  border-bottom: 0px;
 }
 
 .logo {
@@ -3501,8 +3511,6 @@ footer {
   color: var(--color-text-muted);
   font-size: 13px;
   line-height: 1.7;
-  text-align: left;
-  margin: 0px auto;
 }
 
 .footer-brand-mark {
@@ -3944,16 +3952,19 @@ body.drawer-open {
   justify-content: flex-start;
 }
 
-.create-share-btn {
-  width: 100%;
-}
+  .create-share-btn {
+    width: 95%;
+    padding: 0px;
+    margin: 0px auto;
+    font-size: 16px;
+  }
 
 .link-style-control {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   min-width: 0;
-  padding: 6px 9px;
+  padding: 6px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
   background: var(--color-bg-input);
