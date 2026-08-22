@@ -149,6 +149,9 @@ export async function runCleanupWorker(): Promise<CleanupReport> {
         )
           await bucket.delete(fileId);
         await db.collection("shares").deleteOne({ _id: share._id });
+        await db
+          .collection("shareViews")
+          .deleteMany({ slug: String(share.slug) });
         if (expired) report.expiredShares += 1;
         else report.oversizedShares += 1;
         await durableAudit(

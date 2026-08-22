@@ -28,6 +28,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "file-type": "^22.0.1",
+    "geoip-lite": "^2.0.3",
     "mongodb": "^7.5.0",
     "nodemailer": "^9.0.3",
     "prettier": "^3.9.6",

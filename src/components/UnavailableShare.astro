@@ -1,3 +1,28 @@
+---
+interface Props {
+  isOwner?: boolean;
+  variant?: "expired" | "revoked";
+}
+const { isOwner = false, variant = "expired" } = Astro.props;
+const ownerMessaging =
+  variant === "revoked"
+    ? {
+        eyebrow: "Link revoked",
+        title: "You revoked this share",
+        body: "This share is now offline and cannot be viewed by anyone. You can create a fresh share whenever you are ready.",
+      }
+    : {
+        eyebrow: "Share expired",
+        title: "Your share has expired",
+        body: "This share is no longer accessible to its visitors. You can create a new one with the same content whenever you need it.",
+      };
+const visitorMessaging = {
+  eyebrow: "Link unavailable",
+  title: "This share has expired",
+  body: "This private link is no longer available. Its content may have expired or been removed by its owner.",
+};
+---
+
 <div class="expired-card">
   <div class="expired-icon-wrap">
     <svg class="icon-svg expired-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -5,17 +30,19 @@
       <polyline points="12 7 12 12 15.5 14"></polyline>
     </svg>
   </div>
-  <span class="expired-eyebrow">Link unavailable</span>
-  <h1>This share has expired</h1>
-  <p>This private link is no longer available. Its content may have expired or been removed by its owner.</p>
+  <span class="expired-eyebrow">{isOwner ? ownerMessaging.eyebrow : visitorMessaging.eyebrow}</span>
+  <h1>{isOwner ? ownerMessaging.title : visitorMessaging.title}</h1>
+  <p>{isOwner ? ownerMessaging.body : visitorMessaging.body}</p>
   <div class="expired-actions">
     <a href="/" class="btn btn-primary expired-cta">
       <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
         <line x1="12" y1="5" x2="12" y2="19"></line>
         <line x1="5" y1="12" x2="19" y2="12"></line>
       </svg>
-      Create your own share
+      {isOwner ? "Create a new share" : "Create your own share"}
     </a>
-    <a href="/join" class="expired-secondary-link">Join another room <span aria-hidden="true">→</span></a>
+    <a href={isOwner ? "/profile" : "/join"} class="expired-secondary-link">
+      {isOwner ? "Go to your shares" : "Join another room"} <span aria-hidden="true">→</span>
+    </a>
   </div>
 </div>

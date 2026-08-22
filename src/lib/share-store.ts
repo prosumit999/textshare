@@ -27,7 +27,9 @@ export type StoredShare = {
   sizeBytes: number;
   createdAt: Date;
   viewCount: number;
+  analyticsEnabled?: boolean;
   burnClaimedAt?: Date;
+  revokedAt?: Date;
 };
 
 function encryptionKeys() {
@@ -126,6 +128,7 @@ export async function savePersistentShare(slug: string, share: StoredShare) {
       sizeBytes: share.sizeBytes,
       createdAt: share.createdAt,
       viewCount: share.viewCount,
+      analyticsEnabled: share.analyticsEnabled ?? false,
     });
   } catch (error) {
     await bucket.delete(upload.id).catch(() => undefined);
@@ -163,6 +166,7 @@ export async function deletePersistentShare(slug: string, owner?: string) {
   const document = await db.collection("shares").findOne(query);
   if (!document) return false;
   await db.collection("shares").deleteOne({ _id: document._id });
+  await db.collection("shareViews").deleteMany({ slug });
   await bucket
     .delete(document.contentFileId as ObjectId)
     .catch(() => undefined);
@@ -274,4 +278,106 @@ export async function listShares(owner?: string) {
 export async function incrementShareViews(slug: string) {
   await ensureGuestShareMigration();
   await incrementPersistentShareViews(slug);
+}
+
+export async function updateShareExpiry(
+  slug: string,
+  owner: string,
+  newExpiryDate: Date,
+) {
+  await ensureGuestShareMigration();
+  const { db } = await getMongo();
+  const result = await db.collection("shares").updateOne(
+    { slug, owner },
+    { $set: { expiryDate: newExpiryDate } },
+  );
+  return result.modifiedCount > 0;
+}
+
+export async function revokeShare(slug: string, owner: string) {
+  await ensureGuestShareMigration();
+  const { db } = await getMongo();
+  const result = await db.collection("shares").updateOne(
+    { slug, owner },
+    { $set: { revokedAt: new Date() } },
+  );
+  return result.modifiedCount > 0;
+}
+
+export async function setShareAnalyticsEnabled(
+  slug: string,
+  owner: string,
+  enabled: boolean,
+) {
+  await ensureGuestShareMigration();
+  const { db } = await getMongo();
+  const result = await db.collection("shares").updateOne(
+    { slug, owner },
+    { $set: { analyticsEnabled: enabled } },
+  );
+  return result.modifiedCount > 0;
+}
+
+/**
+ * Updates the text content of an owner's share. The payload is re-encrypted
+ * into a fresh GridFS file, the share document is pointed at it, and the old
+ * encrypted file is removed.
+ */
+export async function updateShareText(
+  slug: string,
+  owner: string,
+  textContent: string,
+) {
+  await ensureGuestShareMigration();
+  const { db, bucket } = await getMongo();
+  const document = await db.collection("shares").findOne({ slug, owner });
+  if (!document || document.contentType !== "text") return false;
+  const payload = decryptPayload(
+    await streamToBuffer(
+      bucket.openDownloadStream(document.contentFileId as ObjectId),
+    ),
+  );
+  const updated: StoredShare = {
+    contentType: "text",
+    textContent,
+    imageSrc: payload.imageSrc ?? null,
+    imageSrcs: payload.imageSrcs || [],
+    expiryDate: document.expiryDate,
+    burnAfterReading: document.burnAfterReading,
+    language: document.language,
+    passwordHash: document.passwordHash,
+    owner: document.owner,
+    guestIp: document.guestIp,
+    sizeBytes: Buffer.byteLength(textContent, "utf8"),
+    createdAt: document.createdAt,
+    viewCount: document.viewCount,
+    analyticsEnabled: document.analyticsEnabled ?? false,
+  };
+  const encrypted = encryptPayload(updated);
+  const upload = bucket.openUploadStream(`${slug}.enc`, {
+    metadata: { slug, encrypted: true },
+  });
+  upload.end(encrypted);
+  await new Promise<void>((resolve, reject) =>
+    upload.on("finish", resolve).on("error", reject),
+  );
+  try {
+    await db.collection("shares").updateOne(
+      { slug, owner },
+      {
+        $set: {
+          contentFileId: upload.id,
+          sizeBytes: updated.sizeBytes,
+          updatedAt: new Date(),
+        },
+      },
+    );
+  } catch (error) {
+    await bucket.delete(upload.id).catch(() => undefined);
+    throw error;
+  }
+  await bucket
+    .delete(document.contentFileId as ObjectId)
+    .catch(() => undefined);
+  return true;
 }

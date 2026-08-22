@@ -3949,7 +3949,8 @@ body.drawer-open {
 
 .control-group-left {
   width: 100%;
-  justify-content: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
   .create-share-btn {
@@ -4459,8 +4460,7 @@ body.drawer-open {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 28px;
-  padding: 22px;
-  border-bottom: 1px solid var(--color-border);
+  padding: 22px 22px 0px 22px;
 }
 
 .room-details {
@@ -6199,4 +6199,257 @@ body.drawer-open {
 .admin-security-note {
   margin-top: var(--space-4);
   color: var(--color-text-muted);
+}
+
+/* ===== Share lifecycle owner controls & analytics ===== */
+.btn-sm {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm, 8px);
+}
+.owner-action-banner {
+  width: 81%;
+  margin: 10px auto;
+}
+.owner-panel {
+  display: none;
+}
+.owner-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.owner-panel-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+.owner-panel-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.owner-control-group h3 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+.owner-control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.owner-control-row form {
+  margin: 0;
+}
+.owner-note {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.owner-extend-row {
+  gap: var(--space-2);
+}
+.analytics-panel {
+  margin-top: var(--space-3);
+}
+.analytics-stats {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.analytics-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.analytics-stat strong {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-text-base);
+}
+.analytics-stat span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.analytics-countries {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.analytics-country {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 13px;
+  background: var(--color-bg-base);
+}
+.analytics-country em {
+  font-style: normal;
+  font-weight: 700;
+}
+.analytics-recent h3 {
+  font-size: 13px;
+  margin: 0 0 var(--space-2);
+}
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.analytics-table th,
+.analytics-table td {
+  text-align: left;
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+.analytics-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* ===== Share owner toolbar (top bar) ===== */
+.owner-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0px;
+  background: var(--color-bg-surface);
+  width: 90%;
+  margin: 0px auto;
+}
+.owner-toolbar-analytics {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+.owner-toolbar-analytics .icon-svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-accent);
+}
+.owner-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.owner-stat strong {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-base);
+}
+.owner-stat-off {
+  font-style: italic;
+  font-size: 12px;
+}
+.owner-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.owner-toolbar-form {
+  margin: 0;
+}
+.owner-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.owner-toolbar-btn:hover,
+.owner-toolbar-btn:focus-visible {
+  color: var(--color-text-base);
+  border-color: var(--color-border-focus);
+}
+.owner-toolbar-btn .icon-svg {
+  width: 15px;
+  height: 15px;
+}
+.owner-toolbar-btn span {
+  line-height: 1;
+}
+.owner-toolbar-danger:hover,
+.owner-toolbar-danger:focus-visible {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+.owner-toolbar-locked {
+  color: var(--color-text-muted);
+  opacity: 0.75;
+  text-decoration: none;
+}
+.owner-toolbar-locked:hover,
+.owner-toolbar-locked:focus-visible {
+  color: var(--color-text-base);
+  border-color: var(--color-border-focus);
+}
+
+/* ===== Owner live text editing ===== */
+.owner-edit-form {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg-surface);
+}
+.owner-edit-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.owner-edit-textarea {
+  width: 100%;
+  min-height: 280px;
+  padding: var(--space-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-base);
+  background: var(--color-bg-input);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  resize: vertical;
+}
+.owner-edit-textarea:focus {
+  outline: none;
+  border-color: var(--color-border-focus);
+}
+.owner-edit-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }

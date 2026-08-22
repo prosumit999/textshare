@@ -7,7 +7,9 @@ import { Code } from 'astro:components';
 import QRCode from 'qrcode';
 import bcrypt from 'bcryptjs';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
-import { claimBurnShare, getShare, incrementShareViews } from '../lib/share-store';
+import { getCurrentUser } from '../lib/auth';
+import { claimBurnShare, getShare, incrementShareViews, revokeShare, setShareAnalyticsEnabled, updateShareExpiry, updateShareText } from '../lib/share-store';
+import { getShareAnalytics, recordShareView } from '../lib/share-analytics';
 import { getPageBySlug } from '../lib/page-store';
 
 const { slug } = Astro.params;
@@ -77,9 +79,60 @@ if (!share) {
   };
 }
 
-// Check if share is expired
+const currentUser = await getCurrentUser(Astro.cookies);
+const isOwner = isStoredShare && !!share.owner && share.owner === currentUser?.email;
+const hasPaidPlan = currentUser?.plan === "plus" || currentUser?.plan === "pro";
+
+// Owner-only lifecycle actions (revoke, extend expiry, toggle analytics).
+if (isOwner && slug && Astro.request.method === "POST") {
+  const ownerLimit = await checkRateLimit("share:owner-action", currentUser!.email, 30, 10 * 60);
+  if (!ownerLimit.allowed) return rateLimitResponse(ownerLimit.retryAfter, "Too many share changes. Try again later.");
+  const formData = await Astro.request.formData();
+  const action = formData.get("action")?.toString();
+  if (action === "owner_revoke") {
+    await revokeShare(slug, currentUser!.email);
+    return Astro.redirect(`/${slug}?action=revoked`);
+  } else if (action === "owner_extend") {
+    const amount = formData.get("amount")?.toString();
+    const durationMs: Record<string, number> = {
+      "24h": 24 * 60 * 60 * 1000,
+      "1w": 7 * 24 * 60 * 60 * 1000,
+      "1m": 30 * 24 * 60 * 60 * 1000,
+    };
+    if ((amount === "1w" || amount === "1m") && !hasPaidPlan) {
+      return Astro.redirect(`/${slug}?action=pro_required`);
+    }
+    const added = durationMs[amount || ""];
+    if (added) {
+      const base = Math.max(Date.now(), new Date(share.expiryDate).getTime());
+      await updateShareExpiry(slug, currentUser!.email, new Date(base + added));
+    }
+    return Astro.redirect(`/${slug}?action=extended`);
+  } else if (action === "owner_analytics") {
+    const enabled = formData.get("enabled") === "on";
+    await setShareAnalyticsEnabled(slug, currentUser!.email, enabled);
+    return Astro.redirect(`/${slug}?action=${enabled ? "analytics_on" : "analytics_off"}`);
+  } else if (action === "owner_edit_text") {
+    const newText = formData.get("textContent")?.toString() ?? "";
+    if (
+      share.contentType === "text" &&
+      newText.length > 0 &&
+      new TextEncoder().encode(newText).byteLength <= 50 * 1024 * 1024
+    ) {
+      await updateShareText(slug, currentUser!.email, newText);
+      return Astro.redirect(`/${slug}?action=edited`);
+    }
+    return Astro.redirect(`/${slug}?action=edit_failed`);
+  }
+}
+
+// Check if share is expired or revoked.
 const isExpired = new Date() > new Date(share.expiryDate);
-if (!isExpired && isStoredShare && slug) {
+const isRevoked = !!share.revokedAt;
+const isUnavailable = isExpired || isRevoked;
+
+// Track view counts for active shares.
+if (!isExpired && !isRevoked && isStoredShare && slug) {
   share.viewCount = (share.viewCount || 0) + 1;
   await incrementShareViews(slug);
 }
@@ -131,6 +184,18 @@ if (isStoredShare && share.burnAfterReading && !isExpired && !isLocked && !isCre
   burnAlreadyClaimed = !burnAfterInitialView;
 }
 
+// Record opt-in access analytics for non-owner, active views.
+if (
+  isStoredShare && slug && share.analyticsEnabled && !isOwner &&
+  !isExpired && !isRevoked && !burnAlreadyClaimed
+) {
+  await recordShareView(slug, Astro.request, getClientIp(Astro.request));
+}
+
+const shareAction = Astro.url.searchParams.get("action") || "";
+const shareAnalytics =
+  isOwner && isStoredShare && slug ? await getShareAnalytics(slug) : null;
+
 const roomUrl = Astro.url.origin + Astro.url.pathname;
 const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
 const sharedImages = share.contentType === 'image'
@@ -143,8 +208,8 @@ const sharedImages = share.contentType === 'image'
     <PolicyPage eyebrow={customPageData.eyebrow} title={customPageData.title} summary={customPageData.summary} updated={customPageData.updatedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}>
       <div set:html={customPageData.content}></div>
     </PolicyPage>
-  ) : isExpired || burnAlreadyClaimed ? (
-    <UnavailableShare />
+  ) : isUnavailable || burnAlreadyClaimed ? (
+    <UnavailableShare isOwner={isOwner} variant={isRevoked ? "revoked" : "expired"} />
   ) : isLocked ? (
     /* Password Gate Component */
     <PasswordGate error={passwordError} slug={slug} />
@@ -152,6 +217,18 @@ const sharedImages = share.contentType === 'image'
     /* Active Share Content View */
     <div class="creator-container">
       <div class="view-card">
+        {shareAction && (
+          <div class="banner banner-warning owner-action-banner" role="status">
+            {shareAction === "revoked" && "This share has been revoked and is now offline."}
+            {shareAction === "extended" && "Share expiry extended."}
+            {shareAction === "analytics_on" && "Access analytics are now being tracked for this share."}
+            {shareAction === "analytics_off" && "Access analytics tracking is now off."}
+            {shareAction === "pro_required" && "Extending by 1 week or 1 month requires a Pro plan."}
+            {shareAction === "edited" && "Text updated."}
+            {shareAction === "edit_failed" && "Could not update the text."}
+          </div>
+        )}
+
         <div class="room-topbar">
           <div class="room-details">
             <span class="room-kicker">Share room</span>
@@ -192,6 +269,70 @@ const sharedImages = share.contentType === 'image'
           </div>
         </div>
 
+        {isOwner && (
+          <div class="owner-toolbar" aria-label="Owner controls">
+            <div class="owner-toolbar-analytics">
+              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="3" y1="20" x2="21" y2="20"></line></svg>
+              <span class="owner-stat"><strong>{share.viewCount}</strong> views</span>
+              {share.analyticsEnabled ? (
+                <span class="owner-stat"><strong>{shareAnalytics?.uniqueIps ?? 0}</strong> unique</span>
+              ) : (
+                <span class="owner-stat owner-stat-off">analytics off</span>
+              )}
+            </div>
+            <div class="owner-toolbar-actions">
+              {[
+                ["24h", "+24h", true],
+                ["1w", "+1w", hasPaidPlan],
+                ["1m", "+1m", hasPaidPlan],
+              ].map(([amount, label, allowed]) =>
+                allowed ? (
+                  <form method="POST" class="owner-toolbar-form">
+                    <input type="hidden" name="action" value="owner_extend" />
+                    <input type="hidden" name="amount" value={amount} />
+                    <button type="submit" class="owner-toolbar-btn" title={`Extend expiry by ${label}`} aria-label={`Extend expiry by ${label}`}>
+                      <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+                      <span>{label}</span>
+                    </button>
+                  </form>
+                ) : (
+                  <a href="/pricing" class="owner-toolbar-btn owner-toolbar-locked" title="Extend by 1 week or 1 month requires a Pro plan" aria-label={`Extend by ${label} (Pro feature)`}>
+                    <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 7.7-1.5"></path></svg>
+                    <span>{label}</span>
+                  </a>
+                ),
+              )}
+
+              {share.contentType === "text" && (
+                <button id="owner-edit-btn" type="button" class="owner-toolbar-btn" title="Edit text" aria-label="Edit text">
+                  <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                </button>
+              )}
+
+              {share.contentType === "text" && (
+                <button id="owner-download-txt" type="button" class="owner-toolbar-btn" title="Download as .txt" aria-label="Download as .txt">
+                  <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </button>
+              )}
+
+              <form method="POST" class="owner-toolbar-form">
+                <input type="hidden" name="action" value="owner_analytics" />
+                <input type="hidden" name="enabled" value={share.analyticsEnabled ? "off" : "on"} />
+                <button type="submit" class="owner-toolbar-btn" title={share.analyticsEnabled ? "Disable analytics" : "Enable analytics"} aria-label={share.analyticsEnabled ? "Disable analytics" : "Enable analytics"}>
+                  <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">{share.analyticsEnabled ? <><path d="M3 3v18h18"></path><path d="M9 12l2-3 2 2 3-4"></path></> : <path d="M3 3v18h18"></path>}</svg>
+                </button>
+              </form>
+
+              <form method="POST" class="owner-toolbar-form" onsubmit="return confirm('Revoke this link? It will go offline immediately.');">
+                <input type="hidden" name="action" value="owner_revoke" />
+                <button type="submit" class="owner-toolbar-btn owner-toolbar-danger" title="Revoke link" aria-label="Revoke link">
+                  <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
         <!-- Render Content -->
         <div class="content-display-wrapper">
           {share.contentType === "text" ? (
@@ -218,6 +359,59 @@ const sharedImages = share.contentType === 'image'
             </div>
           )}
         </div>
+
+        {isOwner && share.contentType === "text" && (
+          <form id="owner-edit-form" method="POST" class="owner-edit-form" style="display:none;">
+            <input type="hidden" name="action" value="owner_edit_text" />
+            <div class="owner-edit-heading">
+              <span class="room-kicker">Editing live text</span>
+              <span class="owner-note">Changes apply immediately for anyone viewing this share.</span>
+            </div>
+            <textarea id="owner-edit-textarea" name="textContent" class="owner-edit-textarea" aria-label="Edit text content">{share.textContent}</textarea>
+            <div class="owner-edit-actions">
+              <button type="submit" class="btn btn-primary btn-sm">Save changes</button>
+              <button type="button" id="owner-edit-cancel" class="btn btn-secondary btn-sm">Cancel</button>
+            </div>
+          </form>
+        )}
+
+        {isOwner && shareAnalytics && (
+          <section class="owner-panel analytics-panel" aria-label="Access analytics">
+            <div class="owner-panel-heading">
+              <div>
+                <span class="room-kicker">Access analytics</span>
+                <h2>Viewer activity</h2>
+              </div>
+              <span class="owner-note">{share.analyticsEnabled ? "Opt-in tracking on" : "Tracking is off — enable it above to record views."}</span>
+            </div>
+            <div class="analytics-stats">
+              <div class="analytics-stat"><strong>{shareAnalytics.totalViews}</strong><span>Views</span></div>
+              <div class="analytics-stat"><strong>{shareAnalytics.uniqueIps}</strong><span>Unique visitors</span></div>
+            </div>
+            {shareAnalytics.byCountry.length > 0 && (
+              <div class="analytics-countries">
+                {shareAnalytics.byCountry.map((row) => (
+                  <div class="analytics-country"><span class="analytics-flag">{row.country === "Local" ? "🏠" : row.country === "Unknown" ? "🌐" : `🏳 ${row.country}`}</span><span>{row.country}</span><em>{row.count}</em></div>
+                ))}
+              </div>
+            )}
+            {shareAnalytics.recent.length > 0 ? (
+              <div class="analytics-recent">
+                <h3>Recent views</h3>
+                <table class="analytics-table">
+                  <thead><tr><th>Time</th><th>Country</th></tr></thead>
+                  <tbody>
+                    {shareAnalytics.recent.map((view) => (
+                      <tr><td>{new Date(view.createdAt).toLocaleString()}</td><td>{view.country}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p class="owner-note" style="margin-top:var(--space-3);">No views recorded yet.</p>
+            )}
+          </section>
+        )}
       </div>
 
       <div style="margin-top: var(--space-4); text-align: center;">
@@ -228,10 +422,10 @@ const sharedImages = share.contentType === 'image'
   )}
 </Layout>
 
-<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired, slug, burnAfterInitialView }}>
+<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired, isOwner, slug, burnAfterInitialView }}>
   const copyNotification = document.getElementById("copy-notification");
-  let notificationTimer: number | undefined;
-  const showCopyNotification = (message: string, failed = false) => {
+  let notificationTimer;
+  const showCopyNotification = (message, failed = false) => {
     if (!copyNotification) return;
     window.clearTimeout(notificationTimer);
     copyNotification.textContent = message;
@@ -241,6 +435,103 @@ const sharedImages = share.contentType === 'image'
       copyNotification.classList.remove("is-visible");
     }, 2600);
   };
+
+  // Robust clipboard copy that works across secure/insecure contexts and
+  // browsers: try the async Clipboard API first, then fall back to a hidden
+  // textarea + document.execCommand("copy"), restoring the user's selection.
+  const copyText = async (value) => {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch {
+        /* fall through to legacy fallback */
+      }
+    }
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = value;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.top = "-1000px";
+      textarea.style.left = "-1000px";
+      document.body.appendChild(textarea);
+      const selection = document.getSelection();
+      const prevRange =
+        selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      textarea.focus();
+      textarea.select();
+      textarea.setSelectionRange(0, value.length);
+      const ok = document.execCommand("copy");
+      textarea.remove();
+      if (prevRange && selection) {
+        selection.removeAllRanges();
+        selection.addRange(prevRange);
+      }
+      return ok;
+    } catch {
+      return false;
+    }
+  };
+
+  // Owner-only export helpers.
+  if (isOwner && isText && !isExpired) {
+    const downloadTxt = document.getElementById("owner-download-txt");
+    downloadTxt?.addEventListener("click", () => {
+      try {
+        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `textshare-${slug}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showCopyNotification("Text downloaded as .txt");
+      } catch {
+        const dataUrl =
+          "data:text/plain;charset=utf-8," + encodeURIComponent(text);
+        const win = window.open(dataUrl, "_blank");
+        if (!win) showCopyNotification("Could not download the text.", true);
+      }
+    });
+  }
+
+  // Owner-only live text editing.
+  if (isOwner && isText && !isExpired) {
+    const editBtn = document.getElementById("owner-edit-btn");
+    const editForm = document.getElementById("owner-edit-form");
+    const editTextarea = document.getElementById("owner-edit-textarea");
+    const cancelBtn = document.getElementById("owner-edit-cancel");
+    const contentWrapper = document.querySelector(".content-display-wrapper");
+    const saveBtn = editForm?.querySelector('button[type="submit"]');
+
+    const enterEditMode = () => {
+      if (contentWrapper && editForm) {
+        contentWrapper.style.display = "none";
+        editForm.style.display = "block";
+        editTextarea?.focus();
+        if (editTextarea) {
+          editTextarea.setSelectionRange(editTextarea.value.length, editTextarea.value.length);
+        }
+      }
+    };
+    const exitEditMode = () => {
+      if (contentWrapper && editForm) {
+        editForm.style.display = "none";
+        contentWrapper.style.display = "";
+      }
+    };
+    editBtn?.addEventListener("click", enterEditMode);
+    cancelBtn?.addEventListener("click", exitEditMode);
+    if (editForm) {
+      editForm.addEventListener("submit", () => {
+        if (saveBtn) saveBtn.disabled = true;
+        saveBtn && (saveBtn.textContent = "Saving…");
+      });
+    }
+  }
 
   if (burnAfterInitialView && slug) {
     const removeBurnedShare = () => {
@@ -264,16 +555,16 @@ const sharedImages = share.contentType === 'image'
   roomLinkButton?.addEventListener("click", async () => {
     const roomUrl = roomLinkButton.getAttribute("data-url");
     if (!roomUrl) return;
-    try {
-      await navigator.clipboard.writeText(roomUrl);
+    const ok = await copyText(roomUrl);
+    if (ok) {
       const label = roomLinkButton.querySelector("span");
       if (label) label.textContent = "Copied!";
       setTimeout(() => {
         if (label) label.textContent = "Copy room link";
       }, 2000);
       showCopyNotification("Room link copied to clipboard.");
-    } catch (error) {
-      console.error("Failed to copy room link", error);
+    } else {
+      console.error("Failed to copy room link");
       showCopyNotification("Could not copy the room link.", true);
     }
   });
@@ -284,15 +575,15 @@ const sharedImages = share.contentType === 'image'
     const copyLabel = document.getElementById("copy-btn-label");
 
     copyBtn?.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(text);
+      const ok = await copyText(text);
+      if (ok) {
         if (copyLabel) copyLabel.textContent = "Copied!";
         setTimeout(() => {
           if (copyLabel) copyLabel.textContent = "Copy text";
         }, 2000);
         showCopyNotification("Room text copied to clipboard.");
-      } catch (err) {
-        console.error("Failed to copy code: ", err);
+      } else {
+        console.error("Failed to copy code: ", text);
         showCopyNotification("Could not copy the room text.", true);
       }
     });

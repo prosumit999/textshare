@@ -51,6 +51,7 @@ if (Astro.request.method === "POST") {
     const imageFiles = formData.getAll("imageFile").filter((entry): entry is File => entry instanceof File && entry.size > 0);
     const maxImageCount = hasPaidPlan ? 5 : 1;
     const highlightEnabled = formData.get("syntaxHighlightEnabled") === "on";
+    const analyticsEnabled = isLoggedIn && formData.get("analyticsEnabled") === "on";
 
     // Image duration is fixed by plan unless the free Burn After First View mode is selected.
     if (contentType === "image" && expiry !== "burn") expiry = hasPaidPlan ? "24h" : "3h";
@@ -194,7 +195,8 @@ if (Astro.request.method === "POST") {
         guestIp: currentUser ? null : getClientIp(Astro.request),
         sizeBytes: contentType === "image" ? sanitizedImages.reduce((total, image) => total + image.bytes, 0) : new TextEncoder().encode(textContent).byteLength,
         createdAt: new Date(),
-        viewCount: 0
+        viewCount: 0,
+        analyticsEnabled
       });
 
       // Track the shares visible to this browser/account.
@@ -323,7 +325,7 @@ if (Astro.request.method === "POST") {
                 <polyline points="7 10 12 15 17 10"></polyline>
                 <line x1="12" y1="15" x2="12" y2="3"></line>
               </svg>
-              Download QR
+              Scan Qr To Open This Room
             </a>
           </div>
         </div>
@@ -464,6 +466,14 @@ if (Astro.request.method === "POST") {
                 <svg viewBox="0 0 24 24"><path d="M13.4 2.7c.5 3.2-1.8 4.5-3 6.5-1-1-1.3-2-1.1-3.3C6.9 8 5 10.5 5 14a7 7 0 0 0 14 0c0-4.7-2.8-8.5-5.6-11.3Z"></path><path d="M9.2 16.1c0 1.7 1.2 3 2.8 3s2.8-1.3 2.8-3c0-1.4-.8-2.7-2.1-4.1-.1 1.5-.8 2.2-1.5 3-.5-.6-.8-1.2-.7-2-1 .9-1.3 1.9-1.3 3.1Z"></path></svg>
               </span>
             </div>
+
+            <!-- Access analytics opt-in -->
+            {isLoggedIn && (
+              <label class="checkbox-label" title="Record anonymous view timestamps and country for this share.">
+                <input type="checkbox" name="analyticsEnabled" id="analytics-toggle" class="checkbox-input" />
+                <span>Track access analytics</span>
+              </label>
+            )}
 
             <fieldset class="link-style-control">
               <legend>Link style</legend>

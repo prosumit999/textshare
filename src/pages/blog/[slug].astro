@@ -60,12 +60,27 @@ const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 1000
 </Layout>
 
 <script>
-  const copyButton = document.querySelector<HTMLButtonElement>('#copy-article-link');
-  const copyLabel = document.querySelector<HTMLElement>('#copy-article-label');
+  const copyButton = document.querySelector('#copy-article-link');
+  const copyLabel = document.querySelector('#copy-article-label');
   copyButton?.addEventListener('click', async () => {
     const url = copyButton.dataset.url;
     if (!url) return;
-    await navigator.clipboard.writeText(url);
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = url;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+      } catch {
+        return;
+      }
+    }
     if (copyLabel) copyLabel.textContent = 'Copied';
     window.setTimeout(() => { if (copyLabel) copyLabel.textContent = 'Copy link'; }, 1600);
   });
