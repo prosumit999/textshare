@@ -59,8 +59,8 @@ h6 {
 }
 
 .seo-rich-content p {
-    text-align: center;
-    margin: 10px auto;
+    text-align: left;
+    margin: 5px auto;
 }
 
 /* Base Configuration & Design Tokens */
