@@ -9,6 +9,11 @@ import { MAX_SHARE_BYTES, pruneOversizedShares } from './lib/shares';
 const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
 const MAX_SHARE_REQUEST_BYTES = MAX_SHARE_BYTES + 2 * 1024 * 1024;
 
+// Internal liveness endpoint used by the Docker HEALTHCHECK and Coolify.
+// Requests originate inside the container with no proxy headers, so the
+// resolved client IP is "unknown"; it must not be subject to IP blocking.
+const HEALTH_CHECK_PATH = '/api/health';
+
 export const onRequest = defineMiddleware(async (context, next) => {
   const { request, url } = context;
   const contentLength = Number(request.headers.get('content-length') || '0');
@@ -32,7 +37,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
   };
 
-  if (isIpBlocked(clientIp)) {
+  if (url.pathname !== HEALTH_CHECK_PATH && isIpBlocked(clientIp)) {
     logSecurityEvent('blocked_ip_rejected', request, {
       path: url.pathname
     });
