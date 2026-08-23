@@ -1,0 +1,234 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { recordAudit } from '../../lib/admin';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
+import { getSiteSettings, saveSiteSettings } from '../../lib/site-settings-store';
+
+const admin = (await getCurrentUser(Astro.cookies))!;
+let message = '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  if (!await hasRecentAdminStepUp(Astro.cookies)) {
+    return Astro.redirect('/login?stepup=1');
+  }
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  if (action === 'save') {
+    try {
+      const seoTitle = form.get('seoTitle')?.toString().trim() || '';
+      const seoContent = form.get('seoContent')?.toString() || '';
+      
+      if (!seoTitle) {
+        error = 'Heading title is required.';
+      } else {
+        const existing = await getSiteSettings();
+        await saveSiteSettings({
+          ...existing,
+          seoTitle,
+          seoContent
+        });
+        
+        await recordAudit({
+          actor: admin.email,
+          action: 'update_home_hero',
+          resourceType: 'system_settings',
+          resourceId: 'global',
+          details: 'Updated landing page SEO rich text explanation block'
+        });
+        message = 'Home Hero content saved successfully.';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to save settings.';
+    }
+  }
+}
+
+const settings = await getSiteSettings();
+---
+
+<AdminLayout title="Home Hero Section">
+  {message && <div class="admin-alert success">{message}</div>}
+  {error && <div class="admin-alert danger">{error}</div>}
+
+  <section class="admin-editor-workspace">
+    <div class="blog-editor-heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+      <div>
+        <h2>Home Hero Section</h2>
+        <p style="color: var(--color-text-muted); font-size: 12px; margin-top: 4px;">
+          Customize the rich text explanation blocks, bullet checklists, and inline images rendered on the homepage.
+        </p>
+      </div>
+      <a href="/" target="_blank" class="btn btn-secondary">View live page</a>
+    </div>
+
+    <form id="home-hero-form" method="POST" class="admin-panel admin-editor-form rich-post-form">
+      <input type="hidden" name="action" value="save" />
+
+      <div style="margin-bottom: 16px;">
+        <label class="form-field-label">
+          SEO Section Heading
+          <input 
+            class="text-input" 
+            name="seoTitle" 
+            id="seo-title-input" 
+            maxlength="160" 
+            required 
+            value={settings.seoTitle} 
+            placeholder="e.g. Why developers choose TextShare" 
+            style="width: 100%;"
+          />
+        </label>
+      </div>
+
+      <div class="editor-field-heading" style="margin-bottom: 8px;">
+        <div>
+          <strong>Rich Content Block</strong>
+          <small style="display: block; color: var(--color-text-muted); font-size: 11px; margin-top: 2px;">
+            Write paragraphs, insert lists/checklists, upload multiple inline images, and define headings.
+          </small>
+        </div>
+      </div>
+
+      <div class="rich-editor-shell" style="border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-bg-base); overflow: hidden; margin-bottom: 24px;">
+        <div class="rich-editor-toolbar" role="toolbar" aria-label="Text formatting" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-surface);">
+          <button type="button" data-block="h2" class="toolbar-btn">H2</button>
+          <button type="button" data-block="h3" class="toolbar-btn">H3</button>
+          <button type="button" data-block="p" class="toolbar-btn">Paragraph</button>
+          <span class="toolbar-separator" style="width: 1px; background: var(--color-border); margin: 2px 4px;"></span>
+          <button type="button" data-command="bold" class="toolbar-btn"><strong>B</strong></button>
+          <button type="button" data-command="italic" class="toolbar-btn"><em>I</em></button>
+          <button type="button" data-command="underline" class="toolbar-btn"><u>U</u></button>
+          <span class="toolbar-separator" style="width: 1px; background: var(--color-border); margin: 2px 4px;"></span>
+          <button type="button" data-command="insertUnorderedList" class="toolbar-btn">• List</button>
+          <button type="button" data-command="insertOrderedList" class="toolbar-btn">1. List</button>
+          <button type="button" data-block="blockquote" class="toolbar-btn">Quote</button>
+          <span class="toolbar-separator" style="width: 1px; background: var(--color-border); margin: 2px 4px;"></span>
+          <button type="button" data-action="link" class="toolbar-btn">Link</button>
+          <button type="button" data-action="image-url" class="toolbar-btn">Image URL</button>
+          <button type="button" data-action="image-upload" class="toolbar-btn">Upload Image</button>
+          <button type="button" data-command="undo" class="toolbar-btn">Undo</button>
+        </div>
+        <div 
+          id="rich-seo-editor" 
+          class="rich-post-editor" 
+          contenteditable="true" 
+          role="textbox" 
+          aria-multiline="true" 
+          data-placeholder="Start writing the explanation content..." 
+          style="padding: 16px; min-height: 320px; outline: none; background: var(--color-bg-surface); line-height: 1.7;"
+          set:html={settings.seoContent || '<p></p>'}
+        ></div>
+        <textarea id="rich-seo-content" name="seoContent" hidden>{settings.seoContent || ''}</textarea>
+      </div>
+
+      <div class="admin-editor-footer" style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px;">
+        <button class="btn btn-primary" type="submit">Save home hero</button>
+      </div>
+    </form>
+  </section>
+</AdminLayout>
+
+<style>
+  .form-field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .toolbar-btn {
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--color-text-base);
+    transition: all 0.15s ease;
+  }
+  .toolbar-btn:hover {
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+  .rich-post-editor h2 {
+    font-size: 18px;
+    margin-bottom: 8px;
+    font-weight: 750;
+  }
+  .rich-post-editor h3 {
+    font-size: 15px;
+    margin-bottom: 6px;
+    font-weight: 700;
+  }
+  .rich-post-editor p {
+    font-size: 14px;
+    margin-bottom: 8px;
+  }
+  .rich-post-editor img {
+    max-height: 200px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    margin: 10px 0;
+  }
+</style>
+
+<script>
+  const editor = document.querySelector<HTMLElement>('#rich-seo-editor');
+  const content = document.querySelector<HTMLTextAreaElement>('#rich-seo-content');
+  const form = document.querySelector<HTMLFormElement>('#home-hero-form');
+
+  const focusEditor = () => editor?.focus();
+
+  document.querySelectorAll<HTMLButtonElement>('.rich-editor-toolbar button').forEach((button) => {
+    button.addEventListener('click', () => {
+      focusEditor();
+      const command = button.dataset.command;
+      const block = button.dataset.block;
+      const action = button.dataset.action;
+
+      if (command) {
+        document.execCommand(command, false);
+      }
+      if (block) {
+        document.execCommand('formatBlock', false, block);
+      }
+      if (action === 'link') {
+        const url = window.prompt('Paste the link URL');
+        if (url) document.execCommand('createLink', false, url);
+      }
+      if (action === 'image-url') {
+        const url = window.prompt('Paste an HTTPS image URL');
+        if (url?.startsWith('https://')) document.execCommand('insertImage', false, url);
+      }
+      if (action === 'image-upload') {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/png,image/jpeg,image/webp';
+        fileInput.onchange = async () => {
+          const file = fileInput.files?.[0];
+          if (file) {
+            const body = new FormData();
+            body.set('image', file);
+            try {
+              const response = await fetch('/api/admin/blog-image', { method: 'POST', body });
+              const result = await response.json();
+              if (!response.ok) throw new Error(result.error || 'Upload failed.');
+              document.execCommand('insertImage', false, result.url);
+            } catch (err) {
+              alert(err instanceof Error ? err.message : 'Upload failed.');
+            }
+          }
+        };
+        fileInput.click();
+      }
+    });
+  });
+
+  form?.addEventListener('submit', () => {
+    if (editor && content) {
+      content.value = editor.innerHTML;
+    }
+  });
+</script>

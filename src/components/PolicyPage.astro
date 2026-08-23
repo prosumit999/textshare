@@ -1,0 +1,8 @@
+---
+interface Props { eyebrow: string; title: string; summary: string; updated?: string; }
+const { eyebrow, title, summary, updated = 'August 1, 2026' } = Astro.props;
+---
+<article class="policy-page">
+  <header class="policy-hero"><a href="/" class="policy-back">← TextShare home</a><span class="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{summary}</p><small>Last updated {updated}</small></header>
+  <div class="policy-shell"><aside><strong>Plain-language promise</strong><p>We explain the important parts clearly and avoid hiding material terms.</p><nav><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="/refund-policy">Refunds</a><a href="/acceptable-use">Acceptable use</a><a href="/contact">Contact</a></nav></aside><div class="policy-content"><slot /></div></div>
+</article>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TextShare</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup-shell">
+      <header class="popup-header">
+        <a class="brand" id="home-link" href="#" aria-label="Open TextShare">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+            ></path>
+            <path d="M14 2v6h6M9 13h6M9 17h6"></path>
+          </svg>
+          <span>Text<strong>Share</strong></span>
+        </a>
+        <button
+          class="icon-button"
+          id="settings-toggle"
+          type="button"
+          aria-label="Extension settings"
+          aria-expanded="false"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path
+              d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"
+            ></path>
+          </svg>
+        </button>
+      </header>
+
+      <section class="intro">
+        <span class="eyebrow">Quick share</span>
+        <h1>Share without breaking your flow.</h1>
+        <p>Paste a note here, or select text on any page and right-click.</p>
+      </section>
+
+      <form id="share-form">
+        <label for="share-text">Text or code</label>
+        <textarea
+          id="share-text"
+          rows="6"
+          maxlength="50000"
+          placeholder="Paste something worth sharing…"
+          required
+        ></textarea>
+        <div class="field-meta">
+          <span>Private by default</span
+          ><span id="character-count">0 / 50,000</span>
+        </div>
+        <button class="primary-button" type="submit">
+          <span>Continue in TextShare</span><span aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <section class="context-tip" aria-label="Context menu instructions">
+        <span class="mouse-icon" aria-hidden="true"
+          ><svg viewBox="0 0 24 24">
+            <rect x="7" y="2" width="10" height="20" rx="5"></rect>
+            <path d="M12 2v6"></path></svg
+        ></span>
+        <p>
+          <strong>From any webpage</strong
+          ><span>Select text → right-click → Share with TextShare</span>
+        </p>
+      </section>
+
+      <section class="settings" id="settings-panel" hidden>
+        <label for="site-url">TextShare site address</label>
+        <div class="settings-row">
+          <input
+            id="site-url"
+            type="url"
+            placeholder="https://your-domain.com"
+          /><button id="save-settings" type="button">Save</button>
+        </div>
+        <p id="settings-status" role="status">
+          Use localhost during development, then enter your production domain.
+        </p>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

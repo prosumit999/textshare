@@ -1,21 +1,22 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { countActiveSessions, getCurrentUser, invalidateUserSessions, listUsers, setUserDisabled } from '../../lib/auth';
+import { countActiveSessions, getCurrentUser, hasRecentAdminStepUp, invalidateUserSessions, listUsers, setUserDisabled } from '../../lib/auth';
 import { recordAudit } from '../../lib/admin';
 
 const admin = (await getCurrentUser(Astro.cookies))!;
 let message = '';
 if (Astro.request.method === 'POST') {
+  if (!await hasRecentAdminStepUp(Astro.cookies)) return Astro.redirect('/login?stepup=1');
   const form = await Astro.request.formData();
   const action = form.get('action')?.toString();
   const email = form.get('email')?.toString().toLowerCase() || '';
   if (email && email !== admin.email) {
     if (action === 'disable' && await setUserDisabled(email, true)) {
-      recordAudit({ actor: admin.email, action: 'disable', resourceType: 'user', resourceId: email, details: 'Account disabled and sessions revoked' }); message = `${email} disabled.`;
+      await recordAudit({ actor: admin.email, action: 'disable', resourceType: 'user', resourceId: email, details: 'Account disabled and sessions revoked' }); message = `${email} disabled.`;
     } else if (action === 'enable' && await setUserDisabled(email, false)) {
-      recordAudit({ actor: admin.email, action: 'enable', resourceType: 'user', resourceId: email, details: 'Account restored' }); message = `${email} enabled.`;
+      await recordAudit({ actor: admin.email, action: 'enable', resourceType: 'user', resourceId: email, details: 'Account restored' }); message = `${email} enabled.`;
     } else if (action === 'logout') {
-      const removed = invalidateUserSessions(email); recordAudit({ actor: admin.email, action: 'force_logout', resourceType: 'user', resourceId: email, details: `${removed} sessions invalidated` }); message = `${removed} sessions invalidated.`;
+      const removed = await invalidateUserSessions(email); await recordAudit({ actor: admin.email, action: 'force_logout', resourceType: 'user', resourceId: email, details: `${removed} sessions invalidated` }); message = `${removed} sessions invalidated.`;
     }
   }
 }
@@ -25,6 +26,7 @@ const perPage = 20;
 const filtered = (await listUsers()).filter((user)=>!search || `${user.name} ${user.email}`.toLowerCase().includes(search)).sort((a,b)=>b.createdAt.getTime()-a.createdAt.getTime());
 const totalPages = Math.max(1, Math.ceil(filtered.length/perPage));
 const users = filtered.slice((page-1)*perPage,page*perPage);
+const sessionCounts = new Map(await Promise.all(users.map(async (user) => [user.email, await countActiveSessions(user.email)] as const)));
 ---
 
 <AdminLayout title="User management">
@@ -33,7 +35,7 @@ const users = filtered.slice((page-1)*perPage,page*perPage);
     <div class="admin-panel-heading"><div><h2>Registered users</h2><p>{filtered.length} matching accounts</p></div></div>
     <form method="GET" class="admin-filter-bar"><input class="text-input" name="q" value={search} placeholder="Search name or email"/><button class="btn btn-secondary">Search</button></form>
     <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>User</th><th>Plan</th><th>Joined</th><th>Sessions</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-      {users.map((user)=><tr><td><strong>{user.name}</strong><small>{user.email}</small></td><td>{user.plan}</td><td>{user.createdAt.toLocaleString()}</td><td>{countActiveSessions(user.email)}</td><td><span class:list={["admin-tag",user.disabled?'danger':'published']}>{user.isAdmin?'Admin':user.disabled?'Disabled':'Active'}</span></td><td>{!user.isAdmin&&<div class="admin-row-actions"><form method="POST" onsubmit={`return confirm('${user.disabled?'Enable':'Disable'} this account?')`}><input type="hidden" name="action" value={user.disabled?'enable':'disable'}/><input type="hidden" name="email" value={user.email}/><button class={user.disabled?'':'danger-link'}>{user.disabled?'Enable':'Disable'}</button></form><form method="POST" onsubmit="return confirm('Force this user to sign in again on every device?')"><input type="hidden" name="action" value="logout"/><input type="hidden" name="email" value={user.email}/><button>Force logout</button></form></div>}</td></tr>)}
+      {users.map((user)=><tr><td><strong>{user.name}</strong><small>{user.email}</small></td><td>{user.plan}</td><td>{user.createdAt.toLocaleString()}</td><td>{sessionCounts.get(user.email) || 0}</td><td><span class:list={["admin-tag",user.disabled?'danger':'published']}>{user.isAdmin?'Admin':user.disabled?'Disabled':'Active'}</span></td><td>{!user.isAdmin&&<div class="admin-row-actions"><form method="POST" onsubmit={`return confirm('${user.disabled?'Enable':'Disable'} this account?')`}><input type="hidden" name="action" value={user.disabled?'enable':'disable'}/><input type="hidden" name="email" value={user.email}/><button class={user.disabled?'':'danger-link'}>{user.disabled?'Enable':'Disable'}</button></form><form method="POST" onsubmit="return confirm('Force this user to sign in again on every device?')"><input type="hidden" name="action" value="logout"/><input type="hidden" name="email" value={user.email}/><button>Force logout</button></form></div>}</td></tr>)}
       {users.length===0&&<tr><td colspan="6" class="admin-empty">No users found.</td></tr>}
     </tbody></table></div>
     <div class="admin-pagination"><a aria-disabled={page<=1} href={`?q=${search}&page=${page-1}`}>Previous</a><span>Page {page} of {totalPages}</span><a aria-disabled={page>=totalPages} href={`?q=${search}&page=${page+1}`}>Next</a></div>

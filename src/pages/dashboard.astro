@@ -4,6 +4,8 @@ import { getCurrentUser } from '../lib/auth';
 import { checkRateLimit, getClientIp, rateLimitResponse, secureCookieOptions } from '../lib/security';
 import { deleteShare, getShare, listShares } from '../lib/share-store';
 
+return Astro.redirect('/profile', 302);
+
 const currentUser = await getCurrentUser(Astro.cookies);
 const isLoggedIn = !!currentUser;
 const guestSlug = Astro.cookies.get("guest_share_active")?.value;

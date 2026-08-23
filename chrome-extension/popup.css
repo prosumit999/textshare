@@ -1,0 +1,244 @@
+:root {
+  color-scheme: light dark;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  --accent: #008d6a;
+  --accent-dark: #007459;
+  --ink: #172033;
+  --muted: #65718a;
+  --line: #dbe2eb;
+  --surface: #fff;
+  --soft: #f5f8fa;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  width: 380px;
+  margin: 0;
+  background: var(--soft);
+  color: var(--ink);
+}
+button,
+input,
+textarea {
+  font: inherit;
+}
+.popup-shell {
+  padding: 18px;
+  background: var(--surface);
+}
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.brand strong {
+  color: var(--accent);
+}
+.brand svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.icon-button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.icon-button:hover,
+.icon-button:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.icon-button svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.intro {
+  padding: 18px 0 15px;
+}
+.eyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+h1 {
+  margin: 6px 0 7px;
+  font-size: 22px;
+  line-height: 1.18;
+  letter-spacing: -0.035em;
+}
+.intro p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+form {
+  display: grid;
+  gap: 8px;
+}
+label {
+  font-size: 12px;
+  font-weight: 750;
+}
+textarea,
+input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--soft);
+  color: var(--ink);
+  outline: none;
+}
+textarea {
+  min-height: 126px;
+  padding: 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+textarea:focus,
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.field-meta {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 10px;
+}
+.primary-button {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 0 15px;
+  border: 1px solid var(--accent);
+  border-radius: 11px;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 750;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 141, 106, 0.17);
+}
+.primary-button:hover,
+.primary-button:focus-visible {
+  border-color: var(--accent-dark);
+  background: var(--accent-dark);
+}
+.primary-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.context-tip {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-top: 15px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--soft);
+}
+.mouse-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(0, 141, 106, 0.1);
+  color: var(--accent);
+}
+.mouse-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+.context-tip p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  font-size: 11px;
+}
+.context-tip span {
+  color: var(--muted);
+}
+.settings {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+.settings-row {
+  display: flex;
+  gap: 7px;
+  margin-top: 7px;
+}
+.settings-row input {
+  min-width: 0;
+  padding: 9px 10px;
+  font-size: 12px;
+}
+.settings-row button {
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 750;
+  cursor: pointer;
+}
+.settings p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ink: #edf3f6;
+    --muted: #9ba9bc;
+    --line: #2c394c;
+    --surface: #101827;
+    --soft: #141e2e;
+  }
+}

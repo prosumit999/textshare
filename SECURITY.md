@@ -23,7 +23,7 @@ node -e "import('bcryptjs').then(async b => console.log(await b.default.hash('US
 
 Set `ADMIN_EMAIL` (defaults to `prosumit999@gmail.com`) and either `ADMIN_PASSWORD` or `ADMIN_PASSWORD_HASH` in Coolify, then redeploy. For easy setup, `ADMIN_PASSWORD` is bcrypt-hashed with cost 12 in memory at process startup. Keep it only in Coolify secrets or an ignored local `.env`; never commit it. A precomputed `ADMIN_PASSWORD_HASH` is preferred and takes precedence when both are configured. Admin mutations are written to the audit log store.
 
-Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_USER` and `GMAIL_APP_PASSWORD` in Coolify. The normal Gmail password must never be used. Admin login fails closed if the verification message cannot be sent.
+Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_USER` and `GMAIL_APP_PASSWORD` in Coolify. The normal Gmail password must never be used. New accounts receive a short-lived email code only on their first successful password sign-in; subsequent standard-user sign-ins create a session directly. Admin OTPs are required on every admin sign-in and are delivered to `GMAIL_USER`; the challenged admin identity remains the account configured through `ADMIN_EMAIL` (default: `prosumit999@gmail.com`). Admin accounts continue to support the separate recovery-code flow.
 
 ## Implemented controls
 
@@ -32,7 +32,7 @@ Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_U
 - Eight MB global request-body limit and five MB decoded/re-encoded image limit.
 - PNG/JPEG/WEBP magic-byte verification, full Sharp decode, pixel limit, maximum dimensions, rotation, metadata stripping, and clean re-encoding. SVG and GIF are rejected.
 - bcrypt cost 12 for account and protected-share passwords.
-- Random 256-bit session tokens stored only as SHA-256 keys server-side. Cookies are HttpOnly, Secure in production, and SameSite=Lax.
+- Random 256-bit session tokens stored only as SHA-256 hashes in MongoDB. Session records have TTL expiry and work across restarts and replicas. Cookies are HttpOnly, Secure in production, and SameSite=Lax.
 - Origin validation for state-changing requests.
 - CSP, HSTS, anti-sniffing, anti-framing, referrer, permissions, and cross-origin isolation headers.
 - Public slugs use six random lowercase alphanumeric characters, or six random digits when numeric links are selected. Because these shorter links have reduced entropy, rate limiting and monitoring are required to mitigate enumeration attempts.
@@ -50,4 +50,4 @@ Enable Google 2-Step Verification, create a Gmail App Password, and set `GMAIL_U
 
 ## Persistence model
 
-Users, subscription plans, and signed-in share metadata now use MongoDB. Signed-in share payloads are encrypted with AES-256-GCM and stored in GridFS so content can exceed MongoDB's 16 MB document limit. Passwords and protected-share passwords remain one-way bcrypt hashes. Guest shares, sessions, admin OTP challenges, audit events, traffic events, IP blocks, and blog posts still use process memory and are not durable across deployments. Move ephemeral sessions/OTP challenges to Redis and the remaining operational records to durable collections before running multiple replicas.
+Users, subscription plans, authentication sessions, admin OTP challenges, recovery codes, blog posts, signed audit records, IP blocks, traffic/security events, and all share metadata use MongoDB. Both guest and signed-in share payloads are encrypted with AES-256-GCM and stored in GridFS so content can exceed MongoDB's 16 MB document limit. Passwords and protected-share passwords remain one-way bcrypt hashes. These records survive deployments and work across application replicas.

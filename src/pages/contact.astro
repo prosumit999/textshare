@@ -1,0 +1,15 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { sendSupportMessage } from '../lib/email';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+let sent = false; let error = '';
+if (Astro.request.method === 'POST') {
+  const limit = await checkRateLimit('support:contact', getClientIp(Astro.request), 5, 60 * 60);
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
+  const form = await Astro.request.formData();
+  const name = (form.get('name')?.toString() || '').trim(); const email = (form.get('email')?.toString() || '').trim(); const message = (form.get('message')?.toString() || '').trim();
+  if (name.length < 2 || name.length > 80 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || message.length < 10 || message.length > 4000) error = 'Check your name, email, and message before sending.';
+  else try { await sendSupportMessage(name, email, message); sent = true; } catch { error = 'Support email is temporarily unavailable. Please try again later.'; await logSecurityEvent('support_email_failed', Astro.request); }
+}
+---
+<Layout title="Contact TextShare" description="Contact TextShare support, privacy, billing or abuse teams."><section class="contact-page"><header><span class="eyebrow">Human support</span><h1>How can we help?</h1><p>Tell us what happened. We’ll route it to billing, privacy, security or product support.</p></header><div class="contact-grid"><aside><article><strong>Account & billing</strong><p>Include your account email, but never card details or passwords.</p></article><article><strong>Report abuse</strong><p>Include the room URL and a concise reason without repeating harmful material.</p></article><article><strong>Privacy request</strong><p>We may ask you to verify account ownership before acting.</p></article></aside><div class="contact-form-card">{sent ? <div class="contact-success"><span>✓</span><h2>Message received</h2><p>Thanks. Your request has been delivered.</p><a href="/" class="btn btn-primary">Back to TextShare</a></div> : <><h2>Send a message</h2>{error && <div class="banner banner-warning" role="alert">{error}</div>}<form method="POST"><label>Name<input class="text-input" name="name" minlength="2" maxlength="80" required/></label><label>Email<input class="text-input" type="email" name="email" maxlength="254" required/></label><label>How can we help?<textarea class="text-input" name="message" minlength="10" maxlength="4000" rows="7" required></textarea></label><button class="btn btn-primary">Send securely</button></form></>}</div></div></section></Layout>

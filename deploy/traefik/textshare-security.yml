@@ -20,6 +20,19 @@ http:
         maxRequestBodyBytes: 8388608
         memRequestBodyBytes: 1048576
         retryExpression: IsNetworkError() && Attempts() < 2
+    # Attach these narrower middlewares to higher-priority Coolify routers.
+    textshare-share-buffering:
+      buffering:
+        maxRequestBodyBytes: 54525952
+        memRequestBodyBytes: 1048576
+    textshare-image-buffering:
+      buffering:
+        maxRequestBodyBytes: 6291456
+        memRequestBodyBytes: 1048576
+    textshare-auth-buffering:
+      buffering:
+        maxRequestBodyBytes: 65536
+        memRequestBodyBytes: 65536
     textshare-headers:
       headers:
         contentTypeNosniff: true

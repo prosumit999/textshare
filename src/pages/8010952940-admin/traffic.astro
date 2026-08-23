@@ -1,22 +1,23 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { blockIp, getBlockedIps, getSecuritySignals, getTrafficEvents, recordAudit, unblockIp } from '../../lib/admin';
-import { getCurrentUser } from '../../lib/auth';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
 
 const admin = (await getCurrentUser(Astro.cookies))!;
 let message = '';
 if (Astro.request.method === 'POST') {
+  if (!await hasRecentAdminStepUp(Astro.cookies)) return Astro.redirect('/login?stepup=1');
   const form = await Astro.request.formData();
   const action = form.get('action')?.toString();
   const ip = form.get('ip')?.toString().trim() || '';
   if (/^[a-fA-F0-9:.]{2,64}$/.test(ip)) {
     if (action === 'block') {
       const duration = form.get('duration') === 'permanent' ? null : 60;
-      blockIp(ip, admin.email, duration, form.get('reason')?.toString().slice(0,200) || 'Admin block');
-      recordAudit({ actor: admin.email, action: duration ? 'temporary_block' : 'permanent_block', resourceType: 'ip', resourceId: ip, details: duration ? '60 minutes' : 'Permanent' });
+      await blockIp(ip, admin.email, duration, form.get('reason')?.toString().slice(0,200) || 'Admin block');
+      await recordAudit({ actor: admin.email, action: duration ? 'temporary_block' : 'permanent_block', resourceType: 'ip', resourceId: ip, details: duration ? '60 minutes' : 'Permanent' });
       message = `${ip} blocked.`;
-    } else if (action === 'unblock' && unblockIp(ip)) {
-      recordAudit({ actor: admin.email, action: 'unblock', resourceType: 'ip', resourceId: ip, details: 'Block removed' });
+    } else if (action === 'unblock' && await unblockIp(ip)) {
+      await recordAudit({ actor: admin.email, action: 'unblock', resourceType: 'ip', resourceId: ip, details: 'Block removed' });
       message = `${ip} unblocked.`;
     }
   }
@@ -25,8 +26,8 @@ if (Astro.request.method === 'POST') {
 const windowName = Astro.url.searchParams.get('window') || '24h';
 const windowMs = windowName === '1h' ? 3600000 : windowName === '7d' ? 7 * 86400000 : 86400000;
 const threshold = Math.max(10, Number(Astro.url.searchParams.get('threshold')) || 100);
-const events = getTrafficEvents(new Date(Date.now() - windowMs));
-const signals = getSecuritySignals(new Date(Date.now() - windowMs));
+const events = await getTrafficEvents(new Date(Date.now() - windowMs));
+const signals = await getSecuritySignals(new Date(Date.now() - windowMs));
 const byIp = new Map<string, { count: number; endpoints: Map<string,number>; failed: number }>();
 for (const event of events) {
   const row = byIp.get(event.ip) || { count: 0, endpoints: new Map(), failed: 0 };
@@ -43,7 +44,7 @@ const rows = allRows.slice((page - 1) * perPage, page * perPage);
 const signalPage = Math.max(1, Number(Astro.url.searchParams.get('signalPage')) || 1);
 const signalPages = Math.max(1, Math.ceil(signals.length / perPage));
 const shownSignals = signals.slice((signalPage - 1) * perPage, signalPage * perPage);
-const blocked = getBlockedIps();
+const blocked = await getBlockedIps();
 const blockPage = Math.max(1, Number(Astro.url.searchParams.get('blockPage')) || 1);
 const blockPages = Math.max(1, Math.ceil(blocked.length / perPage));
 const shownBlocks = blocked.slice((blockPage - 1) * perPage, blockPage * perPage);

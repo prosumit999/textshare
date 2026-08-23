@@ -4,6 +4,7 @@ import { completeAdminVerification } from '../lib/admin-auth';
 import { getUserByEmail } from '../lib/auth';
 import { ADMIN_BASE_PATH } from '../lib/admin-path';
 import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse } from '../lib/security';
+import { sendSecurityAlert } from '../lib/email';
 
 let error = '';
 if (Astro.request.method === 'POST') {
@@ -11,19 +12,20 @@ if (Astro.request.method === 'POST') {
   if (!limit.allowed) return rateLimitResponse(limit.retryAfter, 'Too many verification attempts. Try again later.');
   const form = await Astro.request.formData();
   const code = form.get('code')?.toString().trim() || '';
-  if (await completeAdminVerification(Astro.cookies, code, getUserByEmail)) return Astro.redirect(ADMIN_BASE_PATH);
-  logSecurityEvent('admin_verification_failed', Astro.request);
-  error = 'Invalid or expired verification code.';
+  if (await completeAdminVerification(Astro.cookies, code, getUserByEmail, Astro.request)) return Astro.redirect(ADMIN_BASE_PATH);
+  await logSecurityEvent('admin_verification_failed', Astro.request);
+  if (limit.remaining <= 1) await sendSecurityAlert('Repeated admin verification failures', `Repeated invalid owner verification codes were submitted from ${getClientIp(Astro.request)}.`).catch(() => false);
+  error = 'Invalid or expired verification or recovery code.';
 }
 ---
 
 <Layout title="Verify Admin — TextShare">
   <div class="auth-card admin-verify-card">
     <h2>Verify admin sign-in</h2>
-    <p class="subtitle">Enter the six-digit code sent to the configured owner email. It expires in 10 minutes.</p>
+    <p class="subtitle">Enter the six-digit email code, or use one of your single-use recovery codes.</p>
     {error && <div class="banner banner-warning" role="alert">{error}</div>}
     <form method="POST" class="auth-form">
-      <div class="input-label-pair"><label for="admin-code">Verification code</label><input id="admin-code" class="text-input admin-code-input" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required autofocus placeholder="000000"/></div>
+      <div class="input-label-pair"><label for="admin-code">Verification or recovery code</label><input id="admin-code" class="text-input admin-code-input" name="code" autocomplete="one-time-code" minlength="6" maxlength="11" required autofocus placeholder="000000 or abc12-def34"/></div>
       <button class="btn btn-primary" type="submit">Verify and continue</button>
     </form>
   </div>

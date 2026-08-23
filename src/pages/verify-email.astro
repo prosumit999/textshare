@@ -1,0 +1,6 @@
+---
+// Email verification is completed with a one-time code during a new user's
+// first sign-in. Keep this legacy route so old links and bookmarks land on the
+// current flow rather than sending any more confirmation links.
+return Astro.redirect('/login');
+---

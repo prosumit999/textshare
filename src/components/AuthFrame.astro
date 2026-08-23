@@ -1,0 +1,25 @@
+---
+interface Props { eyebrow: string; title: string; subtitle: string; asideTitle?: string; asideText?: string; }
+const { eyebrow, title, subtitle } = Astro.props;
+---
+<section class="auth-experience">
+  <div class="auth-form-panel">
+    <header class="auth-form-heading"><span class="eyebrow">{eyebrow}</span><h1>{title}</h1><p>{subtitle}</p></header>
+    <slot />
+    <footer class="auth-panel-footer"><slot name="footer" /></footer>
+  </div>
+</section>
+
+<script>
+  document.querySelectorAll<HTMLButtonElement>('[data-password-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const input = document.getElementById(button.dataset.target || '') as HTMLInputElement | null;
+      if (!input) return;
+      const visible = input.type === 'password';
+      input.type = visible ? 'text' : 'password';
+      button.classList.toggle('is-visible', visible);
+      button.setAttribute('aria-pressed', String(visible));
+      button.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+    });
+  });
+</script>

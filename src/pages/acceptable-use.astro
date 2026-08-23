@@ -1,0 +1,13 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PolicyPage from '../components/PolicyPage.astro';
+import { getPageBySlug } from '../lib/page-store';
+
+const page = (await getPageBySlug('acceptable-use'))!;
+const updatedStr = page.updatedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+---
+<Layout title={`${page.title} — TextShare`} description={page.summary}>
+  <PolicyPage eyebrow={page.eyebrow} title={page.title} summary={page.summary} updated={updatedStr}>
+    <div set:html={page.content}></div>
+  </PolicyPage>
+</Layout>

@@ -16,6 +16,8 @@ const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 const weekStart = new Date(now.getTime() - 7 * 86400000);
 const imageBytes = imageShares.reduce((sum, share) => sum + (share.sizeBytes || 0), 0);
 const redis = await getRedisHealth();
+const activeSessionCount = await countActiveSessions();
+const auditEntries = await getAuditLog(10);
 let disk = { available: 0, total: 0, percentFree: 0 };
 try {
   const fs = await statfs('/');
@@ -43,7 +45,7 @@ const formatBytes = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).t
     <article><span>Images</span><strong>{imageShares.length}</strong><small>{formatBytes(imageBytes)} stored</small></article>
     <article><span>Users</span><strong>{users.length}</strong><small>{users.filter((u) => u.createdAt >= todayStart).length} today · {users.filter((u) => u.createdAt >= weekStart).length} this week</small></article>
     <article><span>Active rooms</span><strong>{activeShares.length}</strong><small>Resolvable, unexpired rooms</small></article>
-    <article><span>Sessions</span><strong>{countActiveSessions()}</strong><small>Current process</small></article>
+    <article><span>Sessions</span><strong>{activeSessionCount}</strong><small>Durable MongoDB sessions</small></article>
   </div>
 
   <div class="admin-dashboard-grid">
@@ -61,7 +63,7 @@ const formatBytes = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).t
         <div><dt>Redis</dt><dd class:list={{ good: redis.connected, bad: !redis.connected }}>{redis.connected ? formatBytes(redis.usedMemory || 0) : 'Unavailable'}</dd></div>
         <div><dt>Disk available</dt><dd>{formatBytes(disk.available)} ({disk.percentFree.toFixed(1)}%)</dd></div>
         <div><dt>Primary database</dt><dd class="good">MongoDB</dd></div>
-        <div><dt>Traffic events (24h)</dt><dd>{getTrafficEvents(new Date(Date.now() - 86400000)).length}</dd></div>
+        <div><dt>Traffic events (24h)</dt><dd>{(await getTrafficEvents(new Date(Date.now() - 86400000))).length}</dd></div>
       </dl>
     </section>
   </div>
@@ -69,8 +71,8 @@ const formatBytes = (bytes: number) => bytes >= 1048576 ? `${(bytes / 1048576).t
   <section class="admin-panel">
     <div class="admin-panel-heading"><div><h2>Recent admin audit log</h2><p>Every destructive or privileged action</p></div></div>
     <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>When</th><th>Admin</th><th>Action</th><th>Resource</th><th>Details</th></tr></thead><tbody>
-      {getAuditLog().slice(0, 10).map((entry) => <tr><td>{entry.createdAt.toLocaleString()}</td><td>{entry.actor}</td><td><span class="admin-tag">{entry.action}</span></td><td>{entry.resourceType}:{entry.resourceId}</td><td>{entry.details}</td></tr>)}
-      {getAuditLog().length === 0 && <tr><td colspan="5" class="admin-empty">No admin actions recorded yet.</td></tr>}
+      {auditEntries.map((entry) => <tr><td>{entry.createdAt.toLocaleString()}</td><td>{entry.actor}</td><td><span class="admin-tag">{entry.action}</span></td><td>{entry.resourceType}:{entry.resourceId}</td><td>{entry.details}</td></tr>)}
+      {auditEntries.length === 0 && <tr><td colspan="5" class="admin-empty">No admin actions recorded yet.</td></tr>}
     </tbody></table></div>
   </section>
 </AdminLayout>

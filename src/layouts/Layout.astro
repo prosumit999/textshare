@@ -5,6 +5,7 @@ import Footer from '../components/Footer.astro';
 import MobileDrawer from '../components/MobileDrawer.astro';
 import BackToTop from '../components/BackToTop.astro';
 import MobileBottomNav from '../components/MobileBottomNav.astro';
+import PricingModal from '../components/PricingModal.astro';
 
 interface Props {
   title?: string;
@@ -24,20 +25,15 @@ const {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+    <link rel="shortcut icon" type="image/svg+xml" href="/favicon.svg?v=3" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
     <title>{title}</title>
     
-    <!-- Inline FOUC theme initialization script -->
+    <!-- Runs before paint and remains compatible with the strict CSP. -->
     <meta name="color-scheme" content="light dark" />
-    <script is:inline>
-      const savedTheme = localStorage.getItem("color-scheme");
-      const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const initialTheme = savedTheme || (systemPrefersDark ? "dark" : "light");
-      document.documentElement.setAttribute("data-theme", initialTheme);
-      document.documentElement.style.colorScheme = initialTheme;
-    </script>
+    <script is:inline src="/theme-init.js"></script>
   </head>
   <body>
     {!admin && <Header />}
@@ -52,16 +48,6 @@ const {
     {!admin && <Footer />}
     {!admin && <BackToTop />}
     {!admin && <MobileBottomNav />}
-
-    <!-- Premium Tier Popup Lock Modal Script -->
-    <script>
-      const premiumButtons = document.querySelectorAll(".premium-hook-btn");
-      premiumButtons.forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          alert("Upgrade to Pro! This feature is gated. (Mock checkout overlay integration hook)");
-        });
-      });
-    </script>
+    {!admin && <PricingModal />}
   </body>
 </html>
