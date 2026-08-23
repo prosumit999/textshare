@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { defineMiddleware } from 'astro:middleware';
 import { logSecurityEvent } from './lib/security';
 import { getClientIp } from './lib/security';
@@ -184,9 +185,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
     'max-age=31536000; includeSubDomains'
   );
 
+  // Content-Security-Policy is the single security policy for the app
+  // (Astro's built-in security.csp is disabled in astro.config.mjs). A
+  // per-request nonce covers first-party inline scripts, which the middleware
+  // injects into the HTML below, and Cloudflare's edge-injected inline scripts
+  // (JS Detections): Cloudflare parses the CSP response header and copies the
+  // nonce onto the scripts it injects. This is the mechanism Cloudflare
+  // documents for inline scripts and avoids a blanket 'unsafe-inline'.
+  const nonce = randomBytes(18).toString('base64url');
+
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; upgrade-insecure-requests"
+    `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; report-uri /api/csp-report; upgrade-insecure-requests`
   );
 
   if (url.pathname.match(/^\/(?:[A-Za-z0-9_-]{3,64})$/)) {
@@ -194,6 +204,26 @@ export const onRequest = defineMiddleware(async (context, next) => {
       'Cache-Control',
       'private, no-store, max-age=0'
     );
+  }
+
+  const contentType = response.headers.get('content-type') || '';
+
+  if (contentType.includes('text/html')) {
+    // Buffer the page and add the nonce to every script element so Astro's
+    // inlined module scripts keep executing under the nonce-based policy.
+    const html = await response.text();
+    const nonced = html.replace(
+      /<script(?![^>]*\bnonce=)/gi,
+      (tag) => `${tag} nonce="${nonce}"`
+    );
+
+    response.headers.delete('content-length');
+
+    return new Response(nonced, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers
+    });
   }
 
   return response;
