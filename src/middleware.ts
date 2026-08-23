@@ -38,7 +38,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     });
   };
 
-  if (url.pathname !== HEALTH_CHECK_PATH && isIpBlocked(clientIp)) {
+  if (
+    url.pathname !== HEALTH_CHECK_PATH &&
+    (await isIpBlocked(clientIp))
+  ) {
     logSecurityEvent('blocked_ip_rejected', request, {
       path: url.pathname
     });
