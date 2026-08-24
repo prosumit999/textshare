@@ -50,7 +50,8 @@ if (Astro.request.method === 'POST') {
         socials: cleanSocials,
         pages: cleanPages,
         seoTitle: existing.seoTitle,
-        seoContent: existing.seoContent
+        seoContent: existing.seoContent,
+        blogSitemapEnabled: form.get('blogSitemapEnabled') === 'on'
       });
       
       await recordAudit({
@@ -243,6 +244,21 @@ const settings = await getSiteSettings();
         <button type="button" id="add-page-btn" class="btn btn-secondary">
           + Add page link
         </button>
+      </div>
+
+      <!-- SEO Settings -->
+      <h3 class="section-heading" style="margin-top: 32px;">SEO settings</h3>
+      <div class="settings-form-grid">
+        <div class="form-field-label">
+          <span style="font-weight: 600; display: block; margin-bottom: 8px;">Blog post XML sitemap</span>
+          <label class="checkbox-label" style="margin: 0; font-weight: 500;">
+            <input type="checkbox" name="blogSitemapEnabled" id="blog-sitemap-enabled" checked={settings.blogSitemapEnabled} />
+            <span>Enable an XML sitemap of published blog posts</span>
+          </label>
+          <small style="color: var(--color-text-muted); display: block; margin-top: 8px;">
+            Sitemap URL: <code>{Astro.url.origin}/sitemap.xml</code> — serve this to search engines.
+          </small>
+        </div>
       </div>
 
       <div class="form-actions-bar">

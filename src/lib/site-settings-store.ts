@@ -23,6 +23,8 @@ export type SiteSettings = {
   // SEO Section (Rich text)
   seoTitle: string;
   seoContent: string;
+  // SEO / sitemap settings
+  blogSitemapEnabled: boolean;
 };
 
 export const defaultSocials: SocialLink[] = [
@@ -96,7 +98,8 @@ export const defaultSiteSettings: SiteSettings = {
 <p>From a small code snippet to temporary notes or screenshots, TextShare gives you one simple place to create and manage a shareable room.</p>
 <h2>Start Sharing</h2>
 <p>Open TextShare, paste your content, choose your settings, and create your room.</p>
-<p><strong>No clutter. No unnecessary setup. Just a simple way to share.</strong></p>`
+<p><strong>No clutter. No unnecessary setup. Just a simple way to share.</strong></p>`,
+  blogSitemapEnabled: false
 };
 
 export async function getSiteSettings(): Promise<SiteSettings> {
@@ -114,7 +117,11 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     heroTitle: settings.heroTitle || defaultSiteSettings.heroTitle,
     heroSubtitle: settings.heroSubtitle || defaultSiteSettings.heroSubtitle,
     seoTitle: settings.seoTitle || defaultSiteSettings.seoTitle,
-    seoContent: settings.seoContent || defaultSiteSettings.seoContent
+    seoContent: settings.seoContent || defaultSiteSettings.seoContent,
+    blogSitemapEnabled:
+      typeof settings.blogSitemapEnabled === "boolean"
+        ? settings.blogSitemapEnabled
+        : defaultSiteSettings.blogSitemapEnabled
   };
 }
 
