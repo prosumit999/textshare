@@ -1064,7 +1064,7 @@ a.btn-primary:active {
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s ease;
-  width: 110px;
+  width: auto;
 }
 
 .select-input {
@@ -1120,6 +1120,8 @@ a.btn-primary:active {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  justify-content: center;
+  align-items: center;
 }
 
 .input-label-pair label {
@@ -4661,6 +4663,10 @@ body.drawer-open {
 }
 .admin-page-header {
   margin-bottom: 20px;
+  padding: 20px;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid gainsboro;
 }
 .admin-page-header span {
   color: var(--color-accent);
