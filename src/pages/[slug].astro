@@ -83,16 +83,38 @@ const currentUser = await getCurrentUser(Astro.cookies);
 const isOwner = isStoredShare && !!share.owner && share.owner === currentUser?.email;
 const hasPaidPlan = currentUser?.plan === "plus" || currentUser?.plan === "pro";
 
+// Extension is only available while the link is about to expire — i.e. within
+// the final hour before its expiry (and not already expired).
+const shareExpiryMs = new Date(share.expiryDate).getTime();
+const canExtend =
+  shareExpiryMs > Date.now() && shareExpiryMs - Date.now() <= 3600_000;
+
+// Parse the request body once and reuse it. The owner-action handler and the
+// password-verification handler both need the same form data; reading the body
+// twice throws ("An error occurred during verification") because a consumed
+// request body cannot be parsed again.
+let postFormData: FormData | null = null;
+if (Astro.request.method === "POST") {
+  try {
+    postFormData = await Astro.request.formData();
+  } catch {
+    postFormData = null;
+  }
+}
+
 // Owner-only lifecycle actions (revoke, extend expiry, toggle analytics).
-if (isOwner && slug && Astro.request.method === "POST") {
+if (isOwner && slug && postFormData) {
   const ownerLimit = await checkRateLimit("share:owner-action", currentUser!.email, 30, 10 * 60);
   if (!ownerLimit.allowed) return rateLimitResponse(ownerLimit.retryAfter, "Too many share changes. Try again later.");
-  const formData = await Astro.request.formData();
+  const formData = postFormData;
   const action = formData.get("action")?.toString();
   if (action === "owner_revoke") {
     await revokeShare(slug, currentUser!.email);
     return Astro.redirect(`/${slug}?action=revoked`);
   } else if (action === "owner_extend") {
+    if (!canExtend) {
+      return Astro.redirect(`/${slug}?action=extend_unavailable`);
+    }
     const amount = formData.get("amount")?.toString();
     const durationMs: Record<string, number> = {
       "24h": 24 * 60 * 60 * 1000,
@@ -142,9 +164,9 @@ let isLocked = !!share.passwordHash;
 let passwordError = "";
 
 // Handle Password Validation POST Request
-if (Astro.request.method === "POST" && isLocked) {
+if (Astro.request.method === "POST" && isLocked && postFormData) {
   try {
-    const formData = await Astro.request.formData();
+    const formData = postFormData;
     const action = formData.get("action")?.toString();
     
     if (action === "verify_password") {
@@ -224,6 +246,7 @@ const sharedImages = share.contentType === 'image'
             {shareAction === "analytics_on" && "Access analytics are now being tracked for this share."}
             {shareAction === "analytics_off" && "Access analytics tracking is now off."}
             {shareAction === "pro_required" && "Extending by 1 week or 1 month requires a Pro plan."}
+            {shareAction === "extend_unavailable" && "Extension is only available in the last hour before this link expires."}
             {shareAction === "edited" && "Text updated."}
             {shareAction === "edit_failed" && "Could not update the text."}
           </div>
@@ -281,25 +304,35 @@ const sharedImages = share.contentType === 'image'
               )}
             </div>
             <div class="owner-toolbar-actions">
+              {!canExtend && (
+                <span class="owner-note owner-extend-hint">Extend unlocks in the final hour before expiry.</span>
+              )}
               {[
                 ["24h", "+24h", true],
                 ["1w", "+1w", hasPaidPlan],
                 ["1m", "+1m", hasPaidPlan],
               ].map(([amount, label, allowed]) =>
-                allowed ? (
-                  <form method="POST" class="owner-toolbar-form">
-                    <input type="hidden" name="action" value="owner_extend" />
-                    <input type="hidden" name="amount" value={amount} />
-                    <button type="submit" class="owner-toolbar-btn" title={`Extend expiry by ${label}`} aria-label={`Extend expiry by ${label}`}>
-                      <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+                canExtend ? (
+                  allowed ? (
+                    <form method="POST" class="owner-toolbar-form">
+                      <input type="hidden" name="action" value="owner_extend" />
+                      <input type="hidden" name="amount" value={amount} />
+                      <button type="submit" class="owner-toolbar-btn" title={`Extend expiry by ${label}`} aria-label={`Extend expiry by ${label}`}>
+                        <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>
+                        <span>{label}</span>
+                      </button>
+                    </form>
+                  ) : (
+                    <a href="/pricing" class="owner-toolbar-btn owner-toolbar-locked" title="Extend by 1 week or 1 month requires a Pro plan" aria-label={`Extend by ${label} (Pro feature)`}>
+                      <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 7.7-1.5"></path></svg>
                       <span>{label}</span>
-                    </button>
-                  </form>
+                    </a>
+                  )
                 ) : (
-                  <a href="/pricing" class="owner-toolbar-btn owner-toolbar-locked" title="Extend by 1 week or 1 month requires a Pro plan" aria-label={`Extend by ${label} (Pro feature)`}>
+                  <button type="button" class="owner-toolbar-btn owner-toolbar-locked" title="Extension is available in the last hour before this link expires" aria-label={`Extend by ${label} unavailable`}>
                     <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 7.7-1.5"></path></svg>
                     <span>{label}</span>
-                  </a>
+                  </button>
                 ),
               )}
 

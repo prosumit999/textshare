@@ -4572,8 +4572,8 @@ body.drawer-open {
 }
 
 .room-qr img {
-  width: 116px;
-  height: 116px;
+  width: 150px;
+  height: 130px;
   padding: 7px;
   border: 1px solid var(--color-border);
   border-radius: 9px;
@@ -6485,4 +6485,8 @@ body.drawer-open {
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-3);
+}
+.owner-extend-hint {
+  margin-right: var(--space-2);
+  font-style: italic;
 }
