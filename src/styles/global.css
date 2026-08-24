@@ -48,7 +48,7 @@ ul {
     width: 500px;
 }
 
-@media screen and (max-widht: 600px){
+@media screen and (max-width: 600px){
 ul {
     flex-direction: column;
     align-items: flex-start;
