@@ -30,8 +30,12 @@ const pages = siteSettings.pages;
           <p>{siteSettings.footerDescription}</p>
           <div class="footer-socials" aria-label="Social links">
             {socials.filter(s => s.enabled).map(social => {
-              if (social.platform === 'linkedin') {
-                return <a href={social.url} aria-label="LinkedIn">in</a>;
+              if (social.platform === 'youtube') {
+                return (
+                  <a href={social.url} aria-label="YouTube">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22.5 6.4a2.8 2.8 0 0 0-2-2C18.9 4 12 4 12 4s-6.9 0-8.5.4a2.8 2.8 0 0 0-2 2A29.3 29.3 0 0 0 1 12a29.3 29.3 0 0 0 .5 5.6 2.8 2.8 0 0 0 2 2c1.6.4 8.5.4 8.5.4s6.9 0 8.5-.4a2.8 2.8 0 0 0 2-2A29.3 29.3 0 0 0 23 12a29.3 29.3 0 0 0-.5-5.6Z"></path><polygon points="10 15 15 12 10 9 10 15"></polygon></svg>
+                  </a>
+                );
               }
               if (social.platform === 'instagram') {
                 return (

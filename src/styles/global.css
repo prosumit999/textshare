@@ -26,8 +26,8 @@ video,
 canvas,
 svg {
   display: block;
-  margin: 0px auto;
-  max-width: 100%;
+  margin: 10px auto;
+  max-width: 80%;
    aspect-ratio: 2/1;
   border-radius: 12px;
 }
@@ -2243,6 +2243,7 @@ table.dashboard-table tbody tr:last-child td {
 }
 .auth-input-wrap .text-input {
   width: 100%;
+  min-width: 380px;
   min-height: 45px;
   padding-left: 40px;
   border-radius: 11px;
@@ -2302,6 +2303,15 @@ table.dashboard-table tbody tr:last-child td {
   -webkit-text-fill-color: var(--color-text-base);
   box-shadow: 0 0 0 1000px var(--color-bg-input) inset;
   transition: background-color 9999s ease-out;
+}
+/* Neutralize the global img/video/svg media styling on the small field icons
+   so the auth inputs keep their correct size and the icons stay aligned. */
+.auth-input-wrap > svg,
+.auth-password-toggle svg {
+  margin: 0;
+  max-width: none;
+  aspect-ratio: auto;
+  border-radius: 0;
 }
 .auth-form-panel .auth-submit {
   min-height: 45px;
@@ -2723,6 +2733,10 @@ footer {
 .icon-svg {
   width: 18px;
   height: 18px;
+  margin: 0;
+  max-width: none;
+  aspect-ratio: auto;
+  border-radius: 0;
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;

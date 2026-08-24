@@ -1,7 +1,7 @@
 import { getMongo } from "./mongo";
 
 export type SocialLink = {
-  platform: 'linkedin' | 'instagram' | 'github' | 'x';
+  platform: 'youtube' | 'instagram' | 'github' | 'x';
   url: string;
   enabled: boolean;
 };
@@ -26,7 +26,7 @@ export type SiteSettings = {
 };
 
 export const defaultSocials: SocialLink[] = [
-  { platform: 'linkedin', url: '#', enabled: true },
+  { platform: 'youtube', url: '#', enabled: true },
   { platform: 'instagram', url: '#', enabled: true },
   { platform: 'github', url: '#', enabled: true },
   { platform: 'x', url: '#', enabled: true }

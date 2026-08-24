@@ -11,9 +11,9 @@ const { eyebrow, title, subtitle } = Astro.props;
 </section>
 
 <script>
-  document.querySelectorAll<HTMLButtonElement>('[data-password-toggle]').forEach((button) => {
+  document.querySelectorAll('[data-password-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
-      const input = document.getElementById(button.dataset.target || '') as HTMLInputElement | null;
+      const input = document.getElementById(button.dataset.target || '');
       if (!input) return;
       const visible = input.type === 'password';
       input.type = visible ? 'text' : 'password';

@@ -15,7 +15,7 @@ async function createMenu() {
   await chrome.contextMenus.removeAll();
   chrome.contextMenus.create({
     id: MENU_ID,
-    title: "Share selection with TextShare",
+    title: "Share selection with TextShare.pro",
     contexts: ["selection"],
   });
 }
