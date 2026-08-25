@@ -9,6 +9,8 @@ export type CustomPage = {
   eyebrow: string;
   summary: string;
   content: string;
+  /** When true, this page is listed in the website footer links. */
+  showInFooter: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -20,6 +22,7 @@ const defaultSeedPages: Omit<CustomPage, 'createdAt' | 'updatedAt'>[] = [
     slug: "privacy",
     eyebrow: "Privacy",
     summary: "How TextShare handles account and shared data.",
+    showInFooter: false,
     content: `<section><h2>Information we process</h2><p>We process account name, email, password hash, subscription status, security/session records, share metadata and encrypted share payloads. We also record limited IP, request and abuse signals needed for security and rate limiting.</p></section>
 <section><h2>Why we process it</h2><p>Data is used to provide sharing, authenticate users, process subscriptions, prevent abuse, deliver support and meet legal obligations. We do not sell personal information.</p></section>
 <section><h2>Storage and retention</h2><p>Share payloads are encrypted at rest and removed after expiry, burn-after-view, user deletion or administrative abuse action. Account and billing records remain while the account exists and as required for fraud, tax, dispute and legal records. Security logs have limited retention.</p></section>
@@ -34,6 +37,7 @@ const defaultSeedPages: Omit<CustomPage, 'createdAt' | 'updatedAt'>[] = [
     slug: "terms",
     eyebrow: "Legal",
     summary: "The rules that keep TextShare useful, temporary, and safe for everyone.",
+    showInFooter: false,
     content: `<section><h2>1. Agreement and eligibility</h2><p>By using TextShare, you agree to these Terms and our Acceptable Use and Privacy policies. You must be legally able to enter this agreement and provide accurate account information.</p></section>
 <section><h2>2. The service</h2><p>TextShare provides temporary links for text, code and supported images. Expiry and burn-after-view reduce availability but do not guarantee that a recipient has not copied content. Keep your own backups of anything important.</p></section>
 <section><h2>3. Accounts and security</h2><p>You are responsible for your credentials, activity and recipients. Notify us through the contact page if you suspect unauthorized access. We may suspend accounts that threaten the service or other users.</p></section>
@@ -48,6 +52,7 @@ const defaultSeedPages: Omit<CustomPage, 'createdAt' | 'updatedAt'>[] = [
     slug: "refund-policy",
     eyebrow: "Billing",
     summary: "Simple subscription terms with clear control over renewal.",
+    showInFooter: false,
     content: `<section><h2>Cancel anytime</h2><p>You can cancel from Profile → Billing & invoices. Cancellation normally takes effect at the end of the paid billing period, and Pro remains available until that date.</p></section>
 <section><h2>Refund requests</h2><p>Subscription charges are generally non-refundable once a billing period begins. If you were charged because of a technical error, duplicate payment, or service failure, contact us within 7 days. We review eligible requests individually and do not limit mandatory consumer rights.</p></section>
 <section><h2>Renewals and failed payments</h2><p>Subscriptions renew automatically using the payment method held by Stripe. Failed payments may place the subscription into a pending or past-due state and restrict Pro access until payment succeeds.</p></section>
@@ -60,6 +65,7 @@ const defaultSeedPages: Omit<CustomPage, 'createdAt' | 'updatedAt'>[] = [
     slug: "acceptable-use",
     eyebrow: "Trust & safety",
     summary: "Share useful things—not harm, exploitation, malware or abuse.",
+    showInFooter: false,
     content: `<section><h2>Prohibited content and conduct</h2><p>Do not use TextShare for illegal material, sexual exploitation, credible threats, harassment, non-consensual intimate material, stolen credentials, doxxing, fraud, phishing, spam, malware, command-and-control infrastructure, or content that infringes another person’s rights.</p></section>
 <section><h2>Security boundaries</h2><p>Do not probe, scrape, overload, enumerate links, bypass access controls or interfere with other users. Authorized security research requires prior written permission.</p></section>
 <section><h2>Enforcement</h2><p>We may remove shares, rate-limit traffic, block addresses, suspend accounts, preserve evidence or report activity when reasonably necessary to protect users, comply with law or enforce this policy.</p></section>
@@ -114,6 +120,7 @@ export async function savePage(input: Omit<CustomPage, "id" | "createdAt" | "upd
   const page: CustomPage = {
     ...input,
     id: existing?.id || randomUUID(),
+    showInFooter: !!input.showInFooter,
     createdAt: existing?.createdAt || now,
     updatedAt: now
   };

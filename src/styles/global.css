@@ -1290,19 +1290,62 @@ a.btn-primary:active {
 }
 
 .policy-hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 190px;
+  padding: 44px 40px 40px;
+  margin-bottom: 24px;
+  overflow: hidden;
   text-align: center;
 }
+.policy-hero .policy-back {
+  position: absolute;
+  top: 18px;
+  left: 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  transition: color 0.15s ease;
+}
+.policy-hero .policy-back:hover {
+  color: var(--color-accent);
+}
 .policy-hero .eyebrow {
-  display: block;
-  margin-top: 20px;
+  display: inline-flex;
+  margin-bottom: 12px;
+}
+.policy-hero h1 {
+  margin: 0 0 10px;
+  max-width: 720px;
+  font-size: clamp(24px, 3.4vw, 36px);
+  font-weight: 730;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
 }
 .policy-hero p {
-  margin: 0 auto 12px;
+  margin: 0 auto 18px;
+  max-width: 640px;
+  font-size: 15px;
+  line-height: 1.65;
 }
-.policy-hero small,
-.policy-back {
+.policy-hero small {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 13px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
   color: var(--color-text-muted);
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 600;
 }
 .policy-shell {
   display: grid;
@@ -1458,6 +1501,15 @@ a.btn-primary:active {
   .policy-hero,
   .contact-page > header {
     padding: 24px 19px;
+  }
+  .policy-hero {
+    min-height: 0;
+    padding: 48px 22px 34px;
+  }
+  .policy-hero .policy-back {
+    position: static;
+    align-self: flex-start;
+    margin-bottom: 16px;
   }
   .settings-card {
     padding: 22px;

@@ -799,13 +799,72 @@ if (Astro.request.method === "POST") {
     </header>
     <div class="seo-rich-content" set:html={siteSettings.seoContent}></div>
   </section>
+
+  <!-- FAQ Section -->
+  <section class="faq-section" aria-labelledby="faq-title">
+    <header class="faq-header">
+      <h2 id="faq-title">Frequently asked questions</h2>
+      <p>Quick answers about sharing text and code with TextShare.</p>
+    </header>
+    <div class="faq-list">
+      <details class="faq-item">
+        <summary>
+          <span>How to share text online without login?</span>
+          <span class="faq-icon" aria-hidden="true"></span>
+        </summary>
+        <div class="faq-answer">
+          <p>TextShare works without an account. Just paste your text, code, or notes into the composer, choose your expiry and options, and hit share — you'll get a working link right away, no sign-up needed. Creating a free account is only required for extras like access analytics, custom slugs, or longer storage.</p>
+        </div>
+      </details>
+
+      <details class="faq-item" open>
+        <summary>
+          <span>How to share text with QR code online?</span>
+          <span class="faq-icon" aria-hidden="true"></span>
+        </summary>
+        <div class="faq-answer">
+          <p>Sharing with a QR code takes one click. Create a share as usual and TextShare automatically generates a QR code for its link. Download it from the room and print it, display it on screen, or add it to a slide — anyone who scans it with their phone camera opens your shared text or code instantly. No account or app is needed on their side.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>
+          <span>How to share text online with link?</span>
+          <span class="faq-icon" aria-hidden="true"></span>
+        </summary>
+        <div class="faq-answer">
+          <p>Paste your text, code, or notes into the composer, choose how long it should last and any extra options, then hit share. TextShare creates a simple link you can copy and send to anyone through chat, email, or anywhere else. When they open it, they see exactly what you shared.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>
+          <span>How long does text stay on TextShare.Pro?</span>
+          <span class="faq-icon" aria-hidden="true"></span>
+        </summary>
+        <div class="faq-answer">
+          <p>On the free plan, shares stay available for the expiry you choose — typically up to 24 hours for text. TextShare Pro unlocks flexible expiry so you can keep a share live for 1 week, 1 month, or 1 year, and lets you extend a link in the final hour before it expires. Burn-after-first-view links delete themselves the moment they are first opened.</p>
+        </div>
+      </details>
+
+      <details class="faq-item">
+        <summary>
+          <span>What features do I get on TextShare.pro?</span>
+          <span class="faq-icon" aria-hidden="true"></span>
+        </summary>
+        <div class="faq-answer">
+          <p>Pro gives you full control over what you share: flexible expiry (1 week, 1 month, or 1 year), password-protected rooms, unlimited shares with no one-active-link limit, multi-image rooms (up to 5 images for 24 hours), and custom six-character slugs for memorable links. Burn-after-first-view stays free.</p>
+        </div>
+      </details>
+    </div>
+  </section>
 </Layout>
 
 <style>
   .home-seo-section {
-    margin-top: 48px;
+    margin-top: 34px;
     margin-bottom: 32px;
-    padding: 32px;
+    padding: 20px;
     border: 1px solid var(--color-border);
     border-radius: 20px;
     background: var(--color-bg-surface);
@@ -857,6 +916,128 @@ if (Astro.request.method === "POST") {
     border: 1px solid var(--color-border);
     margin: 20px 0;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  /* FAQ Section */
+  .faq-section {
+    margin-top: 24px;
+    margin-bottom: 40px;
+    padding: 20px;
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    background: var(--color-bg-surface);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--color-text-base) 3%, transparent);
+  }
+  .faq-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 14px;
+    text-align: center;
+  }
+  .faq-header h2 {
+    margin: 0;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    color: var(--color-text-base);
+  }
+  .faq-header p {
+    margin: 8px 0 0;
+    color: var(--color-text-muted);
+    font-size: 14px;
+  }
+  .faq-list {
+    display: grid;
+    gap: 12px;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .faq-item {
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-bg-base);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .faq-item[open] {
+    border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--color-accent) 6%, transparent);
+  }
+  .faq-item summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 18px 20px;
+    cursor: pointer;
+    list-style: none;
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    color: var(--color-text-base);
+  }
+  .faq-item summary::-webkit-details-marker {
+    display: none;
+  }
+  .faq-item summary:hover {
+    color: var(--color-accent);
+  }
+  .faq-icon {
+    position: relative;
+    flex: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-accent);
+    transition: transform 0.25s ease, background 0.2s ease;
+  }
+  .faq-icon::before,
+  .faq-icon::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 2px;
+    background: currentColor;
+  }
+  .faq-icon::before {
+    width: 10px;
+    height: 2px;
+  }
+  .faq-icon::after {
+    width: 2px;
+    height: 10px;
+  }
+  .faq-item[open] .faq-icon {
+    transform: rotate(45deg);
+  }
+  .faq-answer {
+    padding: 0 20px 18px;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  .faq-answer p {
+    margin: 0;
+  }
+
+  @media (max-width: 640px) {
+    .faq-section {
+      padding: 32px 20px;
+    }
+    .faq-header h2 {
+      font-size: 21px;
+    }
+    .faq-item summary {
+      font-size: 14px;
+      padding: 16px;
+    }
+    .faq-answer {
+      padding: 0 16px 16px;
+    }
   }
 </style>
 

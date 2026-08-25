@@ -1,6 +1,7 @@
 ---
 import { getPublishedBlogPosts } from '../lib/admin';
 import { getSiteSettings } from '../lib/site-settings-store';
+import { listPages } from '../lib/page-store';
 
 const currentYear = new Date().getFullYear();
 const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
@@ -11,6 +12,18 @@ const posts = (await getPublishedBlogPosts()).slice(0, 5).map((post) => ({
 const siteSettings = await getSiteSettings();
 const socials = siteSettings.socials;
 const pages = siteSettings.pages;
+
+// Custom pages explicitly flagged to appear in the footer links.
+const customFooterPages = (await listPages())
+  .filter((p) => p.showInFooter)
+  .map((p) => ({ label: p.title, url: `/${p.slug}` }));
+
+// Combine enabled site-settings links with footer-flagged custom pages,
+// de-duplicating by URL so the same page never appears twice.
+const footerLinks = [
+  ...customFooterPages,
+  ...pages.filter((p) => p.enabled).map((p) => ({ label: p.label, url: p.url })),
+].filter((link, index, arr) => arr.findIndex((l) => l.url === link.url) === index);
 ---
 
 <footer>
@@ -79,8 +92,8 @@ const pages = siteSettings.pages;
       <div class="footer-bottom">
         <span>&copy; {currentYear} TextShare. All rights reserved.</span>
         <nav class="footer-legal" aria-label="Legal links">
-          {pages.filter(p => p.enabled).map(page => (
-            <a href={page.url}>{page.label}</a>
+          {footerLinks.map(link => (
+            <a href={link.url}>{link.label}</a>
           ))}
         </nav>
       </div>
