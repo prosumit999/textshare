@@ -1390,6 +1390,7 @@ a.btn-primary:active {
   border: 1px solid var(--color-border);
   border-radius: 19px;
   background: var(--color-bg-surface);
+  padding: 20px;
 }
 .policy-content section {
   padding: 27px 30px;
@@ -1416,10 +1417,30 @@ a.btn-primary:active {
 }
 
 .contact-page > header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: auto;
+  min-height: 190px;
+  padding: 44px 40px 40px;
+  margin-bottom: 24px;
+  overflow: hidden;
   text-align: center;
 }
+.contact-page h1 {
+  margin: 0 0 10px;
+  max-width: 720px;
+  font-size: clamp(24px, 3.4vw, 36px);
+  font-weight: 730;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
+}
 .contact-page > header p {
-  margin: auto;
+  margin: 0 auto;
+  max-width: 640px;
+  font-size: 15px;
+  line-height: 1.65;
 }
 .contact-grid {
   display: grid;
@@ -1510,6 +1531,10 @@ a.btn-primary:active {
     position: static;
     align-self: flex-start;
     margin-bottom: 16px;
+  }
+  .contact-page > header {
+    min-height: 0;
+    padding: 40px 22px 34px;
   }
   .settings-card {
     padding: 22px;
