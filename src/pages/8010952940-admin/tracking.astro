@@ -1,0 +1,107 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { ADMIN_BASE_PATH } from '../../lib/admin-path';
+import { recordAudit } from '../../lib/admin';
+import { getCurrentUser, hasRecentAdminStepUp } from '../../lib/auth';
+import { getSiteSettings, saveSiteSettings } from '../../lib/site-settings-store';
+
+const admin = (await getCurrentUser(Astro.cookies))!;
+let message = '';
+let error = '';
+
+if (Astro.request.method === 'POST') {
+  if (!(await hasRecentAdminStepUp(Astro.cookies))) {
+    return Astro.redirect('/login?stepup=1');
+  }
+  const form = await Astro.request.formData();
+  const action = form.get('action')?.toString();
+  if (action === 'save') {
+    try {
+      const headerMetaTags = form.get('headerMetaTags')?.toString() || '';
+      const footerScripts = form.get('footerScripts')?.toString() || '';
+
+      const existing = await getSiteSettings();
+
+      await saveSiteSettings({
+        ...existing,
+        headerMetaTags,
+        footerScripts
+      });
+
+      await recordAudit({
+        actor: admin.email,
+        action: 'update_tracking_settings',
+        resourceType: 'system_settings',
+        resourceId: 'global',
+        details: 'Updated header meta tags and footer scripts'
+      });
+      message = 'Tracking settings saved successfully.';
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to save tracking settings.';
+    }
+  }
+}
+
+const settings = await getSiteSettings();
+---
+
+<AdminLayout title="Tracking & SEO">
+  {message && <div class="admin-alert success">{message}</div>}
+  {error && <div class="admin-alert danger">{error}</div>}
+
+  <section class="admin-panel">
+    <div class="admin-panel-heading">
+      <div>
+        <h2>Header meta tags &amp; footer scripts</h2>
+        <p>
+          Add verification tags (e.g. Google Search Console), analytics snippets
+          (e.g. Google Analytics), and other scripts that run on every page.
+        </p>
+      </div>
+    </div>
+
+    <form method="POST">
+      <input type="hidden" name="action" value="save" />
+
+      <h3 class="section-heading">Header meta tags</h3>
+      <div class="settings-form-grid">
+        <label class="form-field-label">
+          Head content — injected into <code>&lt;head&gt;</code>
+          <textarea
+            class="text-input"
+            name="headerMetaTags"
+            rows="6"
+            placeholder="e.g. <meta name=&quot;google-site-verification&quot; content=&quot;...&quot; />"
+            style="width: 100%; resize: vertical; font-family: monospace;"
+          >{settings.headerMetaTags}</textarea>
+        </label>
+        <small style="display: block; margin-top: 6px;">
+          Example: <code>&lt;meta name="google-site-verification" content="..."/&gt;</code>
+        </small>
+      </div>
+
+      <h3 class="section-heading" style="margin-top: 32px;">Footer scripts</h3>
+      <div class="settings-form-grid">
+        <label class="form-field-label">
+          Body scripts — injected before <code>&lt;/body&gt;</code>
+          <textarea
+            class="text-input"
+            name="footerScripts"
+            rows="10"
+            placeholder="e.g. Google Analytics (gtag.js) snippet"
+            style="width: 100%; resize: vertical; font-family: monospace;"
+          >{settings.footerScripts}</textarea>
+        </label>
+        <small style="display: block; margin-top: 6px;">
+          Example: the Google tag snippet
+          <code>&lt;script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXX"&gt;&lt;/script&gt;</code>
+        </small>
+      </div>
+
+      <div style="margin-top: 24px; display: flex; gap: 12px; align-items: center;">
+        <button class="btn btn-primary" type="submit">Save tracking settings</button>
+        <a class="btn btn-secondary" href={ADMIN_BASE_PATH}>Cancel</a>
+      </div>
+    </form>
+  </section>
+</AdminLayout>

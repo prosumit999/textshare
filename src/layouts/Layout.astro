@@ -6,6 +6,7 @@ import MobileDrawer from '../components/MobileDrawer.astro';
 import BackToTop from '../components/BackToTop.astro';
 import MobileBottomNav from '../components/MobileBottomNav.astro';
 import PricingModal from '../components/PricingModal.astro';
+import { getSiteSettings } from '../lib/site-settings-store';
 
 interface Props {
   title?: string;
@@ -18,6 +19,8 @@ const {
   description = "A minimal, blazing fast utility to share code snippets, text notes, and images securely with custom expiry times and QR codes.",
   admin = false
 } = Astro.props;
+
+const siteSettings = await getSiteSettings();
 ---
 
 <!doctype html>
@@ -35,6 +38,11 @@ const {
     <!-- Runs before paint and remains compatible with the strict CSP. -->
     <meta name="color-scheme" content="light dark" />
     <script is:inline src="/theme-init.js"></script>
+    {
+      siteSettings.headerMetaTags && (
+        <Fragment set:html={siteSettings.headerMetaTags} />
+      )
+    }
   </head>
   <body>
     {!admin && <Header />}
@@ -50,5 +58,10 @@ const {
     {!admin && <BackToTop />}
     {!admin && <MobileBottomNav />}
     {!admin && <PricingModal />}
+    {
+      siteSettings.footerScripts && (
+        <Fragment set:html={siteSettings.footerScripts} />
+      )
+    }
   </body>
 </html>

@@ -51,7 +51,9 @@ if (Astro.request.method === 'POST') {
         pages: cleanPages,
         seoTitle: existing.seoTitle,
         seoContent: existing.seoContent,
-        blogSitemapEnabled: form.get('blogSitemapEnabled') === 'on'
+        blogSitemapEnabled: form.get('blogSitemapEnabled') === 'on',
+        headerMetaTags: existing.headerMetaTags,
+        footerScripts: existing.footerScripts
       });
       
       await recordAudit({

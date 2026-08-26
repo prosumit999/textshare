@@ -25,6 +25,10 @@ export type SiteSettings = {
   seoContent: string;
   // SEO / sitemap settings
   blogSitemapEnabled: boolean;
+  // SEO / tracking: raw head markup (e.g. Google Search Console verification)
+  // and body scripts (e.g. Google Analytics), injected by the site Layout.
+  headerMetaTags: string;
+  footerScripts: string;
 };
 
 export const defaultSocials: SocialLink[] = [
@@ -47,7 +51,7 @@ export const defaultSiteSettings: SiteSettings = {
   extensionDescription: "Share text from any page in one click, right from Chrome.",
   socials: defaultSocials,
   pages: defaultPages,
-  heroEyebrow: "Private by default · No account required",
+  heroEyebrow: "Private by default · No account required · Share Text Without Login",
   heroTitle: "Share text and code without the clutter.",
   heroSubtitle: "Paste anything, choose when it expires, and send one simple link.",
   seoTitle: "Why developers choose TextShare",
@@ -99,7 +103,17 @@ export const defaultSiteSettings: SiteSettings = {
 <h2>Start Sharing</h2>
 <p>Open TextShare, paste your content, choose your settings, and create your room.</p>
 <p><strong>No clutter. No unnecessary setup. Just a simple way to share.</strong></p>`,
-  blogSitemapEnabled: false
+  blogSitemapEnabled: false,
+  headerMetaTags: "",
+  footerScripts: `<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-40NNV1V752"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-40NNV1V752');
+</script>`
 };
 
 export async function getSiteSettings(): Promise<SiteSettings> {
@@ -121,7 +135,15 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     blogSitemapEnabled:
       typeof settings.blogSitemapEnabled === "boolean"
         ? settings.blogSitemapEnabled
-        : defaultSiteSettings.blogSitemapEnabled
+        : defaultSiteSettings.blogSitemapEnabled,
+    headerMetaTags:
+      typeof settings.headerMetaTags === "string"
+        ? settings.headerMetaTags
+        : defaultSiteSettings.headerMetaTags,
+    footerScripts:
+      typeof settings.footerScripts === "string"
+        ? settings.footerScripts
+        : defaultSiteSettings.footerScripts
   };
 }
 

@@ -199,7 +199,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
   response.headers.set(
     'Content-Security-Policy',
-    `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; report-uri /api/csp-report; upgrade-insecure-requests`
+    `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'; script-src 'self' 'nonce-${nonce}' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https://challenges.cloudflare.com https://cloudflareinsights.com https://www.google-analytics.com https://www.googletagmanager.com; frame-src https://challenges.cloudflare.com; report-uri /api/csp-report; upgrade-insecure-requests`
   );
 
   if (url.pathname.match(/^\/(?:[A-Za-z0-9_-]{3,64})$/)) {
