@@ -81,6 +81,9 @@ if (!share) {
 
 const currentUser = await getCurrentUser(Astro.cookies);
 const isOwner = isStoredShare && !!share.owner && share.owner === currentUser?.email;
+// Visitors can manage guest-created shares (no account owner). Account-owned
+// shares stay owner-only. Revoke and analytics are always owner-only.
+const canManage = isStoredShare && (isOwner || !share.owner);
 const hasPaidPlan = currentUser?.plan === "plus" || currentUser?.plan === "pro";
 
 // Extension is only available while the link is about to expire — i.e. within
@@ -103,12 +106,15 @@ if (Astro.request.method === "POST") {
 }
 
 // Owner-only lifecycle actions (revoke, extend expiry, toggle analytics).
-if (isOwner && slug && postFormData) {
-  const ownerLimit = await checkRateLimit("share:owner-action", currentUser!.email, 30, 10 * 60);
+// Visitors can also extend/edit/download, so the handler accepts any visitor
+// but still guards the revoke and analytics actions by ownership.
+if (canManage && slug && postFormData) {
+  const ownerLimit = await checkRateLimit("share:owner-action", currentUser?.email || getClientIp(Astro.request), 30, 10 * 60);
   if (!ownerLimit.allowed) return rateLimitResponse(ownerLimit.retryAfter, "Too many share changes. Try again later.");
   const formData = postFormData;
   const action = formData.get("action")?.toString();
   if (action === "owner_revoke") {
+    if (!isOwner) return Astro.redirect(`/${slug}?action=revoked`);
     await revokeShare(slug, currentUser!.email);
     return Astro.redirect(`/${slug}?action=revoked`);
   } else if (action === "owner_extend") {
@@ -127,10 +133,11 @@ if (isOwner && slug && postFormData) {
     const added = durationMs[amount || ""];
     if (added) {
       const base = Math.max(Date.now(), new Date(share.expiryDate).getTime());
-      await updateShareExpiry(slug, currentUser!.email, new Date(base + added));
+      await updateShareExpiry(slug, share.owner, new Date(base + added));
     }
     return Astro.redirect(`/${slug}?action=extended`);
   } else if (action === "owner_analytics") {
+    if (!isOwner) return Astro.redirect(`/${slug}`);
     const enabled = formData.get("enabled") === "on";
     await setShareAnalyticsEnabled(slug, currentUser!.email, enabled);
     return Astro.redirect(`/${slug}?action=${enabled ? "analytics_on" : "analytics_off"}`);
@@ -141,7 +148,7 @@ if (isOwner && slug && postFormData) {
       newText.length > 0 &&
       new TextEncoder().encode(newText).byteLength <= 50 * 1024 * 1024
     ) {
-      await updateShareText(slug, currentUser!.email, newText);
+      await updateShareText(slug, share.owner, newText);
       return Astro.redirect(`/${slug}?action=edited`);
     }
     return Astro.redirect(`/${slug}?action=edit_failed`);
@@ -292,17 +299,19 @@ const sharedImages = share.contentType === 'image'
           </div>
         </div>
 
-        {isOwner && (
-          <div class="owner-toolbar" aria-label="Owner controls">
-            <div class="owner-toolbar-analytics">
-              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="3" y1="20" x2="21" y2="20"></line></svg>
-              <span class="owner-stat"><strong>{share.viewCount}</strong> views</span>
-              {share.analyticsEnabled ? (
-                <span class="owner-stat"><strong>{shareAnalytics?.uniqueIps ?? 0}</strong> unique</span>
-              ) : (
-                <span class="owner-stat owner-stat-off">analytics off</span>
-              )}
-            </div>
+        {canManage && (
+          <div class="owner-toolbar" aria-label="Share controls">
+            {isOwner && (
+              <div class="owner-toolbar-analytics">
+                <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line><line x1="3" y1="20" x2="21" y2="20"></line></svg>
+                <span class="owner-stat"><strong>{share.viewCount}</strong> views</span>
+                {share.analyticsEnabled ? (
+                  <span class="owner-stat"><strong>{shareAnalytics?.uniqueIps ?? 0}</strong> unique</span>
+                ) : (
+                  <span class="owner-stat owner-stat-off">analytics off</span>
+                )}
+              </div>
+            )}
             <div class="owner-toolbar-actions">
               {!canExtend && (
                 <span class="owner-note owner-extend-hint">Extend unlocks in the final hour before expiry.</span>
@@ -348,20 +357,24 @@ const sharedImages = share.contentType === 'image'
                 </button>
               )}
 
-              <form method="POST" class="owner-toolbar-form">
-                <input type="hidden" name="action" value="owner_analytics" />
-                <input type="hidden" name="enabled" value={share.analyticsEnabled ? "off" : "on"} />
-                <button type="submit" class="owner-toolbar-btn" title={share.analyticsEnabled ? "Disable analytics" : "Enable analytics"} aria-label={share.analyticsEnabled ? "Disable analytics" : "Enable analytics"}>
-                  <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">{share.analyticsEnabled ? <><path d="M3 3v18h18"></path><path d="M9 12l2-3 2 2 3-4"></path></> : <path d="M3 3v18h18"></path>}</svg>
-                </button>
-              </form>
+              {isOwner && (
+                <form method="POST" class="owner-toolbar-form">
+                  <input type="hidden" name="action" value="owner_analytics" />
+                  <input type="hidden" name="enabled" value={share.analyticsEnabled ? "off" : "on"} />
+                  <button type="submit" class="owner-toolbar-btn" title={share.analyticsEnabled ? "Disable analytics" : "Enable analytics"} aria-label={share.analyticsEnabled ? "Disable analytics" : "Enable analytics"}>
+                    <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">{share.analyticsEnabled ? <><path d="M3 3v18h18"></path><path d="M9 12l2-3 2 2 3-4"></path></> : <path d="M3 3v18h18"></path>}</svg>
+                  </button>
+                </form>
+              )}
 
-              <form method="POST" class="owner-toolbar-form" onsubmit="return confirm('Revoke this link? It will go offline immediately.');">
-                <input type="hidden" name="action" value="owner_revoke" />
-                <button type="submit" class="owner-toolbar-btn owner-toolbar-danger" title="Revoke link" aria-label="Revoke link">
-                  <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
-                </button>
-              </form>
+              {isOwner && (
+                <form method="POST" class="owner-toolbar-form" onsubmit="return confirm('Revoke this link? It will go offline immediately.');">
+                  <input type="hidden" name="action" value="owner_revoke" />
+                  <button type="submit" class="owner-toolbar-btn owner-toolbar-danger" title="Revoke link" aria-label="Revoke link">
+                    <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         )}
@@ -393,7 +406,7 @@ const sharedImages = share.contentType === 'image'
           )}
         </div>
 
-        {isOwner && share.contentType === "text" && (
+        {canManage && share.contentType === "text" && (
           <form id="owner-edit-form" method="POST" class="owner-edit-form" style="display:none;">
             <input type="hidden" name="action" value="owner_edit_text" />
             <div class="owner-edit-heading">
@@ -455,7 +468,7 @@ const sharedImages = share.contentType === 'image'
   )}
 </Layout>
 
-<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired, isOwner, slug, burnAfterInitialView }}>
+<script define:vars={{ text: share.textContent, isText: share.contentType === "text", expiryMs: new Date(share.expiryDate).getTime(), isExpired, isOwner, canManage, slug, burnAfterInitialView }}>
   const copyNotification = document.getElementById("copy-notification");
   let notificationTimer;
   const showCopyNotification = (message, failed = false) => {
@@ -507,8 +520,8 @@ const sharedImages = share.contentType === 'image'
     }
   };
 
-  // Owner-only export helpers.
-  if (isOwner && isText && !isExpired) {
+  // Export helpers (available to any visitor).
+  if (canManage && isText && !isExpired) {
     const downloadTxt = document.getElementById("owner-download-txt");
     downloadTxt?.addEventListener("click", () => {
       try {
@@ -531,8 +544,8 @@ const sharedImages = share.contentType === 'image'
     });
   }
 
-  // Owner-only live text editing.
-  if (isOwner && isText && !isExpired) {
+  // Live text editing (available to any visitor).
+  if (canManage && isText && !isExpired) {
     const editBtn = document.getElementById("owner-edit-btn");
     const editForm = document.getElementById("owner-edit-form");
     const editTextarea = document.getElementById("owner-edit-textarea");

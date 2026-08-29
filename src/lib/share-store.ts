@@ -282,7 +282,7 @@ export async function incrementShareViews(slug: string) {
 
 export async function updateShareExpiry(
   slug: string,
-  owner: string,
+  owner: string | null,
   newExpiryDate: Date,
 ) {
   await ensureGuestShareMigration();
@@ -325,7 +325,7 @@ export async function setShareAnalyticsEnabled(
  */
 export async function updateShareText(
   slug: string,
-  owner: string,
+  owner: string | null,
   textContent: string,
 ) {
   await ensureGuestShareMigration();

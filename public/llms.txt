@@ -1,0 +1,18 @@
+# TextShare
+
+> Minimal, fast utility to share code snippets, text notes, and images securely with custom expiry times and QR codes.
+
+## Product
+
+- [Home](https://textshare.pro/)
+- [Join a room](https://textshare.pro/join)
+- [Pricing](https://textshare.pro/pricing)
+- [Blog](https://textshare.pro/blog)
+
+## Legal
+
+- [Acceptable Use](https://textshare.pro/acceptable-use)
+- [Privacy](https://textshare.pro/privacy)
+- [Terms](https://textshare.pro/terms)
+- [Refunds](https://textshare.pro/refund-policy)
+- [Contact](https://textshare.pro/contact)

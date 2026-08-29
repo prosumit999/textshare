@@ -36,7 +36,7 @@ const gridPosts = posts.slice(1);
 
     {featuredPost && <a href={featuredPost.href} class="featured-post" id={featuredPost.id}>
       <div class:list={["post-visual post-visual-featured", { "has-cover": featuredPost.coverImage }]} aria-hidden="true">
-        {featuredPost.coverImage ? <img src={featuredPost.coverImage} alt="" /> : <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>}
+        {featuredPost.coverImage ? <img src={featuredPost.coverImage} alt="" width="960" height="540" loading="lazy" decoding="async" /> : <svg class="icon-svg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>}
       </div>
       <div class="featured-post-content"><div class="post-meta"><span>{featuredPost.category}</span><span>{featuredPost.date}</span></div><h2>{featuredPost.title}</h2><p>{featuredPost.excerpt}</p><span class="read-link">Read article <span aria-hidden="true">→</span></span><span class="read-time">{featuredPost.readTime}</span></div>
     </a>}
@@ -44,7 +44,7 @@ const gridPosts = posts.slice(1);
     <div class="blog-section-heading"><h2>Latest articles</h2><span>{gridPosts.length} articles</span></div>
     <div class="blog-grid">
       {gridPosts.map((post) => <article class="post-card" id={post.id}><a href={post.href} class="post-card-link" aria-label={`Read ${post.title}`}>
-        <div class:list={["post-visual", { "has-cover": post.coverImage }]} aria-hidden="true">{post.coverImage ? <img src={post.coverImage} alt="" /> : <span>{post.visual === 'code' ? '</>' : post.visual === 'clock' ? '24h' : post.visual === 'brackets' ? '{ }' : post.visual === 'lock' ? '•••' : post.visual === 'article' ? 'Aa' : '▦'}</span>}</div>
+        <div class:list={["post-visual", { "has-cover": post.coverImage }]} aria-hidden="true">{post.coverImage ? <img src={post.coverImage} alt="" width="960" height="540" loading="lazy" decoding="async" /> : <span>{post.visual === 'code' ? '</>' : post.visual === 'clock' ? '24h' : post.visual === 'brackets' ? '{ }' : post.visual === 'lock' ? '•••' : post.visual === 'article' ? 'Aa' : '▦'}</span>}</div>
         <div class="post-card-content"><div class="post-meta"><span>{post.category}</span><span>{post.readTime}</span></div><h3>{post.title}</h3><p>{post.excerpt}</p><div class="post-card-footer"><span>{post.date}</span><span class="read-arrow" aria-hidden="true">→</span></div></div>
       </a></article>)}
     </div>

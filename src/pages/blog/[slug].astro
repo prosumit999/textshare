@@ -14,7 +14,7 @@ const olderPost = currentIndex >= 0 && currentIndex < publishedPosts.length - 1 
 const articleUrl = post ? new URL(`/blog/${post.slug}`, Astro.url.origin).toString() : '';
 const encodedUrl = encodeURIComponent(articleUrl);
 const encodedTitle = encodeURIComponent(post?.title || '');
-const publicContent = post ? sanitizeBlogHtml(post.content) : '';
+const publicContent = post ? sanitizeBlogHtml(post.content, `Image from ${post.title}`) : '';
 const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 100000).split(/\s+/).length / 220)) : 0;
 ---
 
@@ -36,7 +36,7 @@ const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 1000
       <p class="article-deck">{post.excerpt || blogTextExcerpt(post.content, 190)}</p>
       <div class="article-meta"><span>TextShare editorial</span><span>{publishedOn}</span><span>{readTime} min read</span></div>
     </header>
-    <figure class:list={["public-article-feature", { generated: !post.coverImage }]}>{post.coverImage ? <img class="public-article-cover" src={post.coverImage} alt={`Featured image for ${post.title}`} /> : <div class="generated-article-visual" aria-hidden="true"><span>Aa</span></div>}</figure>
+    <figure class:list={["public-article-feature", { generated: !post.coverImage }]}>{post.coverImage ? <img class="public-article-cover" src={post.coverImage} alt={`Featured image for ${post.title}`} width="960" height="540" loading="lazy" decoding="async" /> : <div class="generated-article-visual" aria-hidden="true"><span>Aa</span></div>}</figure>
     <div class="public-article-content" set:html={publicContent}></div>
     <footer class="article-footer">
       <section class="article-share" aria-labelledby="article-share-title">

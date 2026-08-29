@@ -15,6 +15,8 @@ export type PageLink = {
 export type SiteSettings = {
   footerDescription: string;
   extensionDescription: string;
+  /** Chrome Web Store URL for the extension, shown in the footer badge. */
+  extensionUrl: string;
   socials: SocialLink[];
   pages: PageLink[];
   heroEyebrow: string;
@@ -25,6 +27,9 @@ export type SiteSettings = {
   seoContent: string;
   // SEO / sitemap settings
   blogSitemapEnabled: boolean;
+  // SEO / site-wide <title> and meta description, editable from the admin panel
+  metaTitle: string;
+  metaDescription: string;
   // SEO / tracking: raw head markup (e.g. Google Search Console verification)
   // and body scripts (e.g. Google Analytics), injected by the site Layout.
   headerMetaTags: string;
@@ -49,6 +54,7 @@ export const defaultPages: PageLink[] = [
 export const defaultSiteSettings: SiteSettings = {
   footerDescription: "Fast, private, and thoughtfully designed sharing for developers. Built to keep your workflow moving.",
   extensionDescription: "Share text from any page in one click, right from Chrome.",
+  extensionUrl: "https://chromewebstore.google.com/search/text%20share",
   socials: defaultSocials,
   pages: defaultPages,
   heroEyebrow: "Private by default · No account required · Share Text Without Login",
@@ -104,6 +110,8 @@ export const defaultSiteSettings: SiteSettings = {
 <p>Open TextShare, paste your content, choose your settings, and create your room.</p>
 <p><strong>No clutter. No unnecessary setup. Just a simple way to share.</strong></p>`,
   blogSitemapEnabled: false,
+  metaTitle: "Text Share — Share text, code snippets & images instantly",
+  metaDescription: "A minimal, blazing fast utility to share code snippets, text notes, and images securely with custom expiry times and QR codes.",
   headerMetaTags: "",
   footerScripts: `<!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-40NNV1V752"></script>
@@ -125,6 +133,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
   return {
     footerDescription: settings.footerDescription || defaultSiteSettings.footerDescription,
     extensionDescription: settings.extensionDescription || defaultSiteSettings.extensionDescription,
+    extensionUrl: settings.extensionUrl || defaultSiteSettings.extensionUrl,
     socials: settings.socials || defaultSiteSettings.socials,
     pages: settings.pages || defaultSiteSettings.pages,
     heroEyebrow: settings.heroEyebrow || defaultSiteSettings.heroEyebrow,
@@ -136,6 +145,9 @@ export async function getSiteSettings(): Promise<SiteSettings> {
       typeof settings.blogSitemapEnabled === "boolean"
         ? settings.blogSitemapEnabled
         : defaultSiteSettings.blogSitemapEnabled,
+    metaTitle: settings.metaTitle || defaultSiteSettings.metaTitle,
+    metaDescription:
+      settings.metaDescription || defaultSiteSettings.metaDescription,
     headerMetaTags:
       typeof settings.headerMetaTags === "string"
         ? settings.headerMetaTags

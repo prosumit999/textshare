@@ -9,6 +9,7 @@ import { MAX_SHARE_BYTES, pruneOversizedShares } from '../lib/shares';
 import { deleteShare, hasShare, listShares, saveShare } from '../lib/share-store';
 import { calculateExpiry, generateAvailableSlug, type ExpiryOption } from '../lib/share-policy';
 import { getSiteSettings } from '../lib/site-settings-store';
+import { enrichContentImages } from '../lib/blog-content';
 
 const siteSettings = await getSiteSettings();
 
@@ -603,7 +604,8 @@ if (Astro.request.method === "POST") {
           sizeFeedback.lastElementChild!.textContent = oversized ? 'Text exceeds the 50 MB limit' : '50 MB maximum';
         };
         shareText?.addEventListener('input', updateTextSize);
-        const extensionShare = new URLSearchParams(window.location.hash.slice(1)).get('share');
+        const extensionShareParams = new URLSearchParams(window.location.hash.slice(1));
+        const extensionShare = extensionShareParams.get('t') || extensionShareParams.get('share');
         if (shareText && extensionShare) {
           shareText.value = extensionShare;
           updateTextSize();
@@ -797,7 +799,7 @@ if (Astro.request.method === "POST") {
     <header class="seo-header">
       <h2>{siteSettings.seoTitle}</h2>
     </header>
-    <div class="seo-rich-content" set:html={siteSettings.seoContent}></div>
+    <div class="seo-rich-content" set:html={enrichContentImages(siteSettings.seoContent)}></div>
   </section>
 
   <!-- FAQ Section -->

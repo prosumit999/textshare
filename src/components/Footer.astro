@@ -82,7 +82,7 @@ const footerLinks = [
         <section class="footer-column footer-extension" aria-labelledby="footer-extension-title">
           <h2 id="footer-extension-title">Get the extension</h2>
           <p>{siteSettings.extensionDescription}</p>
-          <a href="#" class="extension-badge" aria-label="Get TextShare from the Chrome Web Store">
+          <a href={siteSettings.extensionUrl} target="_blank" rel="noopener noreferrer" class="extension-badge" aria-label="Get TextShare from the Chrome Web Store">
             <span class="chrome-mark" aria-hidden="true"></span>
             <span><small>Available on the</small><strong>Chrome Web Store</strong></span>
           </a>

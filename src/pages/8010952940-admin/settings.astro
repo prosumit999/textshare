@@ -21,6 +21,7 @@ if (Astro.request.method === 'POST') {
       const heroSubtitle = form.get('heroSubtitle')?.toString().trim() || '';
       const footerDescription = form.get('footerDescription')?.toString().trim() || '';
       const extensionDescription = form.get('extensionDescription')?.toString().trim() || '';
+      const extensionUrl = form.get('extensionUrl')?.toString().trim() || existing.extensionUrl;
       const socialsJson = form.get('socialsJson')?.toString() || '[]';
       const pagesJson = form.get('pagesJson')?.toString() || '[]';
       
@@ -47,11 +48,14 @@ if (Astro.request.method === 'POST') {
         heroSubtitle,
         footerDescription,
         extensionDescription,
+        extensionUrl,
         socials: cleanSocials,
         pages: cleanPages,
         seoTitle: existing.seoTitle,
         seoContent: existing.seoContent,
         blogSitemapEnabled: form.get('blogSitemapEnabled') === 'on',
+        metaTitle: form.get('metaTitle')?.toString().trim() || existing.metaTitle,
+        metaDescription: form.get('metaDescription')?.toString().trim() || existing.metaDescription,
         headerMetaTags: existing.headerMetaTags,
         footerScripts: existing.footerScripts
       });
@@ -61,7 +65,7 @@ if (Astro.request.method === 'POST') {
         action: 'update_site_settings',
         resourceType: 'system_settings',
         resourceId: 'global',
-        details: 'Updated landing page hero, footer contents, socials, and custom links'
+        details: 'Updated landing page hero, footer contents, socials, custom links, and SEO meta'
       });
       message = 'Site settings saved successfully.';
     } catch (err) {
@@ -160,6 +164,19 @@ const settings = await getSiteSettings();
             required
           >{settings.extensionDescription}</textarea>
         </label>
+
+        <label class="form-field-label">
+          Chrome extension URL
+          <input 
+            type="url" 
+            class="text-input" 
+            name="extensionUrl" 
+            value={settings.extensionUrl} 
+            placeholder="https://chromewebstore.google.com/detail/..." 
+            style="width: 100%;" 
+          />
+          <small style="color: var(--color-text-muted);">Full Chrome Web Store link used by the footer "Get the extension" badge.</small>
+        </label>
       </div>
 
       <!-- Social Links Section -->
@@ -251,6 +268,33 @@ const settings = await getSiteSettings();
       <!-- SEO Settings -->
       <h3 class="section-heading" style="margin-top: 32px;">SEO settings</h3>
       <div class="settings-form-grid">
+        <label class="form-field-label">
+          Site title (browser tab / search results)
+          <input 
+            type="text" 
+            class="text-input" 
+            name="metaTitle" 
+            value={settings.metaTitle} 
+            placeholder="e.g. Text Share — Share text, code snippets & images instantly" 
+            style="width: 100%;" 
+            maxlength="120" 
+          />
+          <small style="color: var(--color-text-muted);">Used as the default page <code>&lt;title&gt;</code> when a page doesn't set its own.</small>
+        </label>
+
+        <label class="form-field-label">
+          Meta description
+          <textarea 
+            class="text-input" 
+            name="metaDescription" 
+            rows="2" 
+            maxlength="320" 
+            placeholder="e.g. A minimal, blazing fast utility to share code snippets, text notes, and images securely..." 
+            style="width: 100%; resize: vertical;" 
+          >{settings.metaDescription}</textarea>
+          <small style="color: var(--color-text-muted);">Used as the default <code>&lt;meta name="description"&gt;</code> for pages without their own description.</small>
+        </label>
+
         <div class="form-field-label">
           <span style="font-weight: 600; display: block; margin-bottom: 8px;">Blog post XML sitemap</span>
           <label class="checkbox-label" style="margin: 0; font-weight: 500;">

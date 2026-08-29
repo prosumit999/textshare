@@ -60,32 +60,6 @@ textarea {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.icon-button {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--muted);
-  cursor: pointer;
-}
-.icon-button:hover,
-.icon-button:focus-visible {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.icon-button svg {
-  width: 17px;
-  height: 17px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
 .intro {
   padding: 18px 0 15px;
 }
@@ -202,36 +176,6 @@ input:focus {
 }
 .context-tip span {
   color: var(--muted);
-}
-.settings {
-  margin-top: 15px;
-  padding-top: 15px;
-  border-top: 1px solid var(--line);
-}
-.settings-row {
-  display: flex;
-  gap: 7px;
-  margin-top: 7px;
-}
-.settings-row input {
-  min-width: 0;
-  padding: 9px 10px;
-  font-size: 12px;
-}
-.settings-row button {
-  padding: 0 12px;
-  border: 1px solid var(--accent);
-  border-radius: 9px;
-  background: transparent;
-  color: var(--accent);
-  font-weight: 750;
-  cursor: pointer;
-}
-.settings p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 1.4;
 }
 @media (prefers-color-scheme: dark) {
   :root {

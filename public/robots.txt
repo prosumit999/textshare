@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /join
+Disallow: /api/
+
+Sitemap: https://textshare.pro/sitemap.xml

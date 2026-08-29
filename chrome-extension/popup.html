@@ -3,35 +3,21 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TextShare.pro – Quick Text Sharing</title>
+    <title>Text Share – Quick Text Sharing</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="popup-shell">
       <header class="popup-header">
-        <a class="brand" id="home-link" href="#" aria-label="Open TextShare.pro">
+        <a class="brand" id="home-link" href="#" aria-label="Open Text Share">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
             ></path>
             <path d="M14 2v6h6M9 13h6M9 17h6"></path>
           </svg>
-          <span>Text<strong>Share</strong></span>
+          <span>Text <strong>Share</strong></span>
         </a>
-        <button
-          class="icon-button"
-          id="settings-toggle"
-          type="button"
-          aria-label="Extension settings"
-          aria-expanded="false"
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path
-              d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"
-            ></path>
-          </svg>
-        </button>
       </header>
 
       <section class="intro">
@@ -54,7 +40,7 @@
           ><span id="character-count">0 / 50,000</span>
         </div>
         <button class="primary-button" type="submit">
-          <span>Continue in TextShare.pro</span><span aria-hidden="true">→</span>
+          <span>Continue in Text Share</span><span aria-hidden="true">→</span>
         </button>
       </form>
 
@@ -66,21 +52,7 @@
         ></span>
         <p>
           <strong>From any webpage</strong
-          ><span>Select text → right-click → Share with TextShare.pro</span>
-        </p>
-      </section>
-
-      <section class="settings" id="settings-panel" hidden>
-        <label for="site-url">TextShare.pro site address</label>
-        <div class="settings-row">
-          <input
-            id="site-url"
-            type="url"
-            placeholder="https://your-domain.com"
-          /><button id="save-settings" type="button">Save</button>
-        </div>
-        <p id="settings-status" role="status">
-          Use localhost during development, then enter your production domain.
+          ><span>Select text → right-click → Share with Text Share</span>
         </p>
       </section>
     </main>

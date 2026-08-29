@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "TextShare.pro – Quick Text Sharing",
-  "description": "Send selected text or a quick note to TextShare.",
+  "name": "Text Share – Quick Text Sharing",
+  "description": "Send selected text or a quick note to Text Share.",
   "version": "1.0.0",
-  "permissions": ["contextMenus", "storage"],
+  "permissions": ["contextMenus"],
   "icons": {
     "16": "assets/icon-16.png",
     "32": "assets/icon-32.png",
@@ -14,7 +14,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Share with TextShare.pro – Quick Text Sharing",
+    "default_title": "Share with Text Share – Quick Text Sharing",
     "default_icon": {
       "16": "assets/icon-16.png",
       "32": "assets/icon-32.png"

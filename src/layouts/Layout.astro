@@ -14,13 +14,13 @@ interface Props {
   admin?: boolean;
 }
 
+const siteSettings = await getSiteSettings();
+
 const { 
-  title = "TextShare — Share text, code snippets & images instantly",
-  description = "A minimal, blazing fast utility to share code snippets, text notes, and images securely with custom expiry times and QR codes.",
+  title = siteSettings.metaTitle,
+  description = siteSettings.metaDescription,
   admin = false
 } = Astro.props;
-
-const siteSettings = await getSiteSettings();
 ---
 
 <!doctype html>
@@ -37,7 +37,23 @@ const siteSettings = await getSiteSettings();
     
     <!-- Runs before paint and remains compatible with the strict CSP. -->
     <meta name="color-scheme" content="light dark" />
-    <script is:inline src="/theme-init.js"></script>
+    <script is:inline>
+      // Trusted Types default policy: keeps existing DOM-string sinks (innerHTML
+      // in the admin editor, dashboard feedback, settings rows) working under the
+      // `require-trusted-types-for` CSP directive.
+      if (window.trustedTypes && trustedTypes.createPolicy) {
+        trustedTypes.createPolicy("default", {
+          createHTML: (s) => s,
+          createScript: (s) => s,
+          createScriptURL: (s) => s
+        });
+      }
+      const savedTheme = localStorage.getItem("color-scheme");
+      const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const initialTheme = savedTheme || (systemPrefersDark ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", initialTheme);
+      document.documentElement.style.colorScheme = initialTheme;
+    </script>
     {
       siteSettings.headerMetaTags && (
         <Fragment set:html={siteSettings.headerMetaTags} />
