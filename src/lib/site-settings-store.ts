@@ -17,6 +17,8 @@ export type SiteSettings = {
   extensionDescription: string;
   /** Chrome Web Store URL for the extension, shown in the footer badge. */
   extensionUrl: string;
+  /** Product Hunt page URL, shown in the footer badge. */
+  productHuntUrl: string;
   socials: SocialLink[];
   pages: PageLink[];
   heroEyebrow: string;
@@ -55,6 +57,7 @@ export const defaultSiteSettings: SiteSettings = {
   footerDescription: "Fast, private, and thoughtfully designed sharing for developers. Built to keep your workflow moving.",
   extensionDescription: "Share text from any page in one click, right from Chrome.",
   extensionUrl: "https://chromewebstore.google.com/search/text%20share",
+  productHuntUrl: "https://www.producthunt.com/products/textshare-pro",
   socials: defaultSocials,
   pages: defaultPages,
   heroEyebrow: "Private by default · No account required · Share Text Without Login",
@@ -134,6 +137,7 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     footerDescription: settings.footerDescription || defaultSiteSettings.footerDescription,
     extensionDescription: settings.extensionDescription || defaultSiteSettings.extensionDescription,
     extensionUrl: settings.extensionUrl || defaultSiteSettings.extensionUrl,
+    productHuntUrl: settings.productHuntUrl || defaultSiteSettings.productHuntUrl,
     socials: settings.socials || defaultSiteSettings.socials,
     pages: settings.pages || defaultSiteSettings.pages,
     heroEyebrow: settings.heroEyebrow || defaultSiteSettings.heroEyebrow,

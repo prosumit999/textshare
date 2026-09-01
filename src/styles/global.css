@@ -72,7 +72,8 @@ h6 {
 
 .seo-rich-content p {
     text-align: left;
-    margin: 5px auto;
+    color: var(--color-text-base);
+    margin: 15px auto 0px;
 }
 
 /* Base Configuration & Design Tokens */
@@ -2530,6 +2531,12 @@ table.dashboard-table tbody tr:last-child td {
   margin-top: 8px;
 }
 @media (max-width: 760px) {
+  .auth-input-wrap .text-input{
+    min-width: 250px;
+  }
+  .select-input, .text-input{
+    width: 250px;
+  }
   .auth-experience {
     margin: 16px auto 70px;
     border-radius: 19px;
@@ -3707,6 +3714,7 @@ footer {
   background: var(--color-bg-surface);
   color: var(--color-text-base);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  min-width: 164px;
 }
 
 .extension-badge:hover {
@@ -3746,6 +3754,22 @@ footer {
   border-radius: 50%;
   background: #4285f4;
   box-shadow: 0 0 0 2px #fff;
+}
+
+.product-hunt-badge {
+  margin-top: 8px;
+}
+
+.product-hunt-mark {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 7px;
+  background: #da552f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .footer-panel .footer-bottom {
@@ -5185,22 +5209,24 @@ body.drawer-open {
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-bg-surface);
+  position: relative;
 }
 .rich-editor-shell:focus-within {
   border-color: var(--color-accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 .rich-editor-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  padding: 8px;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-base);
-  position: sticky;
-  top: 0;
-  z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    padding: 8px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg-base);
+    position: absolute;
+    top: 0;
+    z-index: 2;
+    width: 100%;
 }
 .rich-editor-toolbar button {
   min-width: 32px;
@@ -5225,12 +5251,15 @@ body.drawer-open {
   background: var(--color-border);
 }
 .rich-post-editor {
-  min-height: 420px;
-  padding: 24px;
-  outline: 0;
-  color: var(--color-text-base);
-  font-size: 14px;
-  line-height: 1.75;
+    min-height: 420px;
+    padding: 24px;
+    outline: 0;
+    color: var(--color-text-base);
+    font-size: 14px;
+    line-height: 1.75;
+    margin-top: 43px;
+    max-height: 510px;
+    overflow-y: auto;
 }
 .rich-post-editor:empty::before {
   content: attr(data-placeholder);

@@ -86,6 +86,12 @@ const footerLinks = [
             <span class="chrome-mark" aria-hidden="true"></span>
             <span><small>Available on the</small><strong>Chrome Web Store</strong></span>
           </a>
+          {siteSettings.productHuntUrl && (
+            <a href={siteSettings.productHuntUrl} target="_blank" rel="noopener noreferrer" class="extension-badge product-hunt-badge" aria-label="TextShare on Product Hunt">
+              <span class="product-hunt-mark" aria-hidden="true">P</span>
+              <span><small>Also live on</small><strong>Product Hunt</strong></span>
+            </a>
+          )}
         </section>
       </div>
 

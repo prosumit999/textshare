@@ -22,6 +22,7 @@ if (Astro.request.method === 'POST') {
       const footerDescription = form.get('footerDescription')?.toString().trim() || '';
       const extensionDescription = form.get('extensionDescription')?.toString().trim() || '';
       const extensionUrl = form.get('extensionUrl')?.toString().trim() || existing.extensionUrl;
+      const productHuntUrl = form.get('productHuntUrl')?.toString().trim() || existing.productHuntUrl;
       const socialsJson = form.get('socialsJson')?.toString() || '[]';
       const pagesJson = form.get('pagesJson')?.toString() || '[]';
       
@@ -49,6 +50,7 @@ if (Astro.request.method === 'POST') {
         footerDescription,
         extensionDescription,
         extensionUrl,
+        productHuntUrl,
         socials: cleanSocials,
         pages: cleanPages,
         seoTitle: existing.seoTitle,
@@ -176,6 +178,19 @@ const settings = await getSiteSettings();
             style="width: 100%;" 
           />
           <small style="color: var(--color-text-muted);">Full Chrome Web Store link used by the footer "Get the extension" badge.</small>
+        </label>
+
+        <label class="form-field-label">
+          Product Hunt page URL
+          <input 
+            type="url" 
+            class="text-input" 
+            name="productHuntUrl" 
+            value={settings.productHuntUrl} 
+            placeholder="https://www.producthunt.com/products/..." 
+            style="width: 100%;" 
+          />
+          <small style="color: var(--color-text-muted);">Linked from the Product Hunt badge in the footer. Leave empty to hide the badge.</small>
         </label>
       </div>
 
