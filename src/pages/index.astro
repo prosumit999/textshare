@@ -371,10 +371,60 @@ if (Astro.request.method === "POST") {
             <span class="editor-label">New share</span>
             <span class="editor-hint">Your content is ready when you are.</span>
           </div>
-          <span class="privacy-note">
-            <svg class="icon-svg" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="10" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            Secure link
-          </span>
+          <div class="editor-heading-right">
+            <label class="analytics-control-pill" title="Use numeric link style instead of default letters">
+              <input type="checkbox" name="urlFormat" value="number" id="url-format-numbers-toggle" class="analytics-checkbox-hidden" />
+              <span class="analytics-pill-badge">
+                <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="4" y1="9" x2="20" y2="9"></line>
+                  <line x1="4" y1="15" x2="20" y2="15"></line>
+                  <line x1="10" y1="3" x2="8" y2="21"></line>
+                  <line x1="16" y1="3" x2="14" y2="21"></line>
+                </svg>
+                <span>Numbers</span>
+              </span>
+            </label>
+
+            {isLoggedIn && hasPaidPlan ? (
+              <div class="inline-slug-control">
+                <label class="analytics-control-pill" title="Set a custom vanity URL slug">
+                  <input type="checkbox" id="slug-toggle" class="analytics-checkbox-hidden" />
+                  <span class="analytics-pill-badge">
+                    <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    <span>Custom slug</span>
+                  </span>
+                </label>
+                <div id="slug-input-wrapper" class="expiry-control-pill" style="display: none; padding: 0 8px;" title="Custom slug value">
+                  <span style="color: var(--color-text-muted); font-size: 12px; font-family: var(--font-mono); font-weight: 600;">/</span>
+                  <input
+                    type="text"
+                    name="customSlug"
+                    id="custom-slug-input"
+                    class="expiry-select-compact"
+                    style="padding-right: 4px; font-family: var(--font-mono); width: 80px;"
+                    placeholder="myurl1"
+                    minlength="3"
+                    maxlength="6"
+                    pattern="[a-z0-9]{3,6}"
+                    disabled
+                    aria-describedby="slug-availability-msg"
+                  />
+                </div>
+                <span id="slug-availability-msg" class="inline-availability-msg" style="display: none;"></span>
+              </div>
+            ) : (
+              <span class="analytics-pill-badge" style="opacity: 0.85;">
+                <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>Secure link</span>
+              </span>
+            )}
+          </div>
         </div>
         
         <!-- Content type is available to guests and signed-in users. -->
@@ -426,67 +476,74 @@ if (Astro.request.method === "POST") {
         <div class="form-controls">
           <div class="control-group-left">
             <!-- Syntax highlighting toggle -->
-            <div id="syntax-highlight-toggle-wrapper" style="display: flex; align-items: center; gap: var(--space-2);">
-              <label class="checkbox-label">
-                <input type="checkbox" name="syntaxHighlightEnabled" id="syntax-highlight-toggle" class="checkbox-input" />
-                <span>Syntax</span>
+            <div id="syntax-highlight-toggle-wrapper" style="display: flex; align-items: center; gap: 8px;">
+              <label class="analytics-control-pill" title="Enable code syntax highlighting">
+                <input type="checkbox" name="syntaxHighlightEnabled" id="syntax-highlight-toggle" class="analytics-checkbox-hidden" />
+                <span class="analytics-pill-badge">
+                  <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="16 18 22 12 16 6"></polyline>
+                    <polyline points="8 6 2 12 8 18"></polyline>
+                  </svg>
+                  <span>Syntax</span>
+                </span>
               </label>
-              <select name="language" id="language-select" class="select-input" aria-label="Code language" style="display: none;">
-                <option value="plaintext">Plain Text</option>
-                <option value="javascript">JavaScript</option>
-                <option value="typescript">TypeScript</option>
-                <option value="html">HTML</option>
-                <option value="css">CSS</option>
-                <option value="python">Python</option>
-                <option value="json">JSON</option>
-                <option value="markdown">Markdown</option>
-              </select>
+
+              <div class="expiry-control-pill" id="language-select-pill" style="display: none;" title="Select code language">
+                <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m18 16 4-4-4-4"></path>
+                  <path d="m6 8-4 4 4 4"></path>
+                  <path d="m14.5 4-5 16"></path>
+                </svg>
+                <select name="language" id="language-select" class="expiry-select-compact" aria-label="Code language">
+                  <option value="plaintext">Plain Text</option>
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="html">HTML</option>
+                  <option value="css">CSS</option>
+                  <option value="python">Python</option>
+                  <option value="json">JSON</option>
+                  <option value="markdown">Markdown</option>
+                </select>
+              </div>
             </div>
 
-            <!-- Expiry Dropdown -->
-            <div style="display: flex; align-items: center; gap: var(--space-2);">
-              <label for="expiry-select" style="font-size: 13px;">Expires in:</label>
-              <select name="expiry" id="expiry-select" class="select-input">
+            <!-- Expiry Pill Dropdown -->
+            <div class="expiry-control-pill" title="Set share expiration duration">
+              <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <polyline points="12 7 12 12 15 15"></polyline>
+              </svg>
+              <select name="expiry" id="expiry-select" class="expiry-select-compact" aria-label="Share expiration">
                 {isLoggedIn && hasPaidPlan ? (
                   <option value="24h" selected>24 hours</option>
                   <option value="1w">1 week</option>
                   <option value="1m">1 month</option>
                   <option value="1y">1 year</option>
-                  <option value="burn">Burn after first view · Free</option>
+                  <option value="burn">Burn on view</option>
                 ) : (
                   <>
                     <option value="24h" selected>24 hours</option>
-                    <option value="burn">Burn after first view · Free</option>
+                    <option value="burn">Burn on view</option>
                     <option value="1w" data-premium="true">🔒 1 week · Pro</option>
                     <option value="1m" data-premium="true">🔒 1 month · Pro</option>
                     <option value="1y" data-premium="true">🔒 1 year · Pro</option>
                   </>
                 )}
               </select>
-              <span id="burn-flame" class="burn-flame" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="M13.4 2.7c.5 3.2-1.8 4.5-3 6.5-1-1-1.3-2-1.1-3.3C6.9 8 5 10.5 5 14a7 7 0 0 0 14 0c0-4.7-2.8-8.5-5.6-11.3Z"></path><path d="M9.2 16.1c0 1.7 1.2 3 2.8 3s2.8-1.3 2.8-3c0-1.4-.8-2.7-2.1-4.1-.1 1.5-.8 2.2-1.5 3-.5-.6-.8-1.2-.7-2-1 .9-1.3 1.9-1.3 3.1Z"></path></svg>
-              </span>
             </div>
 
-            <!-- Access analytics opt-in -->
+            <!-- Access analytics opt-in pill -->
             {isLoggedIn && (
-              <label class="checkbox-label" title="Record anonymous view timestamps and country for this share.">
-                <input type="checkbox" name="analyticsEnabled" id="analytics-toggle" class="checkbox-input" />
-                <span>Track Analytics</span>
+              <label class="analytics-control-pill" title="Track anonymous view timestamps and country for this share">
+                <input type="checkbox" name="analyticsEnabled" id="analytics-toggle" class="analytics-checkbox-hidden" />
+                <span class="analytics-pill-badge">
+                  <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 20V10M12 20V4M6 20v-6"></path>
+                  </svg>
+                  <span>Analytics</span>
+                </span>
               </label>
             )}
-
-            <fieldset class="link-style-control">
-              <legend>Link style</legend>
-              <label>
-                <input type="radio" name="urlFormat" value="string" checked />
-                <span>Letters</span>
-              </label>
-              <label>
-                <input type="radio" name="urlFormat" value="number" />
-                <span>Numbers</span>
-              </label>
-            </fieldset>
 
             {!hasPaidPlan && (
               <a class="premium-unlock" href="/pricing" aria-label="View premium sharing features" title="Unlock custom expiry, password protection, and more">
@@ -499,41 +556,28 @@ if (Astro.request.method === "POST") {
               <>
                 {hasPaidPlan && (
                   <div class="inline-password-control">
-                    <label class="checkbox-label">
-                      <input type="checkbox" id="password-toggle" class="checkbox-input" />
-                      <span>Password protect</span>
+                    <label class="analytics-control-pill" title="Require a password to view this share">
+                      <input type="checkbox" id="password-toggle" class="analytics-checkbox-hidden" />
+                      <span class="analytics-pill-badge">
+                        <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <span>Password</span>
+                      </span>
                     </label>
                     <input
                       type="password"
                       name="password"
                       id="password-input"
-                      class="text-input compact-control-input"
+                      class="expiry-control-pill compact-control-input"
                       placeholder="Password"
                       aria-label="Share password"
-                      style="display: none;"
+                      disabled
+                      style="display: none; padding: 0 10px; font-size: 12px; font-weight: 600; width: 130px;"
                     />
                   </div>
                 )}
-
-                {hasPaidPlan && (
-                  <div class="inline-slug-control">
-                    <label for="custom-slug-input">Custom slug</label>
-                    <span>/</span>
-                    <input
-                      type="text"
-                      name="customSlug"
-                      id="custom-slug-input"
-                      class="text-input compact-control-input"
-                      placeholder="myurl1"
-                      minlength="3"
-                      maxlength="6"
-                      pattern="[a-z0-9]{3,6}"
-                      aria-describedby="slug-availability-msg"
-                    />
-                    <span id="slug-availability-msg" class="inline-availability-msg" style="display: none;"></span>
-                  </div>
-                )}
-
               </>
             )}
           </div>
@@ -739,11 +783,11 @@ if (Astro.request.method === "POST") {
 
         // Syntax Highlighter Selector Toggle
         const syntaxHighlightCheckbox = document.getElementById("syntax-highlight-toggle") as HTMLInputElement;
-        const languageSelect = document.getElementById("language-select") as HTMLSelectElement;
+        const languageSelectPill = document.getElementById("language-select-pill");
 
-        if (syntaxHighlightCheckbox && languageSelect) {
+        if (syntaxHighlightCheckbox && languageSelectPill) {
           syntaxHighlightCheckbox.addEventListener("change", () => {
-            languageSelect.style.display = syntaxHighlightCheckbox.checked ? "inline-block" : "none";
+            languageSelectPill.style.display = syntaxHighlightCheckbox.checked ? "inline-flex" : "none";
           });
         }
 
@@ -752,15 +796,43 @@ if (Astro.request.method === "POST") {
         const passwordInput = document.getElementById("password-input") as HTMLInputElement;
 
         if (passwordCheckbox && passwordInput) {
+          passwordInput.disabled = !passwordCheckbox.checked;
+          if (!passwordCheckbox.checked) passwordInput.value = "";
+
           passwordCheckbox.addEventListener("change", () => {
-            passwordInput.style.display = passwordCheckbox.checked ? "block" : "none";
-            if (passwordCheckbox.checked) passwordInput.focus();
+            passwordInput.disabled = !passwordCheckbox.checked;
+            passwordInput.style.display = passwordCheckbox.checked ? "inline-flex" : "none";
+            if (passwordCheckbox.checked) {
+              passwordInput.focus();
+            } else {
+              passwordInput.value = "";
+            }
           });
         }
 
-        // Vanity custom slug real-time mock uniqueness check (Logged In only)
+        // Vanity custom slug reveal & real-time uniqueness check (Logged In Pro only)
+        const slugCheckbox = document.getElementById("slug-toggle") as HTMLInputElement;
         const slugInput = document.getElementById("custom-slug-input") as HTMLInputElement;
+        const slugWrapper = document.getElementById("slug-input-wrapper");
         const availabilityMsg = document.getElementById("slug-availability-msg");
+
+        if (slugInput) {
+          slugInput.disabled = !(slugCheckbox && slugCheckbox.checked);
+          if (slugCheckbox && !slugCheckbox.checked) slugInput.value = "";
+        }
+
+        if (slugCheckbox && slugInput && slugWrapper) {
+          slugCheckbox.addEventListener("change", () => {
+            slugInput.disabled = !slugCheckbox.checked;
+            slugWrapper.style.display = slugCheckbox.checked ? "inline-flex" : "none";
+            if (slugCheckbox.checked) {
+              slugInput.focus();
+            } else {
+              slugInput.value = "";
+              if (availabilityMsg) availabilityMsg.style.display = "none";
+            }
+          });
+        }
 
         if (slugInput && availabilityMsg) {
           slugInput.addEventListener("input", () => {

@@ -2976,7 +2976,7 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
 
 .eyebrow {
   display: inline-flex;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
   color: var(--color-accent);
   font-size: 12px;
   font-weight: 700;
@@ -2995,7 +2995,7 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
 
 .hero-section p {
   max-width: 560px;
-  margin: 16px auto 0;
+  margin: 10px auto;
   font-size: 16px;
   line-height: 1.65;
 }
@@ -3017,9 +3017,15 @@ a.btn-primary.upgrade-btn:focus-visible .badge-pro {
   border-bottom: 1px solid var(--color-border);
 }
 
-.editor-heading > div {
+.editor-heading > div:first-child {
   display: flex;
   align-items: baseline;
+  gap: 12px;
+}
+
+.editor-heading-right {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
@@ -4150,8 +4156,101 @@ body.drawer-open {
   outline-offset: 1px;
 }
 
+/* Creative & Space-Saving Expiry Control Pill */
+.expiry-control-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-bg-input);
+  transition: all 0.2s ease;
+}
+
+.expiry-control-pill:hover,
+.expiry-control-pill:focus-within {
+  border-color: var(--color-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.expiry-select-compact {
+  appearance: none;
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--color-text-base);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  padding-right: 16px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23667085' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right center;
+}
+
+.pill-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+/* Creative Analytics Feature Pill Toggle */
+.analytics-control-pill {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.analytics-checkbox-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.analytics-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-bg-input);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.analytics-control-pill:hover .analytics-pill-badge {
+  border-color: var(--color-border-focus);
+  color: var(--color-text-base);
+}
+
+.analytics-checkbox-hidden:checked + .analytics-pill-badge {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 11%, transparent);
+  color: var(--color-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.analytics-checkbox-hidden:focus-visible + .analytics-pill-badge {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 .select-input option:disabled,
-.select-input option[data-premium="true"] {
+.select-input option[data-premium="true"],
+.expiry-select-compact option:disabled,
+.expiry-select-compact option[data-premium="true"] {
   color: var(--color-text-muted);
   opacity: 0.55;
 }
