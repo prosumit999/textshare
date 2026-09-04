@@ -29,7 +29,6 @@ const readTime = post ? Math.max(1, Math.ceil(blogTextExcerpt(post.content, 1000
       <nav class="article-breadcrumb" aria-label="Breadcrumb">
         <a href="/">Home</a><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4 6 6-6 6"></path></svg>
         <a href="/blog">Blog</a><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m7.5 4 6 6-6 6"></path></svg>
-        <span aria-current="page">{post.title}</span>
       </nav>
       <span class="article-kicker">{post.category || 'TextShare journal'}</span>
       <h1>{post.title}</h1>

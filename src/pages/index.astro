@@ -429,7 +429,7 @@ if (Astro.request.method === "POST") {
             <div id="syntax-highlight-toggle-wrapper" style="display: flex; align-items: center; gap: var(--space-2);">
               <label class="checkbox-label">
                 <input type="checkbox" name="syntaxHighlightEnabled" id="syntax-highlight-toggle" class="checkbox-input" />
-                <span>Syntax highlighting</span>
+                <span>Syntax</span>
               </label>
               <select name="language" id="language-select" class="select-input" aria-label="Code language" style="display: none;">
                 <option value="plaintext">Plain Text</option>
@@ -472,7 +472,7 @@ if (Astro.request.method === "POST") {
             {isLoggedIn && (
               <label class="checkbox-label" title="Record anonymous view timestamps and country for this share.">
                 <input type="checkbox" name="analyticsEnabled" id="analytics-toggle" class="checkbox-input" />
-                <span>Track access analytics</span>
+                <span>Track Analytics</span>
               </label>
             )}
 

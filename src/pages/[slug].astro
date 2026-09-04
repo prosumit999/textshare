@@ -652,7 +652,7 @@ const sharedImages = share.contentType === 'image'
       const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const secs = Math.floor((diff % (1000 * 60)) / 1000);
 
-      let label = "Expires in: ";
+      let label = "Expires: ";
       if (hrs > 0) label += `${hrs}h `;
       if (mins > 0 || hrs > 0) label += `${mins}m `;
       label += `${secs}s`;
