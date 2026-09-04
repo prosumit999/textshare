@@ -1,17 +1,18 @@
-FROM node:24-bookworm-slim AS build
+FROM node:22-bookworm-slim AS build
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
 RUN npm run build && npm prune --omit=dev
 
-FROM node:24-bookworm-slim AS runtime
+FROM node:22-bookworm-slim AS runtime
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=4321
 WORKDIR /app
-RUN groupadd --system --gid 10001 textshare && \
-    useradd --system --uid 10001 --gid textshare --home-dir /app textshare
+RUN groupadd --gid 10001 textshare && \
+    useradd --uid 10001 --gid textshare --create-home --home-dir /app textshare
 COPY --from=build --chown=textshare:textshare /app/dist ./dist
 COPY --from=build --chown=textshare:textshare /app/node_modules ./node_modules
 COPY --from=build --chown=textshare:textshare /app/package.json ./package.json
