@@ -24,8 +24,7 @@ const managedPosts = (await getPublishedBlogPosts()).map((post) => ({
   coverImage: post.coverImage
 }));
 
-const managedSlugs = new Set(managedPosts.map((post) => post.id));
-const posts = [...managedPosts, ...fallbackPosts.filter((post) => !managedSlugs.has(post.id))];
+const posts = managedPosts.length > 0 ? managedPosts : fallbackPosts;
 const featuredPost = posts[0];
 const gridPosts = posts.slice(1);
 ---
@@ -41,12 +40,16 @@ const gridPosts = posts.slice(1);
       <div class="featured-post-content"><div class="post-meta"><span>{featuredPost.category}</span><span>{featuredPost.date}</span></div><h2>{featuredPost.title}</h2><p>{featuredPost.excerpt}</p><span class="read-link">Read article <span aria-hidden="true">→</span></span><span class="read-time">{featuredPost.readTime}</span></div>
     </a>}
 
-    <div class="blog-section-heading"><h2>Latest articles</h2><span>{gridPosts.length} articles</span></div>
-    <div class="blog-grid">
-      {gridPosts.map((post) => <article class="post-card" id={post.id}><a href={post.href} class="post-card-link" aria-label={`Read ${post.title}`}>
-        <div class:list={["post-visual", { "has-cover": post.coverImage }]} aria-hidden="true">{post.coverImage ? <img src={post.coverImage} alt="" width="960" height="540" loading="lazy" decoding="async" /> : <span>{post.visual === 'code' ? '</>' : post.visual === 'clock' ? '24h' : post.visual === 'brackets' ? '{ }' : post.visual === 'lock' ? '•••' : post.visual === 'article' ? 'Aa' : '▦'}</span>}</div>
-        <div class="post-card-content"><div class="post-meta"><span>{post.category}</span><span>{post.readTime}</span></div><h3>{post.title}</h3><p>{post.excerpt}</p><div class="post-card-footer"><span>{post.date}</span><span class="read-arrow" aria-hidden="true">→</span></div></div>
-      </a></article>)}
-    </div>
+    {gridPosts.length > 0 && (
+      <>
+        <div class="blog-section-heading"><h2>Latest articles</h2><span>{gridPosts.length} articles</span></div>
+        <div class="blog-grid">
+          {gridPosts.map((post) => <article class="post-card" id={post.id}><a href={post.href} class="post-card-link" aria-label={`Read ${post.title}`}>
+            <div class:list={["post-visual", { "has-cover": post.coverImage }]} aria-hidden="true">{post.coverImage ? <img src={post.coverImage} alt="" width="960" height="540" loading="lazy" decoding="async" /> : <span>{post.visual === 'code' ? '</>' : post.visual === 'clock' ? '24h' : post.visual === 'brackets' ? '{ }' : post.visual === 'lock' ? '•••' : post.visual === 'article' ? 'Aa' : '▦'}</span>}</div>
+            <div class="post-card-content"><div class="post-meta"><span>{post.category}</span><span>{post.readTime}</span></div><h3>{post.title}</h3><p>{post.excerpt}</p><div class="post-card-footer"><span>{post.date}</span><span class="read-arrow" aria-hidden="true">→</span></div></div>
+          </a></article>)}
+        </div>
+      </>
+    )}
   </section>
 </Layout>
