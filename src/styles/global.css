@@ -46,6 +46,7 @@ ul {
   flex-direction: column;
   align-items: flex-start;
   width: 500px;
+  color: var(--color-text-base);
 }
 
 @media screen and (max-width: 600px) {
@@ -371,7 +372,7 @@ a.btn-primary:active {
 }
 
 .btn-icon:hover {
-  background-color: var(--color-bg-base);
+  background-color: color-mix(in srgb, var(--color-text-base) 6%, var(--color-bg-base));
   border-color: var(--color-border);
 }
 
@@ -2835,7 +2836,7 @@ table.dashboard-table tbody tr:last-child td {
   padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 0px;
 }
 
 .drawer-nav-link {
@@ -3027,7 +3028,7 @@ footer {
 
 /* 2026 visual refresh — editor-first, low-noise interface */
 :root[data-theme="light"] {
-  --color-bg-base: #f6f8fb;
+  --color-bg-base: #ffffff;
   --color-bg-surface: #ffffff;
   --color-bg-input: #fbfcfe;
   --color-text-base: #17202f;
@@ -3054,12 +3055,7 @@ footer {
 
 body {
   font-size: 15px;
-  /* background-image: radial-gradient(
-    circle at 50% 0%,
-    color-mix(in srgb, var(--color-accent) 7%, transparent),
-    transparent 35rem
-  ); */
-  background: white;
+  background-color: var(--color-bg-base);
 }
 
 .container {
@@ -3078,7 +3074,17 @@ header {
 }
 
 header {
-  border-bottom: 1px solid #f4f4f4f0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+:root[data-theme="dark"] header {
+  border-bottom: none !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) header {
+    border-bottom: none !important;
+  }
 }
 
 .logo {
@@ -3559,8 +3565,7 @@ footer {
 header {
   height: 60px;
   position: unset;
-  border-bottom: 0px;
-  border-bottom: 1px solid #f4f4f4f0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .logo {
