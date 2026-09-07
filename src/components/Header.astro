@@ -29,15 +29,76 @@ const isHome = Astro.url.pathname === "/";
             </svg>
           </a>
         )}
+
+        <!-- Tools Dropdown Menu -->
+        <div class="nav-dropdown">
+          <button type="button" class="btn btn-secondary nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            Tools
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="nav-dropdown-menu" role="menu">
+            <a href="/" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              Text Share
+            </a>
+            <a href="/profile#shortlinks" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+              Short Link
+            </a>
+            <a href="/profile#qrcode" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path></svg>
+              QR Code Generator
+            </a>
+          </div>
+        </div>
+
+        <!-- About Us Dropdown Menu -->
+        <div class="nav-dropdown">
+          <button type="button" class="btn btn-secondary nav-dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            About Us
+            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div class="nav-dropdown-menu" role="menu">
+            <a href="/blog" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+              About Us
+            </a>
+            <a href="/contact" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              Contact
+            </a>
+            <a href="/terms" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line></svg>
+              Terms
+            </a>
+            <a href="/privacy" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              Privacy
+            </a>
+            <a href="/acceptable-use" class="nav-dropdown-item" role="menuitem">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              Disclaimer
+            </a>
+          </div>
+        </div>
+
         <a href="/join" class="btn btn-secondary"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="7" r="4"></circle><path d="M3 21v-2a6 6 0 0 1 12 0v2"></path><line x1="19" y1="8" x2="19" y2="14"></line><line x1="22" y1="11" x2="16" y2="11"></line></svg>Join Room</a>
         {hasSession ? (
           <a href="/profile" class="btn btn-secondary" aria-label="Open profile"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>Profile</a>
         ) : (
           <a href="/login" class="btn btn-secondary">Sign In</a>
         )}
-        <a href="/pricing" class="btn btn-primary upgrade-btn">
-          Upgrade <span class="badge-pro">PRO</span>
-        </a>
       </nav>
 
       <!-- Theme Switcher -->
@@ -96,3 +157,4 @@ const isHome = Astro.url.pathname === "/";
     updateIcons(nextTheme);
   });
 </script>
+

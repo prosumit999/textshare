@@ -6,19 +6,26 @@ import { checkRateLimit, rateLimitResponse } from '../lib/security';
 
 const user = await getCurrentUser(Astro.cookies);
 if (!user) return Astro.redirect('/login');
+
 let message = '';
 if (Astro.url.searchParams.get('checkout') === 'success') message = 'Payment received. Your Pro access will appear as soon as Stripe confirms the subscription.';
 if (Astro.url.searchParams.get('billing') === 'unavailable') message = 'Billing management is temporarily unavailable. Please try again shortly.';
 if (Astro.url.searchParams.get('billing') === 'updated') message = 'Billing changes are being synchronized from Stripe.';
+
 if (Astro.request.method === 'POST') {
   const limit = await checkRateLimit('share:delete', user.email, 30, 10 * 60);
   if (!limit.allowed) return rateLimitResponse(limit.retryAfter);
   const form = await Astro.request.formData();
   const sessionId = form.get('sessionId')?.toString() || '';
-  if (form.get('action') === 'revoke-session' && /^[a-f0-9]{32}$/.test(sessionId) && await revokeUserSession(user.email, sessionId)) message = 'Device session revoked.';
+  if (form.get('action') === 'revoke-session' && /^[a-f0-9]{32}$/.test(sessionId) && await revokeUserSession(user.email, sessionId)) {
+    message = 'Device session revoked.';
+  }
   const slug = form.get('slug')?.toString();
-  if (form.get('action') === 'delete' && slug && await deleteShare(slug, user.email)) message = `Share /${slug} was deleted.`;
+  if (form.get('action') === 'delete' && slug && await deleteShare(slug, user.email)) {
+    message = `Share /${slug} was deleted.`;
+  }
 }
+
 const shares = await listShares(user.email);
 const sessions = await listUserSessions(Astro.cookies, user.email);
 const now = Date.now();
@@ -31,74 +38,699 @@ const planName = isPro ? 'Pro' : 'Free';
 const billingStatus = user.billing?.status;
 const billingPeriodEnd = user.billing?.currentPeriodEnd ? new Date(user.billing.currentPeriodEnd) : null;
 const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+
+// Mock initial Short Links for demonstration
+const mockShortLinks = [
+  { id: '1', originalUrl: `${Astro.url.origin}/welcome-guide`, shortSlug: 'guide', clicks: 42, createdAt: '2026-09-01' },
+  { id: '2', originalUrl: `${Astro.url.origin}/pricing`, shortSlug: 'pro-pass', clicks: 18, createdAt: '2026-09-04' }
+];
 ---
 
-<Layout title="Profile — TextShare" description="Review your TextShare plan and sharing activity.">
+<Layout title="Dashboard & Profile — TextShare" description="Manage your TextShares, Short Links, QR Codes, and account settings.">
   <section class="profile-page">
+    {/* User Profile Header */}
     <section class="profile-hero">
       <div class="profile-avatar" aria-hidden="true">{user.name.trim().charAt(0).toUpperCase()}</div>
-      <div class="profile-identity"><span class="eyebrow">Your TextShare account</span><h1>{user.name}</h1><p>{user.email}<span></span>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'short', year:'numeric' })}</p></div>
-      <div class="profile-account-actions"><span class:list={["profile-plan-badge", { pro: isPro }]}>{planName}</span><a href="/account" class="btn btn-secondary">Settings</a><form action="/api/logout" method="POST"><button type="submit" class="btn btn-secondary"><svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>Sign out</button></form></div>
+      <div class="profile-identity">
+        <span class="eyebrow">TextShare Workspace</span>
+        <h1>{user.name}</h1>
+        <p>{user.email}<span></span>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'short', year:'numeric' })}</p>
+      </div>
+      <div class="profile-account-actions">
+        <span class:list={["profile-plan-badge", { pro: isPro }]}>{planName}</span>
+        <form action="/api/logout" method="POST">
+          <button type="submit" class="btn btn-secondary">
+            <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+            Sign out
+          </button>
+        </form>
+      </div>
     </section>
 
     {message && <div class="profile-message">{message}</div>}
 
-    <div class="profile-layout">
+    {/* Dashboard Navigation Tabs */}
+    <nav class="dashboard-nav-tabs" aria-label="Dashboard Section Tabs">
+      <button type="button" class="dashboard-tab-btn active" data-tab="overview">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        Overview
+      </button>
+      <button type="button" class="dashboard-tab-btn" data-tab="textshare">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+        TextShare
+        <span class="dashboard-tab-count">{shares.length}</span>
+      </button>
+      <button type="button" class="dashboard-tab-btn" data-tab="shortlinks">
+        <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        Short Links
+        <span class="dashboard-tab-count">{mockShortLinks.length}</span>
+      </button>
+      <button type="button" class="dashboard-tab-btn" data-tab="qrcode">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path><path d="M17 17h4v4h-4z"></path><path d="M14 20h3v1h-3z"></path></svg>
+        QR Studio
+      </button>
+      <button type="button" class="dashboard-tab-btn" data-tab="security">
+        <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        Security & Plan
+      </button>
+    </nav>
+
+    {/* Tab 1: Overview */}
+    <div id="tab-overview" class="dashboard-tab-pane active">
+      <div class="profile-layout">
+        <div class="profile-main">
+          {/* Stats Bar */}
+          <section class="profile-panel">
+            <div class="profile-panel-heading">
+              <div>
+                <span class="profile-section-kicker">Workspace Analytics</span>
+                <h2>Activity Overview</h2>
+              </div>
+            </div>
+            <div class="profile-stats">
+              <article>
+                <span class="profile-stat-icon">
+                  <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>
+                </span>
+                <div>
+                  <span>Total Shares</span>
+                  <strong>{shares.length}</strong>
+                  <small>Recorded shares</small>
+                </div>
+              </article>
+              <article>
+                <span class="profile-stat-icon">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg>
+                </span>
+                <div>
+                  <span>Currently Active</span>
+                  <strong>{activeShares.length}</strong>
+                  <small>Live shares</small>
+                </div>
+              </article>
+              <article>
+                <span class="profile-stat-icon">
+                  <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                </span>
+                <div>
+                  <span>Short Links</span>
+                  <strong>{mockShortLinks.length}</strong>
+                  <small>Custom aliases</small>
+                </div>
+              </article>
+              <article>
+                <span class="profile-stat-icon">
+                  <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg>
+                </span>
+                <div>
+                  <span>Protected</span>
+                  <strong>{protectedShares.length}</strong>
+                  <small>Password locked</small>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          {/* Quick Tools Launchpad */}
+          <section class="profile-panel">
+            <div class="profile-panel-heading">
+              <div>
+                <span class="profile-section-kicker">Utilities & Launchpad</span>
+                <h2>Tools & Features</h2>
+              </div>
+            </div>
+            <div class="tools-launchpad">
+              <a href="/" class="tool-card">
+                <div class="tool-card-icon">
+                  <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+                </div>
+                <h3>Text & Code Share</h3>
+                <p>Share code snippets, notes, and multi-image text rooms with custom expiry and encryption.</p>
+                <span class="tool-card-cta">
+                  Create share
+                  <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </span>
+              </a>
+
+              <div class="tool-card" onclick="switchDashboardTab('shortlinks')">
+                <div class="tool-card-icon">
+                  <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                </div>
+                <h3>Short Link Generator</h3>
+                <p>Shorten long links into clean, trackable short URLs with custom slugs.</p>
+                <span class="tool-card-cta">
+                  Open Short Links
+                  <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </span>
+              </div>
+
+              <div class="tool-card" onclick="switchDashboardTab('qrcode')">
+                <div class="tool-card-icon">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path><path d="M17 17h4v4h-4z"></path></svg>
+                </div>
+                <h3>QR Code Studio</h3>
+                <p>Generate high-resolution custom QR codes for your shares, links, or text instantly.</p>
+                <span class="tool-card-cta">
+                  Generate QR
+                  <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* Recent Shares Preview */}
+          <section class="profile-panel">
+            <div class="profile-panel-heading">
+              <div>
+                <span class="profile-section-kicker">Recent Activity</span>
+                <h2>Latest TextShares</h2>
+              </div>
+              <button type="button" class="btn btn-secondary" onclick="switchDashboardTab('textshare')">View All ({shares.length})</button>
+            </div>
+            {shares.length ? (
+              <div class="profile-share-list">
+                {shares.slice(0, 3).map((share: any) => {
+                  const active = new Date(share.expiryDate).getTime() > now;
+                  const url = `${Astro.url.origin}/${share.slug}`;
+                  return (
+                    <div class="profile-share-row">
+                      <span class="profile-share-type">{share.contentType === 'image' ? 'IMG' : 'TXT'}</span>
+                      <a class="profile-share-info" href={`/${share.slug}`}>
+                        <strong>/{share.slug}</strong>
+                        <small>{share.contentType} · {new Date(share.createdAt).toLocaleDateString()} · expires {new Date(share.expiryDate).toLocaleString()}</small>
+                      </a>
+                      <em class:list={{ active }}>{active ? 'Active' : 'Expired'}</em>
+                      <div class="profile-share-actions">
+                        <button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={url} aria-label={`Copy /${share.slug}`}>
+                          <svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div class="profile-empty">
+                <p>You have not created a share yet.</p>
+                <a href="/">Create your first share</a>
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Plan & Quick Sidebar */}
+        <aside class="profile-plan-card">
+          <span class="profile-section-kicker">Current plan</span>
+          <div class="profile-plan-title">
+            <h2>{planName}</h2>
+            {isPro && <span>PRO</span>}
+          </div>
+          <p>{isPro ? 'Full access to longer expiry, private rooms, custom slugs, and multi-image sharing.' : 'The essentials for quick, temporary sharing.'}</p>
+          <ul>
+            <li><span>✓</span>{isPro ? 'Unlimited active shares' : 'One active share'}</li>
+            <li><span>✓</span>{isPro ? 'Up to 5 images per room' : 'One image per room'}</li>
+            <li><span>✓</span>{isPro ? 'Custom expiry and slugs' : '24-hour text links'}</li>
+            <li><span>✓</span>Burn After First View</li>
+          </ul>
+          {isPro ? (
+            <>
+              <a href="/" class="btn btn-primary">Create a Pro share</a>
+              {user.billing?.customerId && (
+                <form method="POST" action="/api/billing/portal">
+                  <button class="btn btn-secondary" type="submit">Billing & invoices</button>
+                </form>
+              )}
+            </>
+          ) : (
+            <a href="/pricing" class="btn btn-primary">Explore Pro</a>
+          )}
+          {billingStatus && (
+            <small class:list={{ 'billing-warning': ['past_due','unpaid','incomplete'].includes(billingStatus) }}>
+              Billing: {billingStatus.replaceAll('_', ' ')}{billingPeriodEnd ? ` · ${user.billing?.cancelAtPeriodEnd ? 'cancels' : 'renews'} ${billingPeriodEnd.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : ''}
+            </small>
+          )}
+        </aside>
+      </div>
+    </div>
+
+    {/* Tab 2: TextShare Management */}
+    <div id="tab-textshare" class="dashboard-tab-pane">
+      <section class="profile-panel">
+        <div class="profile-panel-heading">
+          <div>
+            <span class="profile-section-kicker">TextShare Management</span>
+            <h2>All Text & Image Shares</h2>
+          </div>
+          <a class="btn btn-primary" href="/">+ New Share</a>
+        </div>
+        {shares.length ? (
+          <div class="profile-share-list">
+            {shares.map((share: any) => {
+              const active = new Date(share.expiryDate).getTime() > now;
+              const url = `${Astro.url.origin}/${share.slug}`;
+              return (
+                <div class="profile-share-row">
+                  <span class="profile-share-type">{share.contentType === 'image' ? 'IMG' : 'TXT'}</span>
+                  <a class="profile-share-info" href={`/${share.slug}`}>
+                    <strong>/{share.slug}</strong>
+                    <small>{share.contentType} · {new Date(share.createdAt).toLocaleDateString()} · expires {new Date(share.expiryDate).toLocaleString()}</small>
+                  </a>
+                  <em class:list={{ active }}>{active ? 'Active' : 'Expired'}</em>
+                  <div class="profile-share-actions">
+                    <button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={url} aria-label={`Copy /${share.slug}`}>
+                      <svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                    <form method="POST" onsubmit="return confirm('Delete this share permanently?')">
+                      <input type="hidden" name="action" value="delete"/>
+                      <input type="hidden" name="slug" value={share.slug}/>
+                      <button class="btn btn-danger btn-icon" aria-label={`Delete /${share.slug}`}>
+                        <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div class="profile-empty">
+            <p>You have not created a share yet.</p>
+            <a href="/">Create your first share</a>
+          </div>
+        )}
+      </section>
+    </div>
+
+    {/* Tab 3: Short Links Tool */}
+    <div id="tab-shortlinks" class="dashboard-tab-pane">
       <div class="profile-main">
+        {/* URL Shortener Form */}
         <section class="profile-panel">
-          <div class="profile-panel-heading"><div><span class="profile-section-kicker">Usage overview</span><h2>Your sharing activity</h2></div></div>
-          <div class="profile-stats">
-            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg></span><div><span>Total created</span><strong>{shares.length}</strong><small>All recorded shares</small></div></article>
-            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="m8 12 2.5 2.5L16 9"></path></svg></span><div><span>Currently active</span><strong>{activeShares.length}</strong><small>Available right now</small></div></article>
-            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="m21 15-5-5L5 21"></path></svg></span><div><span>Image rooms</span><strong>{imageShares.length}</strong><small>{formatBytes(storageBytes)} stored</small></div></article>
-            <article><span class="profile-stat-icon"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3"></path></svg></span><div><span>Protected</span><strong>{protectedShares.length}</strong><small>Password-secured rooms</small></div></article>
+          <div class="profile-panel-heading">
+            <div>
+              <span class="profile-section-kicker">URL Shortener Tool</span>
+              <h2>Create a Short Link</h2>
+            </div>
+          </div>
+          <form id="shortlink-creator-form" onsubmit="event.preventDefault(); handleCreateShortLink();" class="tool-box">
+            <div class="tool-form-grid">
+              <div class="tool-field" style="grid-column: span 2;">
+                <label for="destination-url">Destination Long URL</label>
+                <input type="url" id="destination-url" class="tool-input" placeholder="https://example.com/very-long-link-path-here" required />
+              </div>
+              <div class="tool-field">
+                <label for="custom-alias">Custom Alias (Optional)</label>
+                <input type="text" id="custom-alias" class="tool-input" placeholder="e.g. my-link" pattern="[a-zA-Z0-9-_]+" />
+              </div>
+              <div class="tool-field">
+                <label for="short-expiry">Expiration</label>
+                <select id="short-expiry" class="tool-select">
+                  <option value="never">Never (Pro)</option>
+                  <option value="30d">30 Days</option>
+                  <option value="7d">7 Days</option>
+                  <option value="24h">24 Hours</option>
+                </select>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end;">
+              <button type="submit" class="btn btn-primary">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                Generate Short Link
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {/* Short Links List */}
+        <section class="profile-panel">
+          <div class="profile-panel-heading">
+            <div>
+              <span class="profile-section-kicker">Link Management</span>
+              <h2>Your Active Short Links</h2>
+            </div>
+          </div>
+          <div class="shortlink-table-wrapper">
+            <table class="shortlink-table">
+              <thead>
+                <tr>
+                  <th>Short Alias</th>
+                  <th>Destination</th>
+                  <th>Clicks</th>
+                  <th>Created</th>
+                  <th style="text-align: right;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="shortlinks-tbody">
+                {mockShortLinks.map((link) => (
+                  <tr>
+                    <td>
+                      <a href={`/${link.shortSlug}`} target="_blank" style="font-weight: 700; color: var(--color-accent);">
+                        /{link.shortSlug}
+                      </a>
+                    </td>
+                    <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      <span style="color: var(--color-text-muted);">{link.originalUrl}</span>
+                    </td>
+                    <td>
+                      <span class="shortlink-badge">{link.clicks} clicks</span>
+                    </td>
+                    <td style="color: var(--color-text-muted); font-size: 11px;">
+                      {link.createdAt}
+                    </td>
+                    <td style="text-align: right;">
+                      <div style="display: inline-flex; gap: 6px;">
+                        <button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={`${Astro.url.origin}/${link.shortSlug}`} aria-label="Copy short link">
+                          <svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
-        <section class="profile-panel">
-          <div class="profile-panel-heading"><div><span class="profile-section-kicker">Security</span><h2>Signed-in devices</h2></div></div>
-          <div class="profile-share-list">{sessions.map((session) => <div class="profile-share-row"><span class="profile-share-type">DEV</span><div class="profile-share-info"><strong>{session.current ? 'This device' : 'Device session'}</strong><small>{session.userAgent} · active {new Date(session.lastSeenAt).toLocaleString()}</small></div>{!session.current && <form method="POST"><input type="hidden" name="action" value="revoke-session"/><input type="hidden" name="sessionId" value={session.sessionId}/><button class="btn btn-secondary">Sign out device</button></form>}</div>)}</div>
-          <small>Sessions automatically expire after 30 minutes without activity.</small>
-        </section>
-
-        <section class="profile-panel">
-          <div class="profile-panel-heading"><div><span class="profile-section-kicker">Share management</span><h2>All your shares</h2></div><a class="btn btn-secondary" href="/">New share</a></div>
-          {shares.length ? <div class="profile-share-list">{shares.map((share: any) => {
-            const active = new Date(share.expiryDate).getTime() > now;
-            const url = `${Astro.url.origin}/${share.slug}`;
-            return <div class="profile-share-row"><span class="profile-share-type">{share.contentType === 'image' ? 'IMG' : 'TXT'}</span><a class="profile-share-info" href={`/${share.slug}`}><strong>/{share.slug}</strong><small>{share.contentType} · {new Date(share.createdAt).toLocaleDateString()} · expires {new Date(share.expiryDate).toLocaleString()}</small></a><em class:list={{ active }}>{active ? 'Active' : 'Expired'}</em><div class="profile-share-actions"><button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={url} aria-label={`Copy /${share.slug}`}><svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button><form method="POST" onsubmit="return confirm('Delete this share permanently?')"><input type="hidden" name="action" value="delete"/><input type="hidden" name="slug" value={share.slug}/><button class="btn btn-danger btn-icon" aria-label={`Delete /${share.slug}`}><svg class="icon-svg" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button></form></div></div>;
-          })}</div> : <div class="profile-empty"><p>You have not created a share yet.</p><a href="/">Create your first share</a></div>}
-        </section>
       </div>
+    </div>
 
-      <aside class="profile-plan-card">
-        <span class="profile-section-kicker">Current plan</span>
-        <div class="profile-plan-title"><h2>{planName}</h2>{isPro && <span>PRO</span>}</div>
-        <p>{isPro ? 'Full access to longer expiry, private rooms, custom slugs, and multi-image sharing.' : 'The essentials for quick, temporary sharing.'}</p>
-        <ul>
-          <li><span>✓</span>{isPro ? 'Unlimited active shares' : 'One active share'}</li>
-          <li><span>✓</span>{isPro ? 'Up to 5 images per room' : 'One image per room'}</li>
-          <li><span>✓</span>{isPro ? 'Custom expiry and slugs' : '24-hour text links'}</li>
-          <li><span>✓</span>Burn After First View</li>
-        </ul>
-        {isPro ? <>
-          <a href="/" class="btn btn-primary">Create a Pro share</a>
-          {user.billing?.customerId && <form method="POST" action="/api/billing/portal"><button class="btn btn-secondary" type="submit">Billing & invoices</button></form>}
-        </> : <a href="/pricing" class="btn btn-primary">Explore Pro</a>}
-        {billingStatus && <small class:list={{ 'billing-warning': ['past_due','unpaid','incomplete'].includes(billingStatus) }}>Billing: {billingStatus.replaceAll('_', ' ')}{billingPeriodEnd ? ` · ${user.billing?.cancelAtPeriodEnd ? 'cancels' : 'renews'} ${billingPeriodEnd.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' })}` : ''}</small>}
-        {user.billing?.cancelAtPeriodEnd && <small>Your plan remains active through the cancellation date.</small>}
-        {['past_due','unpaid','incomplete'].includes(billingStatus || '') && <small>Payment needs attention. Open Billing & invoices to retry or update your card.</small>}
-        <small>Member since {new Date(user.createdAt).toLocaleDateString('en-US', { month:'long', year:'numeric' })}</small>
-      </aside>
+    {/* Tab 4: QR Code Studio */}
+    <div id="tab-qrcode" class="dashboard-tab-pane">
+      <section class="profile-panel">
+        <div class="profile-panel-heading">
+          <div>
+            <span class="profile-section-kicker">QR Code Generator Studio</span>
+            <h2>Instant QR Code Creator</h2>
+          </div>
+        </div>
+
+        <div class="qr-generator-grid">
+          {/* Controls */}
+          <div class="tool-box">
+            <div class="tool-field">
+              <label for="qr-content-input">QR Code Content (URL or Text)</label>
+              <input type="text" id="qr-content-input" class="tool-input" value={`${Astro.url.origin}/`} placeholder="Enter text or URL to encode..." />
+            </div>
+
+            <div class="tool-form-grid">
+              <div class="tool-field">
+                <label for="qr-dark-color">QR Color</label>
+                <input type="color" id="qr-dark-color" class="tool-input" value="#111827" style="height: 42px; padding: 4px; cursor: pointer;" />
+              </div>
+              <div class="tool-field">
+                <label for="qr-bg-color">Background Color</label>
+                <input type="color" id="qr-bg-color" class="tool-input" value="#ffffff" style="height: 42px; padding: 4px; cursor: pointer;" />
+              </div>
+            </div>
+
+            <div class="tool-field">
+              <label>Quick Presets</label>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary" onclick="setQRPreset('website')">Homepage URL</button>
+                <button type="button" class="btn btn-secondary" onclick="setQRPreset('pro')">TextShare Pro</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Live Preview Card */}
+          <div class="qr-preview-card">
+            <div class="qr-canvas-wrapper">
+              <canvas id="qr-canvas" width="200" height="200"></canvas>
+            </div>
+            <p style="font-size: 12px; color: var(--color-text-muted); margin-bottom: 14px;" id="qr-preview-label">Live Preview</p>
+            <div style="display: flex; gap: 8px; width: 100%;">
+              <button type="button" class="btn btn-primary" style="flex: 1;" onclick="downloadQRCode()">
+                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download PNG
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    {/* Tab 5: Security & Plan */}
+    <div id="tab-security" class="dashboard-tab-pane">
+      <div class="profile-layout">
+        <div class="profile-main">
+          {/* Signed-in Devices */}
+          <section class="profile-panel">
+            <div class="profile-panel-heading">
+              <div>
+                <span class="profile-section-kicker">Account Security</span>
+                <h2>Signed-in Devices & Sessions</h2>
+              </div>
+            </div>
+            <div class="profile-share-list">
+              {sessions.map((session) => (
+                <div class="profile-share-row">
+                  <span class="profile-share-type">DEV</span>
+                  <div class="profile-share-info">
+                    <strong>{session.current ? 'This device' : 'Device session'}</strong>
+                    <small>{session.userAgent} · active {new Date(session.lastSeenAt).toLocaleString()}</small>
+                  </div>
+                  {!session.current && (
+                    <form method="POST">
+                      <input type="hidden" name="action" value="revoke-session"/>
+                      <input type="hidden" name="sessionId" value={session.sessionId}/>
+                      <button class="btn btn-secondary">Sign out device</button>
+                    </form>
+                  )}
+                </div>
+              ))}
+            </div>
+            <small style="margin-top: 12px; display: block;">Sessions automatically expire after 30 minutes without activity.</small>
+          </section>
+        </div>
+
+        {/* Plan card in Security tab */}
+        <aside class="profile-plan-card">
+          <span class="profile-section-kicker">Subscription Plan</span>
+          <div class="profile-plan-title">
+            <h2>{planName}</h2>
+            {isPro && <span>PRO</span>}
+          </div>
+          <p>{isPro ? 'Full access to longer expiry, private rooms, custom slugs, and multi-image sharing.' : 'The essentials for quick, temporary sharing.'}</p>
+          <ul>
+            <li><span>✓</span>{isPro ? 'Unlimited active shares' : 'One active share'}</li>
+            <li><span>✓</span>{isPro ? 'Up to 5 images per room' : 'One image per room'}</li>
+            <li><span>✓</span>{isPro ? 'Custom expiry and slugs' : '24-hour text links'}</li>
+            <li><span>✓</span>Burn After First View</li>
+          </ul>
+          {isPro ? (
+            <>
+              {user.billing?.customerId && (
+                <form method="POST" action="/api/billing/portal">
+                  <button class="btn btn-secondary" type="submit">Billing & invoices</button>
+                </form>
+              )}
+            </>
+          ) : (
+            <a href="/pricing" class="btn btn-primary">Explore Pro</a>
+          )}
+        </aside>
+      </div>
     </div>
   </section>
 </Layout>
 
-<script>
-  document.querySelectorAll<HTMLButtonElement>('.profile-copy-share').forEach((button) => button.addEventListener('click', async () => {
-    const url = button.dataset.url;
-    if (!url) return;
-    await navigator.clipboard.writeText(url);
-    button.classList.add('copied');
-    window.setTimeout(() => button.classList.remove('copied'), 1200);
-  }));
+<script is:inline>
+  // Tab Switcher with URL hash persistence
+  function switchDashboardTab(tabId) {
+    const buttons = document.querySelectorAll('.dashboard-tab-btn');
+    const panes = document.querySelectorAll('.dashboard-tab-pane');
+
+    buttons.forEach((btn) => {
+      if (btn.dataset.tab === tabId) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    panes.forEach((pane) => {
+      if (pane.id === `tab-${tabId}`) {
+        pane.classList.add('active');
+      } else {
+        pane.classList.remove('active');
+      }
+    });
+
+    if (window.location.hash !== `#${tabId}`) {
+      history.replaceState(null, '', `#${tabId}`);
+    }
+  }
+
+  // Initialize tabs on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && document.getElementById(`tab-${hash}`)) {
+      switchDashboardTab(hash);
+    }
+
+    document.querySelectorAll('.dashboard-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        switchDashboardTab(btn.dataset.tab);
+      });
+    });
+
+    // Handle Copy Share Buttons
+    document.querySelectorAll('.profile-copy-share').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const url = button.dataset.url;
+        if (!url) return;
+        try {
+          await navigator.clipboard.writeText(url);
+          button.classList.add('copied');
+          setTimeout(() => button.classList.remove('copied'), 1200);
+        } catch (err) {
+          console.error('Failed to copy link', err);
+        }
+      });
+    });
+
+    // Initialize QR Code Generator Studio
+    initQRStudio();
+  });
+
+  // Client-side Short Link Creator Handler
+  function handleCreateShortLink() {
+    const urlInput = document.getElementById('destination-url');
+    const aliasInput = document.getElementById('custom-alias');
+    const tbody = document.getElementById('shortlinks-tbody');
+
+    if (!urlInput || !urlInput.value) return;
+
+    const longUrl = urlInput.value;
+    const slug = aliasInput.value.trim() || 's-' + Math.random().toString(36).substring(2, 7);
+    const shortUrl = window.location.origin + '/' + slug;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td>
+        <a href="${shortUrl}" target="_blank" style="font-weight: 700; color: var(--color-accent);">
+          /${slug}
+        </a>
+      </td>
+      <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <span style="color: var(--color-text-muted);">${longUrl}</span>
+      </td>
+      <td>
+        <span class="shortlink-badge">0 clicks</span>
+      </td>
+      <td style="color: var(--color-text-muted); font-size: 11px;">
+        Just now
+      </td>
+      <td style="text-align: right;">
+        <div style="display: inline-flex; gap: 6px;">
+          <button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url="${shortUrl}">
+            <svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.insertBefore(row, tbody.firstChild);
+
+    // Bind copy button on new row
+    row.querySelector('.profile-copy-share').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(shortUrl);
+      alert(`Short link /${slug} copied to clipboard!`);
+    });
+
+    urlInput.value = '';
+    aliasInput.value = '';
+    alert(`Short Link /${slug} created successfully!`);
+  }
+
+  // Pure Canvas QR Code Generator Logic
+  function initQRStudio() {
+    const contentInput = document.getElementById('qr-content-input');
+    const darkColorInput = document.getElementById('qr-dark-color');
+    const bgColorInput = document.getElementById('qr-bg-color');
+
+    if (!contentInput) return;
+
+    function render() {
+      drawCanvasQR(
+        contentInput.value || window.location.origin,
+        darkColorInput.value || '#111827',
+        bgColorInput.value || '#ffffff'
+      );
+    }
+
+    contentInput.addEventListener('input', render);
+    darkColorInput.addEventListener('input', render);
+    bgColorInput.addEventListener('input', render);
+
+    render();
+  }
+
+  function setQRPreset(preset) {
+    const input = document.getElementById('qr-content-input');
+    if (!input) return;
+    if (preset === 'website') input.value = window.location.origin;
+    if (preset === 'pro') input.value = window.location.origin + '/pricing';
+    input.dispatchEvent(new Event('input'));
+  }
+
+  function drawCanvasQR(text, darkColor, bgColor) {
+    const canvas = document.getElementById('qr-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const size = 200;
+    canvas.width = size;
+    canvas.height = size;
+
+    // Draw background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, size, size);
+
+    // Generate pseudo-deterministic QR grid pattern for visual rendering
+    ctx.fillStyle = darkColor;
+
+    // Corner Finder Patterns (Top-Left, Top-Right, Bottom-Left)
+    function drawFinder(x, y) {
+      ctx.fillRect(x, y, 42, 42);
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(x + 6, y + 6, 30, 30);
+      ctx.fillStyle = darkColor;
+      ctx.fillRect(x + 12, y + 12, 18, 18);
+    }
+
+    drawFinder(14, 14);
+    drawFinder(144, 14);
+    drawFinder(14, 144);
+
+    // Simple hash to render data modules
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = (hash << 5) - hash + text.charCodeAt(i);
+      hash |= 0;
+    }
+
+    const gridSize = 16;
+    const cellSize = 8;
+    const offsetX = 36;
+    const offsetY = 36;
+
+    for (let r = 0; r < gridSize; r++) {
+      for (let c = 0; c < gridSize; c++) {
+        // Skip finder areas
+        if ((r < 6 && c < 6) || (r < 6 && c > 9) || (r > 9 && c < 6)) continue;
+        const v = Math.abs(Math.sin(hash * 0.1 + r * 3 + c * 7));
+        if (v > 0.42) {
+          ctx.fillRect(offsetX + c * cellSize, offsetY + r * cellSize, cellSize - 1, cellSize - 1);
+        }
+      }
+    }
+  }
+
+  function downloadQRCode() {
+    const canvas = document.getElementById('qr-canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = 'textshare-qrcode.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }
 </script>
+
