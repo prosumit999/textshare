@@ -20,6 +20,23 @@ if (!resolutionLimit.allowed) return rateLimitResponse(resolutionLimit.retryAfte
 let share = slug ? await getShare(slug) : null;
 const isStoredShare = Boolean(share);
 
+// FIRST: Check if this is an active Short Link (contentType === 'url') and execute instant redirect
+if (isStoredShare && slug && (share?.contentType as string) === 'url') {
+  const isExpired = new Date() > new Date(share.expiryDate);
+  const isRevoked = !!share.revokedAt;
+  if (!isExpired && !isRevoked) {
+    let targetUrl = share.textContent?.trim() || '';
+    if (targetUrl) {
+      if (!/^https?:\/\//i.test(targetUrl)) {
+        targetUrl = 'https://' + targetUrl;
+      }
+      await recordShareView(slug, Astro.request, getClientIp(Astro.request));
+      await incrementShareViews(slug);
+      return Astro.redirect(targetUrl, 302);
+    }
+  }
+}
+
 let isCustomPage = false;
 let customPageData = null;
 

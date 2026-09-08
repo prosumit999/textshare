@@ -3,6 +3,7 @@ import Layout from '../layouts/Layout.astro';
 import { getCurrentUser, listUserSessions, revokeUserSession } from '../lib/auth';
 import { deleteShare, listShares } from '../lib/share-store';
 import { checkRateLimit, rateLimitResponse } from '../lib/security';
+import { getShareAnalytics } from '../lib/share-analytics';
 
 const user = await getCurrentUser(Astro.cookies);
 if (!user) return Astro.redirect('/login');
@@ -31,6 +32,7 @@ const sessions = await listUserSessions(Astro.cookies, user.email);
 const now = Date.now();
 const activeShares = shares.filter((share: any) => new Date(share.expiryDate).getTime() > now);
 const imageShares = shares.filter((share: any) => share.contentType === 'image');
+const shortLinkShares = shares.filter((share: any) => share.contentType === 'url');
 const protectedShares = shares.filter((share: any) => !!share.passwordHash);
 const storageBytes = shares.reduce((total: number, share: any) => total + Number(share.sizeBytes || 0), 0);
 const isPro = user.plan === 'plus' || user.plan === 'pro';
@@ -39,11 +41,16 @@ const billingStatus = user.billing?.status;
 const billingPeriodEnd = user.billing?.currentPeriodEnd ? new Date(user.billing.currentPeriodEnd) : null;
 const formatBytes = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(0, bytes / 1024).toFixed(bytes < 10240 ? 1 : 0)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-// Mock initial Short Links for demonstration
-const mockShortLinks = [
-  { id: '1', originalUrl: `${Astro.url.origin}/welcome-guide`, shortSlug: 'guide', clicks: 42, createdAt: '2026-09-01' },
-  { id: '2', originalUrl: `${Astro.url.origin}/pricing`, shortSlug: 'pro-pass', clicks: 18, createdAt: '2026-09-04' }
-];
+// Fetch live analytics (Clicks, Unique Visitors, Device Breakdown) for each short link
+const shortLinksWithAnalytics = await Promise.all(
+  shortLinkShares.map(async (share: any) => {
+    const analytics = await getShareAnalytics(share.slug);
+    return {
+      ...share,
+      analytics,
+    };
+  })
+);
 ---
 
 <Layout title="Dashboard & Profile — TextShare" description="Manage your TextShares, Short Links, QR Codes, and account settings.">
@@ -83,7 +90,7 @@ const mockShortLinks = [
       <button type="button" class="dashboard-tab-btn" data-tab="shortlinks">
         <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
         Short Links
-        <span class="dashboard-tab-count">{mockShortLinks.length}</span>
+        <span class="dashboard-tab-count">{shortLinksWithAnalytics.length}</span>
       </button>
       <button type="button" class="dashboard-tab-btn" data-tab="qrcode">
         <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path><path d="M17 17h4v4h-4z"></path><path d="M14 20h3v1h-3z"></path></svg>
@@ -134,7 +141,7 @@ const mockShortLinks = [
                 </span>
                 <div>
                   <span>Short Links</span>
-                  <strong>{mockShortLinks.length}</strong>
+                  <strong>{shortLinksWithAnalytics.length}</strong>
                   <small>Custom aliases</small>
                 </div>
               </article>
@@ -168,6 +175,18 @@ const mockShortLinks = [
                 <p>Share code snippets, notes, and multi-image text rooms with custom expiry and encryption.</p>
                 <span class="tool-card-cta">
                   Create share
+                  <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </span>
+              </a>
+
+              <a href="/share-image-online-temporary" class="tool-card">
+                <div class="tool-card-icon">
+                  <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                </div>
+                <h3>Temp Image Share</h3>
+                <p>Upload & share temporary images with auto-expiration or self-destruct burn mode.</p>
+                <span class="tool-card-cta">
+                  Upload Image
                   <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
                 </span>
               </a>
@@ -324,50 +343,16 @@ const mockShortLinks = [
     {/* Tab 3: Short Links Tool */}
     <div id="tab-shortlinks" class="dashboard-tab-pane">
       <div class="profile-main">
-        {/* URL Shortener Form */}
+        {/* Short Links List & Metrics */}
         <section class="profile-panel">
           <div class="profile-panel-heading">
             <div>
-              <span class="profile-section-kicker">URL Shortener Tool</span>
-              <h2>Create a Short Link</h2>
+              <span class="profile-section-kicker">Link Management & Analytics</span>
+              <h2>Your Active Short Links ({shortLinksWithAnalytics.length})</h2>
             </div>
-          </div>
-          <form id="shortlink-creator-form" onsubmit="event.preventDefault(); handleCreateShortLink();" class="tool-box">
-            <div class="tool-form-grid">
-              <div class="tool-field" style="grid-column: span 2;">
-                <label for="destination-url">Destination Long URL</label>
-                <input type="url" id="destination-url" class="tool-input" placeholder="https://example.com/very-long-link-path-here" required />
-              </div>
-              <div class="tool-field">
-                <label for="custom-alias">Custom Alias (Optional)</label>
-                <input type="text" id="custom-alias" class="tool-input" placeholder="e.g. my-link" pattern="[a-zA-Z0-9-_]+" />
-              </div>
-              <div class="tool-field">
-                <label for="short-expiry">Expiration</label>
-                <select id="short-expiry" class="tool-select">
-                  <option value="never">Never (Pro)</option>
-                  <option value="30d">30 Days</option>
-                  <option value="7d">7 Days</option>
-                  <option value="24h">24 Hours</option>
-                </select>
-              </div>
-            </div>
-            <div style="display: flex; justify-content: flex-end;">
-              <button type="submit" class="btn btn-primary">
-                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
-                Generate Short Link
-              </button>
-            </div>
-          </form>
-        </section>
-
-        {/* Short Links List */}
-        <section class="profile-panel">
-          <div class="profile-panel-heading">
-            <div>
-              <span class="profile-section-kicker">Link Management</span>
-              <h2>Your Active Short Links</h2>
-            </div>
+            <a href="/short-link-generator-online" class="btn btn-primary" style="font-size: 12px; padding: 8px 16px;">
+              + Create Short Link
+            </a>
           </div>
           <div class="shortlink-table-wrapper">
             <table class="shortlink-table">
@@ -375,37 +360,62 @@ const mockShortLinks = [
                 <tr>
                   <th>Short Alias</th>
                   <th>Destination</th>
-                  <th>Clicks</th>
-                  <th>Created</th>
+                  <th>Total Clicks</th>
+                  <th>Unique Visitors</th>
+                  <th>Device Breakdown</th>
                   <th style="text-align: right;">Actions</th>
                 </tr>
               </thead>
               <tbody id="shortlinks-tbody">
-                {mockShortLinks.map((link) => (
+                {shortLinksWithAnalytics.length ? shortLinksWithAnalytics.map((link) => {
+                  const url = `${Astro.url.origin}/${link.slug}`;
+                  const active = new Date(link.expiryDate).getTime() > now;
+                  return (
+                    <tr>
+                      <td>
+                        <a href={`/${link.slug}`} target="_blank" style="font-weight: 700; color: var(--color-accent);">
+                          /{link.slug}
+                        </a>
+                      </td>
+                      <td style="max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span style="color: var(--color-text-muted); font-size: 12px;">{link.textContent}</span>
+                      </td>
+                      <td>
+                        <span class="shortlink-badge" style="background: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent);">
+                          ⚡ {link.analytics.totalViews} clicks
+                        </span>
+                      </td>
+                      <td>
+                        <span class="shortlink-badge" style="background: color-mix(in srgb, var(--color-text-base) 8%, transparent); color: var(--color-text-base);">
+                          👤 {link.analytics.uniqueIps} unique
+                        </span>
+                      </td>
+                      <td style="font-size: 11px; color: var(--color-text-muted); white-space: nowrap;">
+                        💻 {link.analytics.deviceBreakdown.desktop} · 📱 {link.analytics.deviceBreakdown.mobile} · 📱 {link.analytics.deviceBreakdown.tablet}
+                      </td>
+                      <td style="text-align: right;">
+                        <div style="display: inline-flex; gap: 6px;">
+                          <button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={url} aria-label={`Copy /${link.slug}`}>
+                            <svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                          </button>
+                          <form method="POST" onsubmit="return confirm('Delete this short link permanently?')">
+                            <input type="hidden" name="action" value="delete"/>
+                            <input type="hidden" name="slug" value={link.slug}/>
+                            <button class="btn btn-danger btn-icon" aria-label={`Delete /${link.slug}`}>
+                              <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                            </button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                }) : (
                   <tr>
-                    <td>
-                      <a href={`/${link.shortSlug}`} target="_blank" style="font-weight: 700; color: var(--color-accent);">
-                        /{link.shortSlug}
-                      </a>
-                    </td>
-                    <td style="max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                      <span style="color: var(--color-text-muted);">{link.originalUrl}</span>
-                    </td>
-                    <td>
-                      <span class="shortlink-badge">{link.clicks} clicks</span>
-                    </td>
-                    <td style="color: var(--color-text-muted); font-size: 11px;">
-                      {link.createdAt}
-                    </td>
-                    <td style="text-align: right;">
-                      <div style="display: inline-flex; gap: 6px;">
-                        <button type="button" class="btn btn-secondary btn-icon profile-copy-share" data-url={`${Astro.url.origin}/${link.shortSlug}`} aria-label="Copy short link">
-                          <svg class="icon-svg" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                        </button>
-                      </div>
+                    <td colspan="6" style="text-align: center; padding: 24px; color: var(--color-text-muted);">
+                      No short links created yet. <a href="/short-link-generator-online" style="color: var(--color-accent); font-weight: 600;">Create your first short link →</a>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -416,54 +426,49 @@ const mockShortLinks = [
     {/* Tab 4: QR Code Studio */}
     <div id="tab-qrcode" class="dashboard-tab-pane">
       <section class="profile-panel">
-        <div class="profile-panel-heading">
+        <div class="profile-panel-heading" style="border-bottom: 1px solid var(--color-border); padding-bottom: 14px; margin-bottom: 20px;">
           <div>
-            <span class="profile-section-kicker">QR Code Generator Studio</span>
-            <h2>Instant QR Code Creator</h2>
+            <span class="profile-section-kicker">QR CODE METRICS & STUDIO</span>
+            <h2>QR Code Analytics & Tools</h2>
           </div>
+          <a href="/qr-code-generator-online" class="btn btn-primary" style="font-size: 12px; padding: 8px 16px;">
+            Open Dedicated QR Generator →
+          </a>
         </div>
 
-        <div class="qr-generator-grid">
-          {/* Controls */}
-          <div class="tool-box">
-            <div class="tool-field">
-              <label for="qr-content-input">QR Code Content (URL or Text)</label>
-              <input type="text" id="qr-content-input" class="tool-input" value={`${Astro.url.origin}/`} placeholder="Enter text or URL to encode..." />
+        <div class="profile-stats" style="margin-bottom: 24px;">
+          <article>
+            <span class="profile-stat-icon">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path></svg>
+            </span>
+            <div>
+              <span>QR Code Types</span>
+              <strong>WiFi, Phone, URL & Bulk</strong>
+              <small>Custom logos & colors</small>
             </div>
+          </article>
 
-            <div class="tool-form-grid">
-              <div class="tool-field">
-                <label for="qr-dark-color">QR Color</label>
-                <input type="color" id="qr-dark-color" class="tool-input" value="#111827" style="height: 42px; padding: 4px; cursor: pointer;" />
-              </div>
-              <div class="tool-field">
-                <label for="qr-bg-color">Background Color</label>
-                <input type="color" id="qr-bg-color" class="tool-input" value="#ffffff" style="height: 42px; padding: 4px; cursor: pointer;" />
-              </div>
+          <article>
+            <span class="profile-stat-icon">
+              <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </span>
+            <div>
+              <span>High Resolution</span>
+              <strong>PNG & SVG Exports</strong>
+              <small>Vector sharp quality</small>
             </div>
+          </article>
+        </div>
 
-            <div class="tool-field">
-              <label>Quick Presets</label>
-              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" class="btn btn-secondary" onclick="setQRPreset('website')">Homepage URL</button>
-                <button type="button" class="btn btn-secondary" onclick="setQRPreset('pro')">TextShare Pro</button>
-              </div>
-            </div>
-          </div>
-
-          {/* Live Preview Card */}
-          <div class="qr-preview-card">
-            <div class="qr-canvas-wrapper">
-              <canvas id="qr-canvas" width="200" height="200"></canvas>
-            </div>
-            <p style="font-size: 12px; color: var(--color-text-muted); margin-bottom: 14px;" id="qr-preview-label">Live Preview</p>
-            <div style="display: flex; gap: 8px; width: 100%;">
-              <button type="button" class="btn btn-primary" style="flex: 1;" onclick="downloadQRCode()">
-                <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                Download PNG
-              </button>
-            </div>
-          </div>
+        <div style="text-align: center; padding: 32px 16px; background: color-mix(in srgb, var(--color-bg-base) 60%, var(--color-bg-surface)); border-radius: 14px; border: 1px solid var(--color-border);">
+          <svg viewBox="0 0 24 24" style="width: 48px; height: 48px; margin: 0 auto 12px; color: var(--color-accent);"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path><path d="M17 17h4v4h-4z"></path></svg>
+          <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">Looking to Generate Custom QR Codes?</h3>
+          <p style="color: var(--color-text-muted); font-size: 13px; max-width: 460px; margin: 0 auto 16px;">
+            Use our dedicated QR Code Generator to create custom WiFi access QRs, phone call QRs, website links, or batch export bulk QR codes with custom logos.
+          </p>
+          <a href="/qr-code-generator-online" class="btn btn-primary" style="font-size: 13px; padding: 10px 24px;">
+            Launch QR Code Generator →
+          </a>
         </div>
       </section>
     </div>

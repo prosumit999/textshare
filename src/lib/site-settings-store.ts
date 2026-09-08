@@ -21,6 +21,8 @@ export type SiteSettings = {
   productHuntUrl: string;
   socials: SocialLink[];
   pages: PageLink[];
+  toolsPages: PageLink[];
+  aboutPages: PageLink[];
   heroEyebrow: string;
   heroTitle: string;
   heroSubtitle: string;
@@ -53,6 +55,21 @@ export const defaultPages: PageLink[] = [
   { label: 'Contact', url: '/contact', enabled: true }
 ];
 
+export const defaultToolsPages: PageLink[] = [
+  { label: 'Text Share', url: '/', enabled: true },
+  { label: 'Temp Image Share', url: '/share-image-online-temporary', enabled: true },
+  { label: 'Short Link Generator', url: '/short-link-generator-online', enabled: true },
+  { label: 'QR Code Generator', url: '/qr-code-generator-online', enabled: true }
+];
+
+export const defaultAboutPages: PageLink[] = [
+  { label: 'About Us', url: '/blog', enabled: true },
+  { label: 'Contact', url: '/contact', enabled: true },
+  { label: 'Terms', url: '/terms', enabled: true },
+  { label: 'Privacy', url: '/privacy', enabled: true },
+  { label: 'Disclaimer', url: '/acceptable-use', enabled: true }
+];
+
 export const defaultSiteSettings: SiteSettings = {
   footerDescription: "Fast, private, and thoughtfully designed sharing for developers. Built to keep your workflow moving.",
   extensionDescription: "Share text from any page in one click, right from Chrome.",
@@ -60,6 +77,8 @@ export const defaultSiteSettings: SiteSettings = {
   productHuntUrl: "https://www.producthunt.com/products/textshare-pro",
   socials: defaultSocials,
   pages: defaultPages,
+  toolsPages: defaultToolsPages,
+  aboutPages: defaultAboutPages,
   heroEyebrow: "Private by default · No account required · Share Text Without Login",
   heroTitle: "Share text and code without the clutter.",
   heroSubtitle: "Paste anything, choose when it expires, and send one simple link.",
@@ -140,6 +159,8 @@ export async function getSiteSettings(): Promise<SiteSettings> {
     productHuntUrl: settings.productHuntUrl || defaultSiteSettings.productHuntUrl,
     socials: settings.socials || defaultSiteSettings.socials,
     pages: settings.pages || defaultSiteSettings.pages,
+    toolsPages: settings.toolsPages || defaultSiteSettings.toolsPages,
+    aboutPages: settings.aboutPages || defaultSiteSettings.aboutPages,
     heroEyebrow: settings.heroEyebrow || defaultSiteSettings.heroEyebrow,
     heroTitle: settings.heroTitle || defaultSiteSettings.heroTitle,
     heroSubtitle: settings.heroSubtitle || defaultSiteSettings.heroSubtitle,

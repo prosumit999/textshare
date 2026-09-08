@@ -10,13 +10,6 @@ export type ShareView = {
   createdAt: Date;
 };
 
-export type ShareAnalytics = {
-  totalViews: number;
-  uniqueIps: number;
-  byCountry: { country: string; count: number }[];
-  recent: ShareView[];
-};
-
 function hashIp(ip: string) {
   return createHash("sha256").update(ip).digest("hex").slice(0, 24);
 }
@@ -78,6 +71,28 @@ export async function recordShareView(
   });
 }
 
+export type DeviceBreakdown = {
+  desktop: number;
+  mobile: number;
+  tablet: number;
+};
+
+export type ShareAnalytics = {
+  totalViews: number;
+  uniqueIps: number;
+  byCountry: { country: string; count: number }[];
+  deviceBreakdown: DeviceBreakdown;
+  recent: (ShareView & { deviceType: 'mobile' | 'tablet' | 'desktop' })[];
+};
+
+export function parseDeviceType(ua?: string): 'mobile' | 'tablet' | 'desktop' {
+  if (!ua) return 'desktop';
+  const lower = ua.toLowerCase();
+  if (/ipad|tablet|playbook|silk/i.test(lower)) return 'tablet';
+  if (/mobile|android|iphone|ipod|blackberry|webos|windows phone/i.test(lower)) return 'mobile';
+  return 'desktop';
+}
+
 export async function getShareAnalytics(slug: string): Promise<ShareAnalytics> {
   const { db } = await getMongo();
   const collection = db.collection<ShareView>("shareViews");
@@ -87,15 +102,26 @@ export async function getShareAnalytics(slug: string): Promise<ShareAnalytics> {
     collection
       .find({ slug })
       .sort({ createdAt: -1 })
-      .limit(50)
+      .limit(100)
       .toArray(),
   ]);
+
   const byCountryMap = new Map<string, number>();
-  for (const view of recent) {
+  const deviceBreakdown: DeviceBreakdown = { desktop: 0, mobile: 0, tablet: 0 };
+
+  const recentWithDevice = recent.map((view) => {
+    const deviceType = parseDeviceType(view.userAgent);
+    deviceBreakdown[deviceType] = (deviceBreakdown[deviceType] || 0) + 1;
     byCountryMap.set(view.country, (byCountryMap.get(view.country) || 0) + 1);
-  }
+    return {
+      ...view,
+      deviceType,
+    };
+  });
+
   const byCountry = Array.from(byCountryMap.entries())
     .map(([country, count]) => ({ country, count }))
     .sort((a, b) => b.count - a.count);
-  return { totalViews, uniqueIps: uniqueIps.length, byCountry, recent };
+
+  return { totalViews, uniqueIps: uniqueIps.length, byCountry, deviceBreakdown, recent: recentWithDevice };
 }

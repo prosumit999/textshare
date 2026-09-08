@@ -1,0 +1,384 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCurrentUser } from '../lib/auth';
+
+const user = await getCurrentUser(Astro.cookies);
+const isLoggedIn = !!user;
+---
+
+<Layout title="Online QR Code Generator — TextShare" description="Generate high-resolution custom QR codes for websites, WiFi networks, phone numbers, and bulk links with logo overlay and color customization.">
+  <div class="creator-container" style="padding-bottom: var(--space-12);">
+    <!-- Copy Notification Toast -->
+    <div id="copy-notification" class="copy-notification" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Hero Header -->
+    <div class="hero-section">
+      <span class="eyebrow">CUSTOM QR CODE STUDIO</span>
+      <h1>Online QR Code Generator</h1>
+      <p>Create custom QR codes for websites, WiFi credentials, phone calls, and plain text with logo overlays, custom colors, and bulk generation.</p>
+    </div>
+
+    <!-- Main QR Studio Panel -->
+    <div class="profile-panel" style="margin-bottom: 32px;">
+      <!-- Type Switcher Tabs -->
+      <div class="content-tabs" style="margin-bottom: 24px; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--color-border); padding-bottom: 16px;">
+        <button type="button" class="btn btn-secondary qr-type-tab active" data-type="url">
+          🌐 Website URL
+        </button>
+        <button type="button" class="btn btn-secondary qr-type-tab" data-type="wifi">
+          📶 WiFi Network
+        </button>
+        <button type="button" class="btn btn-secondary qr-type-tab" data-type="phone">
+          📞 Phone Call
+        </button>
+        <button type="button" class="btn btn-secondary qr-type-tab" data-type="text">
+          📄 Plain Text
+        </button>
+        <button type="button" class="btn btn-secondary qr-type-tab" data-type="bulk">
+          📦 Bulk Generator
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start;" id="single-qr-container">
+        <!-- Controls & Input Area -->
+        <div>
+          <!-- Type 1: Website URL -->
+          <div id="section-url" class="qr-input-section">
+            <div class="tool-field" style="margin-bottom: 18px;">
+              <label for="input-url" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">Target Website URL *</label>
+              <input type="url" id="input-url" class="tool-input" placeholder="https://example.com/your-landing-page" value={`${Astro.url.origin}/`} style="height: 44px; font-size: 14px;" />
+            </div>
+          </div>
+
+          <!-- Type 2: WiFi Network -->
+          <div id="section-wifi" class="qr-input-section" style="display: none;">
+            <div class="tool-field" style="margin-bottom: 16px;">
+              <label for="input-wifi-ssid" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Network Name (SSID) *</label>
+              <input type="text" id="input-wifi-ssid" class="tool-input" placeholder="e.g. MyHomeWiFi" style="height: 42px;" />
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div class="tool-field">
+                <label for="input-wifi-pass" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">WiFi Password</label>
+                <input type="password" id="input-wifi-pass" class="tool-input" placeholder="Network password" style="height: 42px;" />
+              </div>
+              <div class="tool-field">
+                <label for="input-wifi-type" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Encryption Type</label>
+                <select id="input-wifi-type" class="tool-select" style="height: 42px;">
+                  <option value="WPA">WPA/WPA2/WPA3</option>
+                  <option value="WEP">WEP</option>
+                  <option value="nopass">Open (No Password)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Type 3: Phone Call -->
+          <div id="section-phone" class="qr-input-section" style="display: none;">
+            <div class="tool-field" style="margin-bottom: 18px;">
+              <label for="input-phone" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">Phone Number *</label>
+              <input type="tel" id="input-phone" class="tool-input" placeholder="+1 (555) 000-1234" style="height: 44px; font-size: 14px;" />
+            </div>
+          </div>
+
+          <!-- Type 4: Plain Text -->
+          <div id="section-text" class="qr-input-section" style="display: none;">
+            <div class="tool-field" style="margin-bottom: 18px;">
+              <label for="input-text" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">Plain Text Content *</label>
+              <textarea id="input-text" class="tool-input" style="min-height: 100px; padding: 12px;" placeholder="Type your text note, instructions, or code here..."></textarea>
+            </div>
+          </div>
+
+          <!-- Customization Options Grid -->
+          <div style="border-top: 1px solid var(--color-border); padding-top: 18px; margin-top: 18px;">
+            <span class="profile-section-kicker" style="margin-bottom: 10px; display: block;">CUSTOMIZATION & LOGO</span>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div class="tool-field">
+                <label for="qr-fg-color" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">QR Code Color</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="color" id="qr-fg-color" value="#111827" style="width: 44px; height: 38px; border: 1px solid var(--color-border); border-radius: 8px; padding: 2px; cursor: pointer; background: transparent;" />
+                  <span id="qr-fg-hex" style="font-family: var(--font-mono); font-size: 12px; color: var(--color-text-muted);">#111827</span>
+                </div>
+              </div>
+
+              <div class="tool-field">
+                <label for="qr-bg-color" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Background Color</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <input type="color" id="qr-bg-color" value="#ffffff" style="width: 44px; height: 38px; border: 1px solid var(--color-border); border-radius: 8px; padding: 2px; cursor: pointer; background: transparent;" />
+                  <span id="qr-bg-hex" style="font-family: var(--font-mono); font-size: 12px; color: var(--color-text-muted);">#ffffff</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Logo Upload Option -->
+            <div class="tool-field" style="margin-bottom: 16px;">
+              <label for="qr-logo-file" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Center Logo Image (Optional)</label>
+              <input type="file" id="qr-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="tool-input" style="font-size: 12px; height: 38px; padding: 6px 12px;" />
+              <small style="color: var(--color-text-muted); font-size: 11px;">Upload your company logo or icon to display in the center of the QR code.</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Preview Canvas Card -->
+        <div class="qr-preview-card" style="padding: 24px; border: 1px solid var(--color-border); border-radius: 18px; background: color-mix(in srgb, var(--color-bg-base) 80%, var(--color-bg-surface)); text-align: center;">
+          <div class="qr-canvas-wrapper" style="display: grid; place-items: center; padding: 16px; background: #ffffff; border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); margin-bottom: 16px;">
+            <canvas id="qr-canvas" width="220" height="220" style="display: block; margin: 0 auto; max-width: 100%; height: auto;"></canvas>
+          </div>
+          <span style="font-size: 12px; color: var(--color-text-muted); display: block; margin-bottom: 14px;">High Resolution Vector QR</span>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-primary" id="btn-download-png" style="flex: 1; font-size: 12px; padding: 8px 12px;">
+              <svg class="icon-svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Download PNG
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bulk Generator Panel (Hidden by default) -->
+      <div id="bulk-qr-container" style="display: none;">
+        <div class="tool-field" style="margin-bottom: 20px;">
+          <label for="bulk-input" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">
+            Bulk Links / Text (One entry per line) *
+          </label>
+          <textarea id="bulk-input" class="tool-input" style="min-height: 140px; padding: 14px; font-family: var(--font-mono); font-size: 13px;" placeholder="https://example.com/page-1&#10;https://example.com/page-2&#10;https://example.com/page-3"></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
+          <button type="button" class="btn btn-primary" id="btn-generate-bulk" style="padding: 10px 24px; font-weight: 700;">
+            Generate Bulk QR Codes
+          </button>
+        </div>
+
+        <div id="bulk-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; border-top: 1px solid var(--color-border); padding-top: 20px;"></div>
+      </div>
+    </div>
+
+    <!-- Features Launchpad Grid -->
+    <section class="profile-panel" style="margin-top: 36px;">
+      <div class="profile-panel-heading" style="border-bottom: 1px solid var(--color-border); padding-bottom: 14px; margin-bottom: 20px;">
+        <div>
+          <span class="profile-section-kicker">BUILT-IN FEATURES</span>
+          <h2 style="font-size: 18px; text-align: left; margin: 2px 0 0;">Why Use TextShare QR Code Generator?</h2>
+        </div>
+      </div>
+
+      <div class="tools-launchpad" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+          <h3>Instant Vector Generation</h3>
+          <p>Generate high-resolution PNG QR codes ready for digital sharing or crisp printing.</p>
+        </div>
+
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path></svg>
+          </div>
+          <h3>Custom Logo Overlay</h3>
+          <p>Personalize your QR code by adding a custom logo or brand image directly in the center.</p>
+        </div>
+
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+          </div>
+          <h3>Bulk Generation</h3>
+          <p>Paste multiple URLs or text entries to generate batch QR codes in seconds.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  import QRCode from 'qrcode';
+
+  const typeTabs = document.querySelectorAll<HTMLButtonElement>('.qr-type-tab');
+  const singleContainer = document.getElementById('single-qr-container');
+  const bulkContainer = document.getElementById('bulk-qr-container');
+  const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+
+  const urlInput = document.getElementById('input-url') as HTMLInputElement;
+  const wifiSsid = document.getElementById('input-wifi-ssid') as HTMLInputElement;
+  const wifiPass = document.getElementById('input-wifi-pass') as HTMLInputElement;
+  const wifiType = document.getElementById('input-wifi-type') as HTMLSelectElement;
+  const phoneInput = document.getElementById('input-phone') as HTMLInputElement;
+  const textInput = document.getElementById('input-text') as HTMLTextAreaElement;
+
+  const fgColorInput = document.getElementById('qr-fg-color') as HTMLInputElement;
+  const bgColorInput = document.getElementById('qr-bg-color') as HTMLInputElement;
+  const fgHex = document.getElementById('qr-fg-hex');
+  const bgHex = document.getElementById('qr-bg-hex');
+  const logoFileInput = document.getElementById('qr-logo-file') as HTMLInputElement;
+
+  const btnDownloadPng = document.getElementById('btn-download-png');
+  const btnGenerateBulk = document.getElementById('btn-generate-bulk');
+  const bulkInput = document.getElementById('bulk-input') as HTMLTextAreaElement;
+  const bulkResultsGrid = document.getElementById('bulk-results-grid');
+
+  let currentType = 'url';
+  let uploadedLogoImage: HTMLImageElement | null = null;
+
+  // Tab Switcher
+  typeTabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      typeTabs.forEach((t) => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentType = tab.dataset.type || 'url';
+
+      if (currentType === 'bulk') {
+        if (singleContainer) singleContainer.style.display = 'none';
+        if (bulkContainer) bulkContainer.style.display = 'block';
+      } else {
+        if (singleContainer) singleContainer.style.display = 'grid';
+        if (bulkContainer) bulkContainer.style.display = 'none';
+
+        document.querySelectorAll('.qr-input-section').forEach((sec) => {
+          (sec as HTMLElement).style.display = 'none';
+        });
+        const targetSec = document.getElementById(`section-${currentType}`);
+        if (targetSec) targetSec.style.display = 'block';
+        renderQR();
+      }
+    });
+  });
+
+  // Color Pickers
+  fgColorInput?.addEventListener('input', () => {
+    if (fgHex) fgHex.textContent = fgColorInput.value;
+    renderQR();
+  });
+  bgColorInput?.addEventListener('input', () => {
+    if (bgHex) bgHex.textContent = bgColorInput.value;
+    renderQR();
+  });
+
+  // Input Listeners
+  [urlInput, wifiSsid, wifiPass, wifiType, phoneInput, textInput].forEach((input) => {
+    input?.addEventListener('input', renderQR);
+    input?.addEventListener('change', renderQR);
+  });
+
+  // Logo Upload Listener
+  logoFileInput?.addEventListener('change', (e) => {
+    const file = logoFileInput.files?.[0];
+    if (!file) {
+      uploadedLogoImage = null;
+      renderQR();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        uploadedLogoImage = img;
+        renderQR();
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function getQRData(): string {
+    if (currentType === 'url') return urlInput?.value.trim() || 'https://textshare.pro';
+    if (currentType === 'wifi') {
+      const ssid = wifiSsid?.value.trim() || 'WiFi';
+      const pass = wifiPass?.value || '';
+      const type = wifiType?.value || 'WPA';
+      return `WIFI:S:${ssid};T:${type};P:${pass};;`;
+    }
+    if (currentType === 'phone') {
+      const phone = phoneInput?.value.trim() || '+1234567890';
+      return `tel:${phone}`;
+    }
+    if (currentType === 'text') return textInput?.value.trim() || 'TextShare QR';
+    return 'https://textshare.pro';
+  }
+
+  async function renderQR() {
+    if (!canvas) return;
+    const data = getQRData();
+    const fg = fgColorInput?.value || '#111827';
+    const bg = bgColorInput?.value || '#ffffff';
+
+    try {
+      await QRCode.toCanvas(canvas, data, {
+        width: 220,
+        margin: 1,
+        color: { dark: fg, light: bg },
+        errorCorrectionLevel: 'H'
+      });
+
+      if (uploadedLogoImage) {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          const logoSize = canvas.width * 0.22;
+          const x = (canvas.width - logoSize) / 2;
+          const y = (canvas.height - logoSize) / 2;
+
+          ctx.fillStyle = bg;
+          ctx.beginPath();
+          ctx.arc(canvas.width / 2, canvas.height / 2, logoSize / 2 + 4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.drawImage(uploadedLogoImage, x, y, logoSize, logoSize);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to render QR Code', err);
+    }
+  }
+
+  // PNG Download
+  btnDownloadPng?.addEventListener('click', () => {
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = `qr-code-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  // Bulk Generator Handler
+  btnGenerateBulk?.addEventListener('click', async () => {
+    if (!bulkInput || !bulkResultsGrid) return;
+    const lines = bulkInput.value.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    bulkResultsGrid.innerHTML = '';
+
+    if (lines.length === 0) return;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const card = document.createElement('div');
+      card.style.cssText = 'padding: 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-surface); text-align: center;';
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 140;
+      tempCanvas.height = 140;
+
+      await QRCode.toCanvas(tempCanvas, line, { width: 140, margin: 1 });
+
+      const label = document.createElement('p');
+      label.style.cssText = 'font-size: 11px; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 6px 0;';
+      label.textContent = line;
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'btn btn-secondary btn-sm';
+      dlBtn.style.cssText = 'font-size: 11px; width: 100%; padding: 4px 8px;';
+      dlBtn.textContent = 'Download';
+      dlBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `qr-${i + 1}.png`;
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+      });
+
+      card.appendChild(tempCanvas);
+      card.appendChild(label);
+      card.appendChild(dlBtn);
+      bulkResultsGrid.appendChild(card);
+    }
+  });
+
+  // Initial Render
+  renderQR();
+</script>

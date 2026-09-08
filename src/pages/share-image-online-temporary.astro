@@ -1,0 +1,553 @@
+---
+import Layout from '../layouts/Layout.astro';
+import bcrypt from 'bcryptjs';
+import { getCurrentUser } from '../lib/auth';
+import { sanitizeImage, UnsafeImageError } from '../lib/images';
+import { checkRateLimit, getClientIp, logSecurityEvent, rateLimitResponse, secureCookieOptions } from '../lib/security';
+import { deleteShare, hasShare, listShares, saveShare } from '../lib/share-store';
+import { calculateExpiry, generateAvailableSlug, type ExpiryOption } from '../lib/share-policy';
+import QRCode from 'qrcode';
+
+const currentUser = await getCurrentUser(Astro.cookies);
+const isLoggedIn = !!currentUser;
+const userPlan = currentUser?.plan || "free";
+const hasPaidPlan = userPlan === "plus" || userPlan === "pro";
+const maxImageCount = hasPaidPlan ? 5 : 1;
+const activeGuestSlug = Astro.cookies.get("guest_share_active")?.value;
+
+let errors: Record<string, string> = {};
+let result: {
+  url: string;
+  slug: string;
+  qrCode: string;
+  expiryTime: string;
+} | null = null;
+
+if (Astro.request.method === "POST") {
+  try {
+    const requester = isLoggedIn ? currentUser!.email : getClientIp(Astro.request);
+    const createLimit = await checkRateLimit('share:create', requester, isLoggedIn ? 30 : 10, 10 * 60);
+    if (!createLimit.allowed) return rateLimitResponse(createLimit.retryAfter, 'Image share creation limit reached. Try again later.');
+
+    const formData = await Astro.request.formData();
+    const imageFiles = formData.getAll("imageFile").filter((entry): entry is File => entry instanceof File && entry.size > 0);
+    let expiry = formData.get("expiry")?.toString() || "24h";
+    const password = formData.get("password")?.toString() || "";
+    const customSlug = formData.get("customSlug")?.toString()?.trim().toLowerCase() || "";
+    const analyticsEnabled = isLoggedIn && formData.get("analyticsEnabled") === "on";
+
+    // Guest & Plan Validation
+    if (!isLoggedIn) {
+      if (customSlug) errors.customSlug = "Only registered users can set custom vanity URLs.";
+      if (password) errors.password = "Only registered users can password-protect image shares.";
+    }
+
+    if (isLoggedIn && !hasPaidPlan) {
+      if (password) errors.password = "Password protection is available on Plus and Pro.";
+      if (customSlug) errors.customSlug = "Custom slugs are available on Pro.";
+    }
+
+    if (imageFiles.length === 0) {
+      errors.imageFile = "Please select at least one image to upload.";
+    } else if (imageFiles.length > maxImageCount) {
+      errors.imageFile = hasPaidPlan ? "Paid shares support up to 5 images." : "Free image shares support 1 image. Upgrade to Pro for up to 5.";
+    } else if (imageFiles.some((file) => file.size > 5 * 1024 * 1024)) {
+      errors.imageFile = "Each image file must not exceed 5 MB.";
+    }
+
+    if (customSlug) {
+      const slugRegex = /^[a-z0-9]{3,6}$/;
+      if (!slugRegex.test(customSlug)) {
+        errors.customSlug = "Slug must be 3-6 lowercase letters or numbers.";
+      }
+      if (await hasShare(customSlug)) {
+        errors.customSlug = "This custom short link is already taken.";
+      }
+    }
+
+    if (Object.keys(errors).length === 0) {
+      const uploadLimit = await checkRateLimit(
+        'image:upload',
+        isLoggedIn ? currentUser!.email : getClientIp(Astro.request),
+        isLoggedIn ? 30 : 10,
+        10 * 60
+      );
+      if (!uploadLimit.allowed) return rateLimitResponse(uploadLimit.retryAfter, 'Image upload limit reached. Try again later.');
+
+      let sanitizedImages: Awaited<ReturnType<typeof sanitizeImage>>[] = [];
+      try {
+        sanitizedImages = await Promise.all(imageFiles.map((file) => sanitizeImage(file)));
+      } catch (error) {
+        await logSecurityEvent('image_upload_rejected', Astro.request, { reason: error instanceof Error ? error.message : 'unknown' });
+        if (error instanceof UnsafeImageError) errors.imageFile = error.message;
+        else errors.imageFile = 'The image could not be processed safely.';
+      }
+
+      if (Object.keys(errors).length > 0) throw new Error('VALIDATION_FAILED');
+
+      let slug = "";
+      if (isLoggedIn && customSlug) {
+        slug = customSlug;
+      } else {
+        slug = await generateAvailableSlug('string', hasShare);
+      }
+
+      const expiryDate = calculateExpiry(expiry as ExpiryOption);
+
+      if (!isLoggedIn && activeGuestSlug) {
+        await deleteShare(activeGuestSlug);
+      }
+      if (isLoggedIn && !hasPaidPlan) {
+        const existingFreeShares = await listShares(currentUser!.email);
+        for (const existing of existingFreeShares) await deleteShare(existing.slug, currentUser!.email);
+      }
+
+      const imageSrcs = sanitizedImages.map((image) => image.dataUrl);
+      const imageSrc = imageSrcs[0] || null;
+      const passwordHash = password ? await bcrypt.hash(password, 12) : null;
+
+      await saveShare(slug, {
+        contentType: 'image',
+        textContent: '',
+        imageSrc,
+        imageSrcs,
+        expiryDate,
+        burnAfterReading: expiry === 'burn',
+        language: 'plaintext',
+        passwordHash,
+        owner: currentUser?.email || null,
+        guestIp: currentUser ? null : getClientIp(Astro.request),
+        sizeBytes: sanitizedImages.reduce((total, image) => total + image.bytes, 0),
+        createdAt: new Date(),
+        viewCount: 0,
+        analyticsEnabled
+      });
+
+      if (!isLoggedIn) {
+        Astro.cookies.set("guest_share_active", slug, secureCookieOptions(60 * 60 * 24));
+      } else if (!hasPaidPlan) {
+        Astro.cookies.set("free_share_active", slug, secureCookieOptions(60 * 60 * 24));
+        Astro.cookies.set("account_share_slugs", JSON.stringify([slug]), secureCookieOptions(60 * 60 * 24 * 365));
+      }
+
+      const shareUrl = `${Astro.url.origin}/${slug}`;
+      const qrCode = await QRCode.toDataURL(shareUrl, { width: 200, margin: 1 });
+      const expiryFormatted = expiry === 'burn' ? 'Burn after first view' : expiryDate.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+
+      result = {
+        url: shareUrl,
+        slug,
+        qrCode,
+        expiryTime: expiryFormatted
+      };
+    }
+  } catch (e) {
+    if (!(e instanceof Error && e.message === 'VALIDATION_FAILED')) {
+      errors.server = "An unexpected error occurred while processing your image.";
+    }
+  }
+}
+---
+
+<Layout title="Share Image Online Temporary — TextShare" description="Upload and share images temporarily online with automatic expiration, burn-after-reading protection, and QR code generation.">
+  <div class="creator-container" style="padding-bottom: var(--space-12);">
+    <div id="copy-notification" class="copy-notification" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Hero Header -->
+    <div class="hero-section">
+      <span class="eyebrow">PRIVATE BY DEFAULT · NO ACCOUNT REQUIRED</span>
+      <h1>Share Image Online Temporary</h1>
+      <p>Upload images privately, set when they expire, and send one simple link.</p>
+    </div>
+
+    {errors.server && (
+      <div class="banner banner-warning" style="margin-bottom: 24px; background-color: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.25); color: var(--color-danger); border-radius: 14px; padding: 14px 18px; font-size: 13px;">
+        {errors.server}
+      </div>
+    )}
+
+    {result ? (
+      <div class="result-card" style="margin-bottom: 32px; border-color: var(--color-accent);">
+        <div class="result-header">
+          <h2 style="margin: 0; color: var(--color-accent); font-size: 20px;">Temporary Image Shared Successfully!</h2>
+          <p style="color: var(--color-text-muted); font-size: 13px; margin-top: var(--space-2);">Your image is live and accessible at the link below.</p>
+        </div>
+
+        <div class="result-body">
+          <div class="result-info">
+            <div class="input-label-pair">
+              <label style="font-size: 12px; font-weight: 700; color: var(--color-text-base);">Image Share Link</label>
+              <div class="url-copy-box">
+                <div class="url-text" id="created-url-text" style="color: var(--color-accent); font-weight: 700;">{result.url}</div>
+                <button id="copy-url-btn" class="btn btn-primary" data-url={result.url} title="Copy share link">
+                  <svg class="icon-svg" viewBox="0 0 24 24" style="width: 15px; height: 15px; margin-right: 4px;">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                  </svg>
+                  <span>Copy</span>
+                </button>
+              </div>
+            </div>
+
+            <div style="font-size: 13px; color: var(--color-text-muted);">
+              <strong>Expires at:</strong> <span>{result.expiryTime}</span>
+            </div>
+
+            <div style="margin-top: var(--space-3); display: flex; gap: 10px; flex-wrap: wrap;">
+              <a href="/share-image-online-temporary" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 8px 16px;">
+                Upload Another Image
+              </a>
+              {isLoggedIn ? (
+                <a href="/profile" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 8px 16px;">
+                  View Workspace Shares →
+                </a>
+              ) : (
+                <a href="/login" class="btn btn-secondary btn-sm" style="font-size: 12px; padding: 8px 16px;">
+                  Sign In to Keep Multiple Shares
+                </a>
+              )}
+            </div>
+          </div>
+
+          <div class="qr-code-section" style="display: flex; flex-direction: column; align-items: center; justify-content: center;">
+            <div class="qr-container" style="padding: 12px; background: #ffffff; border-radius: 14px; border: 1px solid var(--color-border); box-shadow: 0 8px 20px rgba(0,0,0,0.06);">
+              <img src={result.qrCode} alt="Image Share QR Code" width="150" height="150" style="display: block; margin: 0 auto; aspect-ratio: 1/1;" />
+            </div>
+            <a href={result.qrCode} download={`qr-${result.slug}.png`} class="btn btn-secondary btn-sm" style="font-size: 11px; margin-top: 10px; padding: 5px 12px;">
+              Download QR Code
+            </a>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <form method="POST" action="/share-image-online-temporary" enctype="multipart/form-data" class="share-form" id="share-form">
+        <input type="hidden" name="contentType" value="image" />
+
+        <!-- Editor Header Bar -->
+        <div class="editor-heading">
+          <div class="editor-title-group">
+            <span class="editor-title">New share</span>
+            <span class="editor-subtitle">Your content is ready when you are.</span>
+          </div>
+
+          <div class="editor-controls-inline">
+            {isLoggedIn && hasPaidPlan ? (
+              <div class="inline-slug-control">
+                <label class="analytics-control-pill" title="Set a custom vanity URL slug">
+                  <input type="checkbox" id="slug-toggle" class="analytics-checkbox-hidden" />
+                  <span class="analytics-pill-badge">
+                    <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+                    </svg>
+                    <span>Custom slug</span>
+                  </span>
+                </label>
+                <div id="slug-input-wrapper" class="expiry-control-pill" style="display: none; padding: 0 8px;" title="Custom slug value">
+                  <span style="color: var(--color-text-muted); font-size: 12px; font-family: var(--font-mono); font-weight: 600;">/</span>
+                  <input
+                    type="text"
+                    name="customSlug"
+                    id="custom-slug-input"
+                    class="expiry-select-compact"
+                    style="padding-right: 4px; font-family: var(--font-mono); width: 80px;"
+                    placeholder="myurl1"
+                    minlength="3"
+                    maxlength="6"
+                    pattern="[a-z0-9]{3,6}"
+                    disabled
+                  />
+                </div>
+              </div>
+            ) : (
+              <span class="analytics-pill-badge" style="opacity: 0.85;">
+                <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <span>Secure link</span>
+              </span>
+            )}
+          </div>
+        </div>
+
+        <!-- Content Type Tabs -->
+        <div class="content-tabs">
+          <a href="/" class="content-tab" style="text-decoration: none;">Text / Code</a>
+          <button type="button" class="content-tab active" style="cursor: default;">Image Upload</button>
+        </div>
+
+        <!-- Image Upload Area -->
+        <div id="image-input-section">
+          <div class="image-upload-wrapper" id="image-drag-area">
+            <input type="file" name="imageFile" id="image-file-input" aria-label="Select images to share" accept="image/png, image/jpeg, image/webp" multiple={hasPaidPlan} style="display: none;" />
+            <button type="button" class="image-drop-zone" id="image-drop-zone">
+              <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 16V4"></path><path d="m8 8 4-4 4 4"></path><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"></path>
+              </svg>
+              <span><strong>Drag and drop {hasPaidPlan ? 'images' : 'an image'} here</strong><span>or <em>choose files</em> to upload · PNG, JPG, WEBP</span></span>
+              <small id="image-expiry-hint">{hasPaidPlan ? 'Pro: up to 5 images · expires in 24 hours' : 'One image · expires in 3 hours'} · 5 MB per image</small>
+            </button>
+            <div id="image-preview-grid" class:list={["image-preview-grid", { single: !hasPaidPlan }]} data-max={hasPaidPlan ? 5 : 1} hidden></div>
+            <div class="image-upload-footer"><span id="image-selection-status" aria-live="polite">0 / {hasPaidPlan ? 5 : 1} selected</span></div>
+          </div>
+          {errors.imageFile && (
+            <span style="color:var(--color-danger); font-size:12px; padding:var(--space-2) var(--space-4); display:block;">
+              {errors.imageFile}
+            </span>
+          )}
+        </div>
+
+        <!-- Bottom Options Toolbar -->
+        <div class="form-controls">
+          <div class="control-group-left">
+            <!-- Expiry Pill Dropdown -->
+            <div class="expiry-control-pill" title="Set share expiration duration">
+              <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="9"></circle>
+                <polyline points="12 7 12 12 15 15"></polyline>
+              </svg>
+              <select name="expiry" id="expiry-select" class="expiry-select-compact" aria-label="Share expiration">
+                {isLoggedIn && hasPaidPlan ? (
+                  <option value="24h" selected>24 hours</option>
+                  <option value="1w">1 week</option>
+                  <option value="1m">1 month</option>
+                  <option value="1y">1 year</option>
+                  <option value="burn">Burn on view</option>
+                ) : (
+                  <>
+                    <option value="24h" selected>24 hours</option>
+                    <option value="burn">Burn on view</option>
+                    <option value="1w" data-premium="true">🔒 1 week · Pro</option>
+                    <option value="1m" data-premium="true">🔒 1 month · Pro</option>
+                    <option value="1y" data-premium="true">🔒 1 year · Pro</option>
+                  </>
+                )}
+              </select>
+            </div>
+
+            <!-- Analytics Opt-In Pill -->
+            {isLoggedIn && (
+              <label class="analytics-control-pill" title="Track view timestamps and country for this share">
+                <input type="checkbox" name="analyticsEnabled" id="analytics-toggle" class="analytics-checkbox-hidden" />
+                <span class="analytics-pill-badge">
+                  <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 20V10M12 20V4M6 20v-6"></path>
+                  </svg>
+                  <span>Analytics</span>
+                </span>
+              </label>
+            )}
+
+            {!hasPaidPlan && (
+              <a class="premium-unlock" href="/pricing" aria-label="View premium sharing features" title="Unlock custom expiry, password protection, and more">
+                <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                </svg>
+                <span>Unlock more</span>
+              </a>
+            )}
+
+            {isLoggedIn && (
+              <>
+                {hasPaidPlan && (
+                  <div class="inline-password-control">
+                    <label class="analytics-control-pill" title="Require a password to view this share">
+                      <input type="checkbox" id="password-toggle" class="analytics-checkbox-hidden" />
+                      <span class="analytics-pill-badge">
+                        <svg class="pill-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <span>Password</span>
+                      </span>
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      id="password-input"
+                      class="expiry-control-pill compact-control-input"
+                      placeholder="Password"
+                      aria-label="Share password"
+                      disabled
+                      style="display: none; padding: 0 10px; font-size: 12px; font-weight: 600; width: 130px;"
+                    />
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          <!-- Submit Button -->
+          <button 
+            type="submit" 
+            class="btn btn-primary create-share-btn"
+          >
+            Create Share
+          </button>
+        </div>
+
+        {isLoggedIn && (errors.password || errors.customSlug) && (
+          <div class="inline-errors-row">
+            {errors.password && <span class="inline-form-error">{errors.password}</span>}
+            {errors.customSlug && <span class="inline-form-error">{errors.customSlug}</span>}
+          </div>
+        )}
+      </form>
+    )}
+
+    <!-- Features Launchpad Section -->
+    <section class="profile-panel" style="margin-top: 36px;">
+      <div class="profile-panel-heading" style="border-bottom: 1px solid var(--color-border); padding-bottom: 14px; margin-bottom: 20px;">
+        <div>
+          <span class="profile-section-kicker">BUILT-IN PRIVACY</span>
+          <h2 style="font-size: 18px; text-align: left; margin: 2px 0 0;">Why Share Temporary Images Here?</h2>
+        </div>
+      </div>
+
+      <div class="tools-launchpad" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+          </div>
+          <h3>Auto-Expiring Images</h3>
+          <p>Set custom expiration limits from 24 hours to self-destructing burn-after-reading images.</p>
+        </div>
+
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+          </div>
+          <h3>Sanitized & Safe</h3>
+          <p>Uploaded images are sanitized, validated, and served safely without intrusive tracking ads.</p>
+        </div>
+
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path></svg>
+          </div>
+          <h3>Instant QR Code</h3>
+          <p>Every temporary image share comes with an auto-generated QR code for instant mobile viewing.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<script>
+  const fileInput = document.getElementById("image-file-input") as HTMLInputElement;
+  const dropZone = document.getElementById("image-drop-zone");
+  const dragArea = document.getElementById("image-drag-area");
+  const previewGrid = document.getElementById("image-preview-grid");
+  const statusSpan = document.getElementById("image-selection-status");
+  const copyBtn = document.getElementById("copy-url-btn");
+  const notificationToast = document.getElementById("copy-notification");
+
+  const slugToggle = document.getElementById("slug-toggle") as HTMLInputElement;
+  const slugWrapper = document.getElementById("slug-input-wrapper");
+  const slugInput = document.getElementById("custom-slug-input") as HTMLInputElement;
+
+  const passwordToggle = document.getElementById("password-toggle") as HTMLInputElement;
+  const passwordInput = document.getElementById("password-input") as HTMLInputElement;
+
+  // Slug Toggle Handler
+  slugToggle?.addEventListener("change", () => {
+    if (slugWrapper && slugInput) {
+      if (slugToggle.checked) {
+        slugWrapper.style.display = "inline-flex";
+        slugInput.disabled = false;
+        slugInput.focus();
+      } else {
+        slugWrapper.style.display = "none";
+        slugInput.disabled = true;
+        slugInput.value = "";
+      }
+    }
+  });
+
+  // Password Toggle Handler
+  passwordToggle?.addEventListener("change", () => {
+    if (passwordInput) {
+      if (passwordToggle.checked) {
+        passwordInput.style.display = "inline-flex";
+        passwordInput.disabled = false;
+        passwordInput.focus();
+      } else {
+        passwordInput.style.display = "none";
+        passwordInput.disabled = true;
+        passwordInput.value = "";
+      }
+    }
+  });
+
+  const showCopyToast = (message: string) => {
+    if (!notificationToast) return;
+    notificationToast.textContent = message;
+    notificationToast.classList.add("is-visible");
+    setTimeout(() => notificationToast.classList.remove("is-visible"), 2600);
+  };
+
+  copyBtn?.addEventListener("click", async () => {
+    const url = copyBtn.getAttribute("data-url");
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      showCopyToast("Image share link copied to clipboard!");
+    } catch (err) {
+      console.error("Failed to copy URL", err);
+    }
+  });
+
+  // File Upload Handlers
+  if (dropZone && fileInput) {
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    dragArea?.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      dragArea.classList.add("is-dragover");
+    });
+
+    dragArea?.addEventListener("dragleave", () => {
+      dragArea.classList.remove("is-dragover");
+    });
+
+    dragArea?.addEventListener("drop", (e) => {
+      e.preventDefault();
+      dragArea.classList.remove("is-dragover");
+      if (e.dataTransfer?.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        updatePreviews();
+      }
+    });
+
+    fileInput.addEventListener("change", updatePreviews);
+
+    function updatePreviews() {
+      if (!previewGrid || !statusSpan || !fileInput.files) return;
+      const files = Array.from(fileInput.files);
+      const max = parseInt(previewGrid.getAttribute("data-max") || "1", 10);
+
+      previewGrid.innerHTML = "";
+      if (files.length === 0) {
+        previewGrid.hidden = true;
+        statusSpan.textContent = `0 / ${max} selected`;
+        return;
+      }
+
+      previewGrid.hidden = false;
+      statusSpan.textContent = `${files.length} / ${max} selected`;
+
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const item = document.createElement("div");
+          item.className = "image-preview-item";
+          item.innerHTML = `<img src="${e.target?.result}" alt="Preview" /><span class="image-preview-meta">${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)</span>`;
+          previewGrid.appendChild(item);
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  }
+</script>

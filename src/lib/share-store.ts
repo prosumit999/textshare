@@ -14,7 +14,7 @@ declare global {
 }
 
 export type StoredShare = {
-  contentType: "text" | "image";
+  contentType: "text" | "image" | "url";
   textContent: string;
   imageSrc: string | null;
   imageSrcs?: string[];

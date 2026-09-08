@@ -427,12 +427,7 @@ if (Astro.request.method === "POST") {
           </div>
         </div>
         
-        <!-- Content type is available to guests and signed-in users. -->
-        <div class="content-tabs">
-          <button type="button" id="tab-text" class="content-tab active">Text / Code</button>
-          <button type="button" id="tab-image" class="content-tab">Image Upload</button>
-          <input type="hidden" name="contentType" id="content-type-input" value="text" />
-        </div>
+        <input type="hidden" name="contentType" id="content-type-input" value="text" />
 
         <!-- Main text content area -->
         <div class="textarea-wrapper" id="text-input-section">
@@ -449,27 +444,6 @@ if (Astro.request.method === "POST") {
               {errors.textContent}
             </span>
           )}
-        </div>
-
-        <!-- Main image upload area (hidden until selected) -->
-        <div id="image-input-section" style="display: none;">
-            <div class="image-upload-wrapper" id="image-drag-area">
-              <input type="file" name="imageFile" id="image-file-input" aria-label="Select images to share" accept="image/png, image/jpeg, image/webp" multiple={hasPaidPlan} style="display: none;" />
-              <button type="button" class="image-drop-zone" id="image-drop-zone" aria-describedby="image-expiry-hint image-selection-status">
-                <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M12 16V4"></path><path d="m8 8 4-4 4 4"></path><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"></path>
-                </svg>
-                <span><strong>Drag and drop {hasPaidPlan ? 'images' : 'an image'} here</strong><span>or <em>choose files</em> to upload · PNG, JPG, WEBP</span></span>
-                <small id="image-expiry-hint">{hasPaidPlan ? 'Pro: up to 5 images · expires in 24 hours' : 'One image · expires in 3 hours'} · 5 MB per image</small>
-              </button>
-              <div id="image-preview-grid" class:list={["image-preview-grid", { single: !hasPaidPlan }]} data-max={hasPaidPlan ? 5 : 1} hidden></div>
-              <div class="image-upload-footer"><span id="image-selection-status" aria-live="polite">0 / {hasPaidPlan ? 5 : 1} selected</span></div>
-            </div>
-            {errors.imageFile && (
-              <span style="color:var(--color-danger); font-size:12px; padding:var(--space-2) var(--space-4); display:block;">
-                {errors.imageFile}
-              </span>
-            )}
         </div>
 
         <!-- Bottom Controls Bar -->
