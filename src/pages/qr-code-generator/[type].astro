@@ -1,0 +1,821 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCurrentUser } from '../../lib/auth';
+
+const { type } = Astro.params;
+const validTypes = ['wifi', 'phone', 'website', 'text', 'bulk'];
+const currentType = (type && validTypes.includes(type)) ? type : 'website';
+
+if (type && !validTypes.includes(type)) {
+  return Astro.redirect('/qr-code-generator/website');
+}
+
+const user = await getCurrentUser(Astro.cookies);
+const isLoggedIn = !!user;
+
+const metaInfo: Record<string, { title: string; description: string; h1: string; eyebrow: string }> = {
+  website: {
+    title: "Website URL QR Code Generator — TextShare",
+    description: "Convert website URLs into custom high-resolution QR codes with logo overlay, custom colors, and PNG download.",
+    h1: "Website URL QR Code Generator",
+    eyebrow: "WEBSITE & LINK QR STUDIO"
+  },
+  wifi: {
+    title: "WiFi QR Code Generator — TextShare",
+    description: "Generate free WiFi QR codes to share wireless network name and password instantly without typing.",
+    h1: "WiFi Network QR Code Generator",
+    eyebrow: "INSTANT WIFI ACCESS QR"
+  },
+  phone: {
+    title: "Phone Call QR Code Generator — TextShare",
+    description: "Create phone call QR codes so users can dial phone numbers instantly with one camera scan.",
+    h1: "Phone Call QR Code Generator",
+    eyebrow: "ONE-TAP DIAL QR STUDIO"
+  },
+  text: {
+    title: "Text & Note QR Code Generator — TextShare",
+    description: "Generate plain text and note QR codes with custom styling, logo overlay, and vector PNG exports.",
+    h1: "Plain Text QR Code Generator",
+    eyebrow: "TEXT & NOTE QR STUDIO"
+  },
+  bulk: {
+    title: "Bulk QR Code Generator — TextShare",
+    description: "Batch generate multiple QR codes from a list of URLs or text entries at once.",
+    h1: "Bulk Batch QR Code Generator",
+    eyebrow: "BULK & BATCH QR STUDIO"
+  }
+};
+
+const currentMeta = metaInfo[currentType] || metaInfo.website;
+---
+
+<Layout title={currentMeta.title} description={currentMeta.description}>
+  <div class="creator-container" style="padding-bottom: var(--space-12);">
+    <!-- Copy Notification Toast -->
+    <div id="copy-notification" class="copy-notification" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Hero Header -->
+    <div class="hero-section">
+      <span class="eyebrow">{currentMeta.eyebrow}</span>
+      <h1>{currentMeta.h1}</h1>
+      <p>{currentMeta.description}</p>
+    </div>
+
+    <!-- Main QR Studio Panel -->
+    <div class="profile-panel" style="margin-bottom: 32px;">
+      <!-- Child Permalinks Type Switcher Tabs -->
+      <div class="content-tabs" style="margin-bottom: 24px; display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--color-border); padding-bottom: 16px;">
+        <a href="/qr-code-generator/website" class:list={["btn", "btn-secondary", "qr-type-tab", { active: currentType === 'website' }]} style="text-decoration: none;">
+          <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px; margin-right:6px; vertical-align: middle;"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          Website URL
+        </a>
+        <a href="/qr-code-generator/wifi" class:list={["btn", "btn-secondary", "qr-type-tab", { active: currentType === 'wifi' }]} style="text-decoration: none;">
+          <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px; margin-right:6px; vertical-align: middle;"><path d="M5 12.55a11 11 0 0 1 14.08 0"></path><path d="M1.42 9a16 16 0 0 1 21.16 0"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+          WiFi Network
+        </a>
+        <a href="/qr-code-generator/phone" class:list={["btn", "btn-secondary", "qr-type-tab", { active: currentType === 'phone' }]} style="text-decoration: none;">
+          <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px; margin-right:6px; vertical-align: middle;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+          Phone Call
+        </a>
+        <a href="/qr-code-generator/text" class:list={["btn", "btn-secondary", "qr-type-tab", { active: currentType === 'text' }]} style="text-decoration: none;">
+          <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px; margin-right:6px; vertical-align: middle;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Plain Text
+        </a>
+        <a href="/qr-code-generator/bulk" class:list={["btn", "btn-secondary", "qr-type-tab", { active: currentType === 'bulk' }]} style="text-decoration: none;">
+          <svg class="icon-svg" viewBox="0 0 24 24" style="width:14px; height:14px; margin-right:6px; vertical-align: middle;"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          Bulk Generator
+        </a>
+      </div>
+
+      {currentType !== 'bulk' ? (
+        <div class="qr-studio-grid" style="display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start;" id="single-qr-container">
+          <!-- Controls & Input Area -->
+          <div>
+            <!-- Type 1: Website URL -->
+            {currentType === 'website' && (
+              <div id="section-website" class="qr-input-section">
+                <div class="tool-field" style="margin-bottom: 18px;">
+                  <label for="input-url" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">Target Website URL *</label>
+                  <input type="url" id="input-url" class="tool-input" placeholder="https://example.com/your-landing-page" value={`${Astro.url.origin}/`} style="height: 44px; font-size: 14px;" />
+                </div>
+              </div>
+            )}
+
+            <!-- Type 2: WiFi Network -->
+            {currentType === 'wifi' && (
+              <div id="section-wifi" class="qr-input-section">
+                <div class="tool-field" style="margin-bottom: 16px;">
+                  <label for="input-wifi-ssid" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Network Name (SSID) *</label>
+                  <input type="text" id="input-wifi-ssid" class="tool-input" placeholder="e.g. MyHomeWiFi" style="height: 42px;" />
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                  <div class="tool-field">
+                    <label for="input-wifi-pass" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">WiFi Password</label>
+                    <input type="password" id="input-wifi-pass" class="tool-input" placeholder="Network password" style="height: 42px;" />
+                  </div>
+                  <div class="tool-field">
+                    <label for="input-wifi-type" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Encryption Type</label>
+                    <div style="position: relative;">
+                      <select id="input-wifi-type" class="tool-select" style="height: 42px; padding-right: 36px; appearance: none; -webkit-appearance: none; -moz-appearance: none; cursor: pointer;">
+                        <option value="WPA">WPA / WPA2 / WPA3</option>
+                        <option value="WEP">WEP Encryption</option>
+                        <option value="nopass">Open (No Password)</option>
+                      </select>
+                      <svg class="icon-svg" viewBox="0 0 24 24" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--color-text-muted); pointer-events: none;">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <!-- Type 3: Phone Call -->
+            {currentType === 'phone' && (
+              <div id="section-phone" class="qr-input-section">
+                <div class="tool-field" style="margin-bottom: 18px;">
+                  <label for="input-phone" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">Phone Number *</label>
+                  <input type="tel" id="input-phone" class="tool-input" placeholder="+1 (555) 000-1234" style="height: 44px; font-size: 14px;" />
+                </div>
+              </div>
+            )}
+
+            <!-- Type 4: Plain Text -->
+            {currentType === 'text' && (
+              <div id="section-text" class="qr-input-section">
+                <div class="tool-field" style="margin-bottom: 18px;">
+                  <label for="input-text" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">Plain Text Content *</label>
+                  <textarea id="input-text" class="tool-input" style="min-height: 100px; padding: 12px;" placeholder="Type your text note, instructions, or code here..."></textarea>
+                </div>
+              </div>
+            )}
+
+            <!-- Customization Options Grid -->
+            <div style="border-top: 1px solid var(--color-border); padding-top: 18px; margin-top: 18px;">
+              <span class="profile-section-kicker" style="margin-bottom: 12px; display: block;">CUSTOMIZATION & LOGO</span>
+              
+              <!-- Color Controls -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                <div class="tool-field">
+                  <label style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">QR Code Color</label>
+                  <div style="display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-input);">
+                    <div id="qr-fg-swatch" style="position: relative; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--color-border); cursor: pointer; flex-shrink: 0; background-color: #111827; overflow: hidden;">
+                      <input type="color" id="qr-fg-color" value="#111827" style="position: absolute; opacity: 0; width: 200%; height: 200%; top: -50%; left: -50%; cursor: pointer;" />
+                    </div>
+                    <span id="qr-fg-hex" style="font-family: var(--font-mono); font-size: 12px; font-weight: 650; color: var(--color-text-base);">#111827</span>
+                  </div>
+                </div>
+
+                <div class="tool-field">
+                  <label style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Background Color</label>
+                  <div style="display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-input);">
+                    <div id="qr-bg-swatch" style="position: relative; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--color-border); cursor: pointer; flex-shrink: 0; background-color: #ffffff; overflow: hidden;">
+                      <input type="color" id="qr-bg-color" value="#ffffff" style="position: absolute; opacity: 0; width: 200%; height: 200%; top: -50%; left: -50%; cursor: pointer;" />
+                    </div>
+                    <span id="qr-bg-hex" style="font-family: var(--font-mono); font-size: 12px; font-weight: 650; color: var(--color-text-base);">#ffffff</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Preset Color Palette Chips -->
+              <div style="margin-bottom: 18px;">
+                <label style="font-size: 11px; font-weight: 600; color: var(--color-text-muted); display: block; margin-bottom: 6px;">Color Presets</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button type="button" class="color-preset-chip" data-fg="#111827" data-bg="#ffffff" style="width: 22px; height: 22px; border-radius: 50%; background: #111827; border: 1px solid var(--color-border); cursor: pointer;" title="Classic Dark"></button>
+                  <button type="button" class="color-preset-chip" data-fg="#008f68" data-bg="#ffffff" style="width: 22px; height: 22px; border-radius: 50%; background: #008f68; border: 1px solid var(--color-border); cursor: pointer;" title="TextShare Green"></button>
+                  <button type="button" class="color-preset-chip" data-fg="#2563eb" data-bg="#ffffff" style="width: 22px; height: 22px; border-radius: 50%; background: #2563eb; border: 1px solid var(--color-border); cursor: pointer;" title="Royal Blue"></button>
+                  <button type="button" class="color-preset-chip" data-fg="#7c3aed" data-bg="#ffffff" style="width: 22px; height: 22px; border-radius: 50%; background: #7c3aed; border: 1px solid var(--color-border); cursor: pointer;" title="Deep Purple"></button>
+                  <button type="button" class="color-preset-chip" data-fg="#dc2626" data-bg="#ffffff" style="width: 22px; height: 22px; border-radius: 50%; background: #dc2626; border: 1px solid var(--color-border); cursor: pointer;" title="Crimson Red"></button>
+                </div>
+              </div>
+
+              <!-- QR Pattern & Eye Shape Controls -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                <div class="tool-field">
+                  <label for="qr-pattern-style" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">QR Dots Pattern Style</label>
+                  <div style="position: relative;">
+                    <select id="qr-pattern-style" class="tool-input" style="padding: 7px 10px; font-size: 12px; height: 38px;">
+                      <option value="dots" selected>Circular Dots (Sample Style)</option>
+                      <option value="rounded">Smooth Rounded</option>
+                      <option value="square">Classic Square</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="tool-field">
+                  <label for="qr-eye-style" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Corner Eyes Shape</label>
+                  <div style="position: relative;">
+                    <select id="qr-eye-style" class="tool-input" style="padding: 7px 10px; font-size: 12px; height: 38px;">
+                      <option value="rounded" selected>Rounded Corners (Sample Style)</option>
+                      <option value="square">Classic Square</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Center Logo Image Upload -->
+              <div class="tool-field" style="margin-bottom: 16px;">
+                <label style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Center Logo Image (Optional)</label>
+
+                <!-- Custom Logo Upload Box -->
+                <div class="custom-file-box" style="display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 1px dashed var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-base) 60%, var(--color-bg-surface)); transition: border-color 0.2s;">
+                  <input type="file" id="qr-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;" />
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-browse-logo" style="font-size: 12px; padding: 6px 14px; font-weight: 650; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+                    <svg class="icon-svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; color: var(--color-accent);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    Upload Custom Image
+                  </button>
+                  <div style="flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <span id="logo-file-label" style="font-size: 12px; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">No image chosen</span>
+                    <button type="button" id="btn-remove-logo" class="btn btn-secondary btn-sm" style="display: none; font-size: 11px; padding: 3px 8px; color: var(--color-danger); border-color: transparent;" title="Remove logo">
+                      Remove
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Logo Formatting Controls: Size Scale & Shape Crop -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-border);">
+                  <div class="tool-field">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                      <label for="qr-logo-size" style="font-size: 11px; font-weight: 650; color: var(--color-text-base);">Logo Size & Scale</label>
+                      <span id="qr-logo-size-label" style="font-family: var(--font-mono); font-size: 11px; font-weight: 650; color: var(--color-accent);">28%</span>
+                    </div>
+                    <input type="range" id="qr-logo-size" min="15" max="35" value="28" style="width: 100%; cursor: pointer; accent-color: var(--color-accent);" />
+                  </div>
+
+                  <div class="tool-field">
+                    <label for="qr-logo-shape" style="font-size: 11px; font-weight: 650; color: var(--color-text-base);">Logo Crop Shape</label>
+                    <div style="position: relative;">
+                      <select id="qr-logo-shape" class="tool-select" style="height: 34px; padding: 4px 28px 4px 8px; font-size: 11px; cursor: pointer;">
+                        <option value="circle" selected>Circle Crop (Sample Style)</option>
+                        <option value="rounded">Rounded Square</option>
+                        <option value="square">Square Frame</option>
+                      </select>
+                      <svg class="icon-svg" viewBox="0 0 24 24" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 12px; height: 12px; color: var(--color-text-muted); pointer-events: none;">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+                <small style="color: var(--color-text-muted); font-size: 11px; margin-top: 6px; display: block;">Upload your custom logo or select a preset icon, then fine-tune size and shape formatting above.</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Preview Canvas Card (Sticky Sidebar) -->
+          <div class="qr-preview-card" style="position: sticky; top: 24px; padding: 24px; border: 1px solid var(--color-border); border-radius: 18px; background: color-mix(in srgb, var(--color-bg-base) 80%, var(--color-bg-surface)); text-align: center; display: flex; flex-direction: column; align-items: center;">
+            <div class="qr-canvas-wrapper" style="width: 100%; max-width: 260px; aspect-ratio: 1 / 1; display: grid; place-items: center; padding: 16px; background: #ffffff; border: 1px solid var(--color-border); border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); margin-bottom: 16px; box-sizing: border-box;">
+              <canvas id="qr-canvas" width="500" height="500" style="display: block; width: 100%; height: 100%; aspect-ratio: 1 / 1; object-fit: contain;"></canvas>
+            </div>
+            <span style="font-size: 12px; font-weight: 600; color: var(--color-text-muted); display: block; margin-bottom: 12px;">High Resolution Vector QR</span>
+            
+            <!-- Export Size Selector -->
+            <div style="width: 100%; margin-bottom: 12px; text-align: left;">
+              <label for="qr-export-size" style="font-size: 11px; font-weight: 650; color: var(--color-text-muted); display: block; margin-bottom: 4px;">Export PNG Size</label>
+              <div style="position: relative;">
+                <select id="qr-export-size" class="tool-select" style="height: 38px; padding: 6px 30px 6px 10px; font-size: 12px; width: 100%; cursor: pointer;">
+                  <option value="250">250 x 250 px (Standard)</option>
+                  <option value="500" selected>500 x 500 px (HD - Default)</option>
+                  <option value="1000">1000 x 1000 px (Ultra HD Print)</option>
+                </select>
+                <svg class="icon-svg" viewBox="0 0 24 24" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--color-text-muted); pointer-events: none;">
+                  <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+              </div>
+            </div>
+
+            <div style="width: 100%; display: flex; flex-direction: column; gap: 8px;">
+              <button type="button" class="btn btn-secondary" id="btn-open-final-qr-modal" style="width: 100%; font-size: 12px; padding: 9px 14px; font-weight: 650; display: inline-flex; align-items: center; justify-content: center; gap: 6px;" title="Preview Final QR Code in Dialogue Box">
+                <svg class="icon-svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; color: var(--color-accent);"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                Preview Final QR Code
+              </button>
+              <button type="button" class="btn btn-primary" id="btn-download-png" style="width: 100%; font-size: 13px; padding: 10px 16px; font-weight: 700;">
+                <svg class="icon-svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Download PNG
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div id="bulk-qr-container">
+          <div class="tool-field" style="margin-bottom: 20px;">
+            <label for="bulk-input" style="font-size: 13px; font-weight: 700; color: var(--color-text-base);">
+              Bulk Links / Text (One entry per line) *
+            </label>
+            <textarea id="bulk-input" class="tool-input" style="min-height: 140px; padding: 14px; font-family: var(--font-mono); font-size: 13px;" placeholder="https://example.com/page-1&#10;https://example.com/page-2&#10;https://example.com/page-3"></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
+            <button type="button" class="btn btn-primary" id="btn-generate-bulk" style="padding: 10px 24px; font-weight: 700;">
+              Generate Bulk QR Codes
+            </button>
+          </div>
+
+          <div id="bulk-results-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 16px; border-top: 1px solid var(--color-border); padding-top: 20px;"></div>
+        </div>
+      )}
+    </div>
+
+    <!-- Features Launchpad Grid -->
+    <section class="profile-panel" style="margin-top: 36px;">
+      <div class="profile-panel-heading" style="border-bottom: 1px solid var(--color-border); padding-bottom: 14px; margin-bottom: 20px;">
+        <div>
+          <span class="profile-section-kicker">BUILT-IN FEATURES</span>
+          <h2 style="font-size: 18px; text-align: left; margin: 2px 0 0;">Why Use TextShare QR Code Generator?</h2>
+        </div>
+      </div>
+
+      <div class="tools-launchpad" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));">
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+          <h3>Instant Vector Generation</h3>
+          <p>Generate high-resolution PNG QR codes ready for digital sharing or crisp printing.</p>
+        </div>
+
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3z"></path></svg>
+          </div>
+          <h3>Custom Logo Overlay</h3>
+          <p>Personalize your QR code by adding a custom logo or brand image directly in the center.</p>
+        </div>
+
+        <div class="tool-card" style="cursor: default;">
+          <div class="tool-card-icon">
+            <svg viewBox="0 0 24 24"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+          </div>
+          <h3>Bulk Generation</h3>
+          <p>Paste multiple URLs or text entries to generate batch QR codes in seconds.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Final QR Code Preview Dialogue Modal -->
+    <div id="final-qr-modal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; z-index: 9999; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); align-items: center; justify-content: center; padding: 20px;">
+      <div class="modal-card" style="background: var(--color-bg-surface); border: 1px solid var(--color-border); border-radius: 22px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.4); max-width: 420px; width: 100%; padding: 24px; text-align: center; position: relative;">
+        <button type="button" id="btn-close-final-qr-modal" style="position: absolute; top: 14px; right: 16px; background: transparent; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-muted); line-height: 1; padding: 4px 8px; border-radius: 8px;" title="Close Modal">&times;</button>
+        <span class="profile-section-kicker" style="display: block; margin-bottom: 4px;">DIALOGUE BOX PREVIEW</span>
+        <h3 style="font-size: 17px; font-weight: 700; margin: 0 0 16px; color: var(--color-text-base);">Final QR Code Preview</h3>
+        
+        <!-- Canvas Container Box -->
+        <div style="display: grid; place-items: center; padding: 20px; background: #ffffff; border: 1px solid var(--color-border); border-radius: 18px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08); margin-bottom: 16px;">
+          <canvas id="modal-final-qr-canvas" width="500" height="500" style="display: block; width: 230px; height: 230px; max-width: 100%; aspect-ratio: 1 / 1; object-fit: contain;"></canvas>
+        </div>
+
+        <!-- Specifications Readout -->
+        <div style="background: color-mix(in srgb, var(--color-bg-base) 60%, var(--color-bg-surface)); border: 1px solid var(--color-border); border-radius: 12px; padding: 10px 14px; margin-bottom: 18px; text-align: left;">
+          <div id="modal-spec-res" style="font-size: 12px; font-weight: 700; color: var(--color-text-base); margin-bottom: 2px;">Export Resolution: 500 x 500 px (HD)</div>
+          <div id="modal-spec-payload" style="font-family: var(--font-mono); font-size: 11px; color: var(--color-accent); font-weight: 650; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Payload: https://textshare.pro/</div>
+          <div id="modal-spec-logo" style="font-size: 11px; color: var(--color-text-muted);">Center Logo: Custom Image Overlay (28% Scale)</div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="button" id="btn-modal-download-png" class="btn btn-primary" style="flex: 1; font-weight: 700; font-size: 13px; padding: 10px 16px;">
+            <svg class="icon-svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; margin-right: 6px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Download PNG
+          </button>
+          <button type="button" id="btn-modal-close" class="btn btn-secondary" style="font-weight: 650; font-size: 13px; padding: 10px 16px;">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    @media (max-width: 860px) {
+      .qr-studio-grid {
+        grid-template-columns: 1fr !important;
+      }
+      .qr-preview-card {
+        position: static !important;
+      }
+    }
+  </style>
+</Layout>
+
+<script>
+  import QRCode from 'qrcode';
+
+  const rootElement = document.getElementById('qr-studio-root');
+  const pathSegments = window.location.pathname.split('/').filter(Boolean);
+  const typeFromPath = pathSegments[pathSegments.length - 1];
+  const validTypes = ['wifi', 'phone', 'website', 'text', 'bulk'];
+  const currentType = (rootElement?.getAttribute('data-type')) || (validTypes.includes(typeFromPath) ? typeFromPath : 'website');
+
+  const canvas = document.getElementById('qr-canvas') as HTMLCanvasElement;
+  const urlInput = document.getElementById('input-url') as HTMLInputElement;
+  const wifiSsid = document.getElementById('input-wifi-ssid') as HTMLInputElement;
+  const wifiPass = document.getElementById('input-wifi-pass') as HTMLInputElement;
+  const wifiType = document.getElementById('input-wifi-type') as HTMLSelectElement;
+  const phoneInput = document.getElementById('input-phone') as HTMLInputElement;
+  const textInput = document.getElementById('input-text') as HTMLTextAreaElement;
+
+  const fgColorInput = document.getElementById('qr-fg-color') as HTMLInputElement;
+  const bgColorInput = document.getElementById('qr-bg-color') as HTMLInputElement;
+  const fgSwatch = document.getElementById('qr-fg-swatch');
+  const bgSwatch = document.getElementById('qr-bg-swatch');
+  const fgHex = document.getElementById('qr-fg-hex');
+  const bgHex = document.getElementById('qr-bg-hex');
+  const logoFileInput = document.getElementById('qr-logo-file') as HTMLInputElement;
+  const btnBrowseLogo = document.getElementById('btn-browse-logo');
+  const btnRemoveLogo = document.getElementById('btn-remove-logo');
+  const logoFileLabel = document.getElementById('logo-file-label');
+
+  const btnDownloadPng = document.getElementById('btn-download-png');
+  const btnGenerateBulk = document.getElementById('btn-generate-bulk');
+  const bulkInput = document.getElementById('bulk-input') as HTMLTextAreaElement;
+  const bulkResultsGrid = document.getElementById('bulk-results-grid');
+
+  const qrPatternStyleSelect = document.getElementById('qr-pattern-style') as HTMLSelectElement;
+  const qrEyeStyleSelect = document.getElementById('qr-eye-style') as HTMLSelectElement;
+
+  let uploadedLogoImage: HTMLImageElement | null = null;
+
+  // Sync Color & Style Inputs
+  const updateColors = () => {
+    if (fgHex && fgColorInput) fgHex.textContent = fgColorInput.value;
+    if (bgHex && bgColorInput) bgHex.textContent = bgColorInput.value;
+    if (fgSwatch && fgColorInput) fgSwatch.style.backgroundColor = fgColorInput.value;
+    if (bgSwatch && bgColorInput) bgSwatch.style.backgroundColor = bgColorInput.value;
+    renderQR();
+  };
+
+  fgColorInput?.addEventListener('input', updateColors);
+  bgColorInput?.addEventListener('input', updateColors);
+  qrPatternStyleSelect?.addEventListener('change', renderQR);
+  qrEyeStyleSelect?.addEventListener('change', renderQR);
+
+  // Preset Color Chips
+  document.querySelectorAll<HTMLButtonElement>('.color-preset-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const fg = chip.dataset.fg;
+      const bg = chip.dataset.bg;
+      if (fg && fgColorInput) fgColorInput.value = fg;
+      if (bg && bgColorInput) bgColorInput.value = bg;
+      updateColors();
+    });
+  });
+
+  // Input Listeners
+  [urlInput, wifiSsid, wifiPass, wifiType, phoneInput, textInput].forEach((input) => {
+    input?.addEventListener('input', renderQR);
+    input?.addEventListener('change', renderQR);
+    input?.addEventListener('keyup', renderQR);
+  });
+
+  const btnOpenFinalQrModal = document.getElementById('btn-open-final-qr-modal');
+  const finalQrModal = document.getElementById('final-qr-modal');
+  const btnCloseFinalQrModal = document.getElementById('btn-close-final-qr-modal');
+  const btnModalClose = document.getElementById('btn-modal-close');
+  const btnModalDownloadPng = document.getElementById('btn-modal-download-png');
+  const modalFinalQrCanvas = document.getElementById('modal-final-qr-canvas') as HTMLCanvasElement;
+  const modalSpecRes = document.getElementById('modal-spec-res');
+  const modalSpecPayload = document.getElementById('modal-spec-payload');
+  const modalSpecLogo = document.getElementById('modal-spec-logo');
+
+  // Custom Logo Upload Handling
+  btnBrowseLogo?.addEventListener('click', () => {
+    logoFileInput?.click();
+  });
+
+  logoFileInput?.addEventListener('change', () => {
+    const file = logoFileInput.files?.[0];
+    if (!file) {
+      uploadedLogoImage = null;
+      if (logoFileLabel) logoFileLabel.textContent = 'No image chosen';
+      if (btnRemoveLogo) btnRemoveLogo.style.display = 'none';
+      renderQR();
+      return;
+    }
+
+    if (logoFileLabel) logoFileLabel.textContent = file.name;
+    if (btnRemoveLogo) btnRemoveLogo.style.display = 'inline-flex';
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        uploadedLogoImage = img;
+        renderQR();
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  btnRemoveLogo?.addEventListener('click', () => {
+    if (logoFileInput) logoFileInput.value = '';
+    uploadedLogoImage = null;
+    if (logoFileLabel) logoFileLabel.textContent = 'No image chosen';
+    if (btnRemoveLogo) btnRemoveLogo.style.display = 'none';
+    renderQR();
+  });
+
+  btnOpenFinalQrModal?.addEventListener('click', async () => {
+    if (!finalQrModal || !modalFinalQrCanvas) return;
+
+    const exportSizeSelect = document.getElementById('qr-export-size') as HTMLSelectElement;
+    const exportSize = parseInt(exportSizeSelect?.value || '500', 10);
+    const data = getQRData();
+    const logoPercent = parseInt(qrLogoSizeInput?.value || '28', 10);
+
+    await renderQRToCanvas(modalFinalQrCanvas, exportSize);
+
+    if (modalSpecRes) modalSpecRes.textContent = `Export Resolution: ${exportSize} x ${exportSize} px`;
+    if (modalSpecPayload) modalSpecPayload.textContent = `Payload: ${data}`;
+    if (modalSpecLogo) {
+      modalSpecLogo.textContent = uploadedLogoImage
+        ? `Center Logo: Custom Image Overlay (${logoPercent}% Scale)`
+        : 'Center Logo: None';
+    }
+
+    finalQrModal.style.display = 'flex';
+  });
+
+  const closeFinalQrModal = () => {
+    if (finalQrModal) finalQrModal.style.display = 'none';
+  };
+
+  btnCloseFinalQrModal?.addEventListener('click', closeFinalQrModal);
+  btnModalClose?.addEventListener('click', closeFinalQrModal);
+  finalQrModal?.addEventListener('click', (e) => {
+    if (e.target === finalQrModal) closeFinalQrModal();
+  });
+
+  btnModalDownloadPng?.addEventListener('click', () => {
+    btnDownloadPng?.click();
+  });
+
+  function getQRData(): string {
+    if (currentType === 'website') return urlInput?.value.trim() || 'https://textshare.pro';
+    if (currentType === 'wifi') {
+      const ssid = wifiSsid?.value.trim() || 'WiFi';
+      const pass = wifiPass?.value || '';
+      const type = wifiType?.value || 'WPA';
+      if (type === 'nopass') {
+        return `WIFI:S:${ssid};T:nopass;;`;
+      }
+      return `WIFI:S:${ssid};T:${type};P:${pass};;`;
+    }
+    if (currentType === 'phone') {
+      const phone = phoneInput?.value.trim() || '+1234567890';
+      return `tel:${phone}`;
+    }
+    if (currentType === 'text') return textInput?.value.trim() || 'TextShare QR';
+    return 'https://textshare.pro';
+  }
+
+  const qrLogoSizeInput = document.getElementById('qr-logo-size') as HTMLInputElement;
+  const qrLogoSizeLabel = document.getElementById('qr-logo-size-label');
+  const qrLogoShapeSelect = document.getElementById('qr-logo-shape') as HTMLSelectElement;
+
+  qrLogoSizeInput?.addEventListener('input', () => {
+    if (qrLogoSizeLabel) qrLogoSizeLabel.textContent = `${qrLogoSizeInput.value}%`;
+    renderQR();
+  });
+  qrLogoShapeSelect?.addEventListener('change', renderQR);
+
+  async function renderQRToCanvas(targetCanvas: HTMLCanvasElement, targetWidth: number) {
+    if (!targetCanvas) return;
+    const data = getQRData();
+    const fg = fgColorInput?.value || '#111827';
+    const bg = bgColorInput?.value || '#ffffff';
+    const patternStyle = qrPatternStyleSelect?.value || 'dots';
+    const eyeStyle = qrEyeStyleSelect?.value || 'rounded';
+
+    try {
+      const qr = QRCode.create(data, { errorCorrectionLevel: 'H' });
+      const moduleCount = qr.modules.size;
+      const margin = 2;
+      const totalModules = moduleCount + margin * 2;
+
+      targetCanvas.width = targetWidth;
+      targetCanvas.height = targetWidth;
+
+      const ctx = targetCanvas.getContext('2d');
+      if (!ctx) return;
+
+      const cellSize = targetWidth / totalModules;
+
+      // Clear & fill background
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, targetWidth, targetWidth);
+
+      const isEyeModule = (r: number, c: number) => {
+        if (r < 7 && c < 7) return true;
+        if (r < 7 && c >= moduleCount - 7) return true;
+        if (r >= moduleCount - 7 && c < 7) return true;
+        return false;
+      };
+
+      // Custom Eye Finder Pattern Drawing
+      const drawEye = (r0: number, c0: number) => {
+        const eyeX = (margin + c0) * cellSize;
+        const eyeY = (margin + r0) * cellSize;
+        const eyeSize = 7 * cellSize;
+        const radiusOuter = eyeStyle === 'rounded' ? eyeSize * 0.28 : 0;
+        const radiusInner = eyeStyle === 'rounded' ? (eyeSize * 3 / 7) * 0.28 : 0;
+
+        // Outer Eye Border Frame
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        if (eyeStyle === 'rounded') {
+          ctx.roundRect(eyeX, eyeY, eyeSize, eyeSize, radiusOuter);
+        } else {
+          ctx.rect(eyeX, eyeY, eyeSize, eyeSize);
+        }
+        ctx.fill();
+
+        // Inner White Gap
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        if (eyeStyle === 'rounded') {
+          ctx.roundRect(eyeX + cellSize, eyeY + cellSize, 5 * cellSize, 5 * cellSize, radiusOuter * 0.7);
+        } else {
+          ctx.rect(eyeX + cellSize, eyeY + cellSize, 5 * cellSize, 5 * cellSize);
+        }
+        ctx.fill();
+
+        // Center Eye Square/Dot
+        ctx.fillStyle = fg;
+        ctx.beginPath();
+        if (eyeStyle === 'rounded') {
+          ctx.roundRect(eyeX + 2 * cellSize, eyeY + 2 * cellSize, 3 * cellSize, 3 * cellSize, radiusInner);
+        } else {
+          ctx.rect(eyeX + 2 * cellSize, eyeY + 2 * cellSize, 3 * cellSize, 3 * cellSize);
+        }
+        ctx.fill();
+      };
+
+      // Draw the 3 Eyes
+      drawEye(0, 0);
+      drawEye(0, moduleCount - 7);
+      drawEye(moduleCount - 7, 0);
+
+      // Draw Data Modules
+      const dataArr = qr.modules.data;
+      for (let r = 0; r < moduleCount; r++) {
+        for (let c = 0; c < moduleCount; c++) {
+          if (isEyeModule(r, c)) continue;
+
+          const isDark = dataArr[r * moduleCount + c] === 1;
+          if (!isDark) continue;
+
+          const x = (margin + c) * cellSize;
+          const y = (margin + r) * cellSize;
+
+          ctx.fillStyle = fg;
+
+          if (patternStyle === 'dots') {
+            ctx.beginPath();
+            ctx.arc(x + cellSize / 2, y + cellSize / 2, cellSize * 0.42, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (patternStyle === 'rounded') {
+            ctx.beginPath();
+            ctx.roundRect(x + cellSize * 0.08, y + cellSize * 0.08, cellSize * 0.84, cellSize * 0.84, cellSize * 0.35);
+            ctx.fill();
+          } else {
+            ctx.fillRect(x, y, cellSize, cellSize);
+          }
+        }
+      }
+
+      // Draw Center Logo (User Image or Preset) with Custom Formatting & Aspect Ratio Preservation
+      if (uploadedLogoImage) {
+        const logoPercent = parseInt(qrLogoSizeInput?.value || '28', 10) / 100;
+        const logoShape = qrLogoShapeSelect?.value || 'circle';
+
+        const logoSize = targetWidth * logoPercent;
+        const cx = targetWidth / 2;
+        const cy = targetWidth / 2;
+        const padding = Math.max(2, targetWidth * 0.006);
+
+        // Aspect Ratio calculation to prevent image stretching/squishing
+        const imgWidth = uploadedLogoImage.naturalWidth || uploadedLogoImage.width || 1;
+        const imgHeight = uploadedLogoImage.naturalHeight || uploadedLogoImage.height || 1;
+        const aspect = imgWidth / imgHeight;
+
+        let drawW = logoSize;
+        let drawH = logoSize;
+        if (aspect > 1) {
+          drawW = logoSize * aspect;
+          drawH = logoSize;
+        } else if (aspect < 1) {
+          drawW = logoSize;
+          drawH = logoSize / aspect;
+        }
+
+        const drawX = cx - drawW / 2;
+        const drawY = cy - drawH / 2;
+
+        ctx.fillStyle = bg;
+
+        if (logoShape === 'circle') {
+          // Snug background padding circle
+          ctx.beginPath();
+          ctx.arc(cx, cy, logoSize / 2 + padding, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Circular cropped user logo image preserving original aspect ratio
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cx, cy, logoSize / 2, 0, Math.PI * 2);
+          ctx.clip();
+          ctx.drawImage(uploadedLogoImage, drawX, drawY, drawW, drawH);
+          ctx.restore();
+        } else if (logoShape === 'rounded') {
+          const cornerRadius = logoSize * 0.2;
+          ctx.beginPath();
+          ctx.roundRect(cx - logoSize / 2 - padding, cy - logoSize / 2 - padding, logoSize + padding * 2, logoSize + padding * 2, cornerRadius + padding);
+          ctx.fill();
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(cx - logoSize / 2, cy - logoSize / 2, logoSize, logoSize, cornerRadius);
+          ctx.clip();
+          ctx.drawImage(uploadedLogoImage, drawX, drawY, drawW, drawH);
+          ctx.restore();
+        } else {
+          ctx.beginPath();
+          ctx.rect(cx - logoSize / 2 - padding, cy - logoSize / 2 - padding, logoSize + padding * 2, logoSize + padding * 2);
+          ctx.fill();
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(cx - logoSize / 2, cy - logoSize / 2, logoSize, logoSize);
+          ctx.clip();
+          ctx.drawImage(uploadedLogoImage, drawX, drawY, drawW, drawH);
+          ctx.restore();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to render QR Code', err);
+    }
+  }
+
+  async function renderQR() {
+    if (!canvas) return;
+    await renderQRToCanvas(canvas, 500);
+  }
+
+  // PNG High Resolution Download
+  btnDownloadPng?.addEventListener('click', async () => {
+    const exportSizeSelect = document.getElementById('qr-export-size') as HTMLSelectElement;
+    const exportSize = parseInt(exportSizeSelect?.value || '500', 10);
+
+    const tempCanvas = document.createElement('canvas');
+    await renderQRToCanvas(tempCanvas, exportSize);
+
+    const link = document.createElement('a');
+    link.download = `qr-code-${currentType}-${exportSize}x${exportSize}-${Date.now()}.png`;
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+  });
+
+  // Bulk Generator Handler
+  btnGenerateBulk?.addEventListener('click', async () => {
+    if (!bulkInput || !bulkResultsGrid) return;
+    const lines = bulkInput.value.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+    bulkResultsGrid.innerHTML = '';
+
+    if (lines.length === 0) return;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const card = document.createElement('div');
+      card.style.cssText = 'padding: 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-surface); text-align: center;';
+
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 140;
+      tempCanvas.height = 140;
+
+      await QRCode.toCanvas(tempCanvas, line, { width: 140, margin: 1 });
+
+      const label = document.createElement('p');
+      label.style.cssText = 'font-size: 11px; color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 6px 0;';
+      label.textContent = line;
+
+      const dlBtn = document.createElement('button');
+      dlBtn.className = 'btn btn-secondary btn-sm';
+      dlBtn.style.cssText = 'font-size: 11px; width: 100%; padding: 4px 8px;';
+      dlBtn.textContent = 'Download';
+      dlBtn.addEventListener('click', () => {
+        const link = document.createElement('a');
+        link.download = `qr-${i + 1}.png`;
+        link.href = tempCanvas.toDataURL('image/png');
+        link.click();
+      });
+
+      card.appendChild(tempCanvas);
+      card.appendChild(label);
+      card.appendChild(dlBtn);
+      bulkResultsGrid.appendChild(card);
+    }
+  });
+
+  if (currentType !== 'bulk') {
+    renderQR();
+  }
+</script>

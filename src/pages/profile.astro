@@ -382,16 +382,16 @@ const shortLinksWithAnalytics = await Promise.all(
                       </td>
                       <td>
                         <span class="shortlink-badge" style="background: color-mix(in srgb, var(--color-accent) 15%, transparent); color: var(--color-accent);">
-                          ⚡ {link.analytics.totalViews} clicks
+                          {link.analytics.totalViews} clicks
                         </span>
                       </td>
                       <td>
                         <span class="shortlink-badge" style="background: color-mix(in srgb, var(--color-text-base) 8%, transparent); color: var(--color-text-base);">
-                          👤 {link.analytics.uniqueIps} unique
+                          {link.analytics.uniqueIps} unique
                         </span>
                       </td>
                       <td style="font-size: 11px; color: var(--color-text-muted); white-space: nowrap;">
-                        💻 {link.analytics.deviceBreakdown.desktop} · 📱 {link.analytics.deviceBreakdown.mobile} · 📱 {link.analytics.deviceBreakdown.tablet}
+                        Desktop: {link.analytics.deviceBreakdown.desktop} · Mobile: {link.analytics.deviceBreakdown.mobile} · Tablet: {link.analytics.deviceBreakdown.tablet}
                       </td>
                       <td style="text-align: right;">
                         <div style="display: inline-flex; gap: 6px;">
@@ -431,7 +431,7 @@ const shortLinksWithAnalytics = await Promise.all(
             <span class="profile-section-kicker">QR CODE METRICS & STUDIO</span>
             <h2>QR Code Analytics & Tools</h2>
           </div>
-          <a href="/qr-code-generator-online" class="btn btn-primary" style="font-size: 12px; padding: 8px 16px;">
+          <a href="/qr-code-generator/wifi" class="btn btn-primary" style="font-size: 12px; padding: 8px 16px;">
             Open Dedicated QR Generator →
           </a>
         </div>
@@ -466,7 +466,7 @@ const shortLinksWithAnalytics = await Promise.all(
           <p style="color: var(--color-text-muted); font-size: 13px; max-width: 460px; margin: 0 auto 16px;">
             Use our dedicated QR Code Generator to create custom WiFi access QRs, phone call QRs, website links, or batch export bulk QR codes with custom logos.
           </p>
-          <a href="/qr-code-generator-online" class="btn btn-primary" style="font-size: 13px; padding: 10px 24px;">
+          <a href="/qr-code-generator/wifi" class="btn btn-primary" style="font-size: 13px; padding: 10px 24px;">
             Launch QR Code Generator →
           </a>
         </div>
