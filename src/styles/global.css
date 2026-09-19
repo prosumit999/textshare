@@ -4260,6 +4260,195 @@ body.drawer-open {
   .back-to-top {
     bottom: calc(84px + env(safe-area-inset-bottom));
   }
+
+  button.mobile-tools-trigger-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  /* Overlay backdrop for mobile tools dropup */
+  .mobile-tools-overlay {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 48;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+
+  .mobile-tools-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Mobile tools drop-up container */
+  .mobile-tools-dropup {
+    position: fixed;
+    right: 12px;
+    bottom: calc(76px + env(safe-area-inset-bottom));
+    left: 12px;
+    z-index: 50;
+    max-width: 440px;
+    margin: 0 auto;
+    padding: 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--color-bg-surface) 96%, transparent);
+    box-shadow: 0 -12px 36px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(20px);
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+    pointer-events: none;
+    transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .mobile-tools-dropup.open {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  .mobile-tools-dropup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .mobile-tools-dropup-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text-heading);
+  }
+
+  .mobile-tools-dropup-title-wrap .header-icon {
+    width: 18px;
+    height: 18px;
+    color: var(--color-accent);
+  }
+
+  .mobile-tools-dropup-title {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .mobile-tools-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    background: var(--color-bg-base);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+
+  .mobile-tools-close-btn svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .mobile-tools-close-btn:hover {
+    background: var(--color-bg-surface);
+    color: var(--color-text-heading);
+  }
+
+  .mobile-tools-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .mobile-tools-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 14px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-bg-base);
+    color: var(--color-text);
+    text-decoration: none;
+    transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+  }
+
+  .mobile-tools-card:hover,
+  .mobile-tools-card:active {
+    border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+    background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-base));
+    transform: translateY(-1px);
+  }
+
+  .mobile-tools-card.active {
+    border-color: var(--color-accent);
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-bg-base));
+  }
+
+  .mobile-tools-card-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    color: var(--color-accent);
+  }
+
+  .mobile-tools-card-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .mobile-tools-card-text {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .mobile-tools-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-heading);
+  }
+
+  .mobile-tools-card-sub {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mobile-tools-card-active-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--color-accent);
+    box-shadow: 0 0 8px var(--color-accent);
+  }
 }
 
 /* Compact options with a dedicated primary action row */

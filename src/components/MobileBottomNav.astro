@@ -1,8 +1,66 @@
 ---
 import { getCurrentUser } from '../lib/auth';
+import { getSiteSettings } from '../lib/site-settings-store';
+
 const hasSession = !!(await getCurrentUser(Astro.cookies));
 const currentPath = Astro.url.pathname;
+const siteSettings = await getSiteSettings();
+const toolsPages = (siteSettings.toolsPages || []).filter((p) => p.enabled);
+
+const isToolActive = toolsPages.some(
+  (p) => currentPath === p.url || (p.url !== '/' && currentPath.startsWith(p.url))
+);
 ---
+
+{toolsPages.length > 0 && (
+  <>
+    {/* Dark Backdrop for Drop-Up */}
+    <div id="mobile-tools-overlay" class="mobile-tools-overlay" aria-hidden="true"></div>
+
+    {/* Drop-Up Tools Menu Sheet */}
+    <div id="mobile-tools-dropup" class="mobile-tools-dropup" aria-hidden="true" role="dialog" aria-label="Tools menu">
+      <div class="mobile-tools-dropup-header">
+        <div class="mobile-tools-dropup-title-wrap">
+          <svg class="icon-svg header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+          </svg>
+          <span class="mobile-tools-dropup-title">TextShare Tools</span>
+        </div>
+        <button type="button" id="mobile-tools-close" class="mobile-tools-close-btn" aria-label="Close tools menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="mobile-tools-list">
+        {toolsPages.map((page) => {
+          const isActive = currentPath === page.url || (page.url !== '/' && currentPath.startsWith(page.url));
+          return (
+            <a href={page.url} class:list={["mobile-tools-card", { active: isActive }]}>
+              <div class="mobile-tools-card-icon">
+                {page.url.includes('image') ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                ) : page.url.includes('short') ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                ) : page.url.includes('qr') ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3z"/><path d="M17 17h4v4h-4z"/><path d="M14 20h3v1h-3z"/></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                )}
+              </div>
+              <div class="mobile-tools-card-text">
+                <span class="mobile-tools-card-title">{page.label}</span>
+                <span class="mobile-tools-card-sub">
+                  {page.url.includes('image') ? 'Temporary image sharing' : page.url.includes('short') ? 'Custom URL shortener' : page.url.includes('qr') ? 'QR code studio' : 'Instant text snippet share'}
+                </span>
+              </div>
+              {isActive && <span class="mobile-tools-card-active-dot"></span>}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  </>
+)}
 
 <nav class="mobile-bottom-nav" aria-label="Mobile quick navigation">
   <a href="/join" class:list={["mobile-nav-item", { active: currentPath === '/join' }]}>
@@ -40,4 +98,84 @@ const currentPath = Astro.url.pathname;
     </svg>
     <span>{hasSession ? 'Account' : 'Sign in'}</span>
   </a>
+
+  <!-- 5th Item: Tools Drop-Up Menu Trigger -->
+  <button type="button" id="mobile-tools-trigger" class:list={["mobile-nav-item", "mobile-tools-trigger-btn", { active: isToolActive }]} aria-expanded="false" aria-label="Open tools menu">
+    <svg class="icon-svg" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
+    </svg>
+    <span>Tools</span>
+  </button>
 </nav>
+
+<script>
+  function setupMobileToolsDropup() {
+    const trigger = document.getElementById('mobile-tools-trigger');
+    const dropup = document.getElementById('mobile-tools-dropup');
+    const overlay = document.getElementById('mobile-tools-overlay');
+    const closeBtn = document.getElementById('mobile-tools-close');
+
+    if (!trigger || !dropup || !overlay) return;
+
+    function openTools() {
+      dropup?.classList.add('open');
+      overlay?.classList.add('open');
+      dropup?.setAttribute('aria-hidden', 'false');
+      overlay?.setAttribute('aria-hidden', 'false');
+      trigger?.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeTools() {
+      dropup?.classList.remove('open');
+      overlay?.classList.remove('open');
+      dropup?.setAttribute('aria-hidden', 'true');
+      overlay?.setAttribute('aria-hidden', 'true');
+      trigger?.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    }
+
+    function toggleTools() {
+      if (dropup?.classList.contains('open')) {
+        closeTools();
+      } else {
+        openTools();
+      }
+    }
+
+    trigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleTools();
+    });
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        closeTools();
+      });
+    }
+
+    overlay.addEventListener('click', () => {
+      closeTools();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dropup.classList.contains('open')) {
+        closeTools();
+      }
+    });
+
+    // Close when clicking any tool link inside dropup
+    const links = dropup.querySelectorAll('.mobile-tools-card');
+    links.forEach((link) => {
+      link.addEventListener('click', () => {
+        closeTools();
+      });
+    });
+  }
+
+  // Setup on initial page load and Astro view transitions
+  setupMobileToolsDropup();
+  document.addEventListener('astro:page-load', setupMobileToolsDropup);
+</script>
