@@ -23,13 +23,15 @@ body {
 img,
 picture,
 video,
-canvas,
-svg {
+canvas {
   display: block;
-  margin: 10px auto;
-  max-width: 80%;
-  aspect-ratio: 2/1;
-  border-radius: 12px;
+  max-width: 100%;
+  height: auto;
+}
+
+svg {
+  display: inline-block;
+  vertical-align: middle;
 }
 
 input,
@@ -39,26 +41,8 @@ select {
   font: inherit;
 }
 
-
 ul {
-  margin: 0px auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  width: 500px;
-  color: var(--color-text-base);
-}
-
-@media screen and (max-width: 600px) {
-  ul {
-    flex-direction: column;
-    align-items: flex-start;
-    width: auto;
-    margin: 0 auto;
-    display: flex;
-    overflow-wrap: break-word;
-    padding: 3px 20px;
-  }
+  list-style: none;
 }
 
 p,
