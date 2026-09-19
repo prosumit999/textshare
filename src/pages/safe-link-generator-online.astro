@@ -6,8 +6,8 @@ const user = await getCurrentUser(Astro.cookies);
 ---
 
 <Layout
-  title="Safe Link Inspector & Live Iframe Previewer — SSL Verification | TextShare"
-  description="Inspect web links, verify SSL certificate security, and render target web pages inside a live interactive iframe previewer."
+  title="Safe Link Inspector & Live Webpage Previewer — SSL Verification | TextShare"
+  description="Inspect web links, verify SSL certificate security, and preview target web pages with real-time inspection on TextShare."
 >
   <div class="safe-link-page container">
     <!-- Header Section -->
@@ -21,7 +21,7 @@ const user = await getCurrentUser(Astro.cookies);
       </div>
       <h1>Safe Link Inspector</h1>
       <p class="tool-subtitle">
-        Enter or paste any link to inspect SSL security and preview the destination webpage live in an embedded browser frame.
+        Enter or paste any link to inspect SSL security and preview destination webpage content before opening.
       </p>
     </header>
 
@@ -43,7 +43,7 @@ const user = await getCurrentUser(Astro.cookies);
             type="url"
             id="destinationUrl"
             class="url-input"
-            placeholder="https://wikipedia.org"
+            placeholder="https://ahrefs.com"
             autocomplete="off"
             spellcheck="false"
           />
@@ -87,7 +87,7 @@ const user = await getCurrentUser(Astro.cookies);
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           </div>
           <div class="sec-info">
-            <span class="sec-label">Protocol & Port</span>
+            <span class="sec-label">HTTP Status Code</span>
             <strong id="sec-proto-text" class="sec-status-text">—</strong>
           </div>
         </div>
@@ -117,6 +117,10 @@ const user = await getCurrentUser(Astro.cookies);
           </div>
 
           <div class="browser-tools">
+            <div class="view-switcher">
+              <button type="button" id="view-iframe-btn" class="switch-btn active" title="Interactive Iframe View">Frame</button>
+              <button type="button" id="view-summary-btn" class="switch-btn" title="Server Webpage Summary">Summary</button>
+            </div>
             <button type="button" id="reload-iframe-btn" class="tool-btn" title="Reload Frame">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
             </button>
@@ -126,13 +130,14 @@ const user = await getCurrentUser(Astro.cookies);
           </div>
         </div>
 
-        <!-- Frame Viewport -->
+        <!-- Frame Viewport Area -->
         <div class="viewport-area">
           <div id="loading-spinner" class="viewport-loading hidden">
             <div class="spinner"></div>
-            <span>Loading live webpage preview...</span>
+            <span>Inspecting webpage & checking SSL security...</span>
           </div>
 
+          <!-- Direct Iframe -->
           <iframe
             id="preview-iframe"
             src="about:blank"
@@ -141,22 +146,35 @@ const user = await getCurrentUser(Astro.cookies);
             loading="lazy"
           ></iframe>
 
-          <!-- Fallback Notice overlay -->
-          <div id="fallback-overlay" class="fallback-overlay hidden">
-            <div class="fallback-card">
-              <div class="fallback-shield-icon">🛡️</div>
-              <h3>Site Restricts Direct Embedded Frame</h3>
-              <p>
-                The server for <strong id="fallback-domain">example.com</strong> sets security headers (<code>X-Frame-Options</code> or <code>Content-Security-Policy</code>) that prevent rendering inside third-party frames.
-              </p>
-              <div class="fallback-meta">
-                <span class="meta-tag green">✓ SSL Encrypted Connection Verified</span>
-                <span class="meta-tag blue">✓ Valid Target Domain</span>
+          <!-- Webpage Summary & Inspection Fallback View -->
+          <div id="summary-view" class="summary-view hidden">
+            <div class="summary-card">
+              <div class="summary-badge-header">
+                <span class="summary-shield-badge" id="summary-shield-badge">🔒 HTTPS SSL Verified</span>
+                <span class="summary-status-tag" id="summary-status-tag">HTTP 200 OK</span>
               </div>
-              <a id="fallback-direct-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary fallback-btn">
-                <span>Open Destination Webpage Safely in New Tab</span>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-              </a>
+              <h2 id="summary-page-title" class="summary-title">Webpage Title</h2>
+              <p id="summary-page-desc" class="summary-desc">Webpage description will appear here after URL inspection.</p>
+
+              <div class="summary-excerpt-box">
+                <div class="excerpt-header">
+                  <span>Page Content Excerpt</span>
+                  <span id="summary-domain-badge" class="domain-tag">domain.com</span>
+                </div>
+                <p id="summary-excerpt-text" class="excerpt-text">Page text excerpt...</p>
+              </div>
+
+              <div id="summary-frame-warning" class="frame-warning-banner hidden">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>Target domain sets <code>X-Frame-Options</code> restrictions preventing inline iframe embedding. Webpage text and SSL security verified above.</span>
+              </div>
+
+              <div class="summary-actions">
+                <a id="summary-direct-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary summary-open-btn">
+                  <span>Open Destination Webpage Safely</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -198,21 +216,50 @@ const user = await getCurrentUser(Astro.cookies);
     const secOpenLink = document.getElementById('sec-open-link') as HTMLAnchorElement;
     const secIconWrap = document.getElementById('sec-icon-wrap');
 
-    // Browser Elements
+    // Browser Header Elements
     const browserLockIcon = document.getElementById('browser-lock-icon');
     const browserAddressUrl = document.getElementById('browser-address-url');
     const browserSslBadge = document.getElementById('browser-ssl-badge');
     const browserOpenExt = document.getElementById('browser-open-ext') as HTMLAnchorElement;
     const reloadIframeBtn = document.getElementById('reload-iframe-btn');
+    const viewIframeBtn = document.getElementById('view-iframe-btn');
+    const viewSummaryBtn = document.getElementById('view-summary-btn');
 
     // Viewport Elements
     const iframe = document.getElementById('preview-iframe') as HTMLIFrameElement;
     const loadingSpinner = document.getElementById('loading-spinner');
-    const fallbackOverlay = document.getElementById('fallback-overlay');
-    const fallbackDomain = document.getElementById('fallback-domain');
-    const fallbackDirectLink = document.getElementById('fallback-direct-link') as HTMLAnchorElement;
+    const summaryView = document.getElementById('summary-view');
 
-    let iframeCheckTimeout: any = null;
+    // Summary Elements
+    const summaryShieldBadge = document.getElementById('summary-shield-badge');
+    const summaryStatusTag = document.getElementById('summary-status-tag');
+    const summaryPageTitle = document.getElementById('summary-page-title');
+    const summaryPageDesc = document.getElementById('summary-page-desc');
+    const summaryDomainBadge = document.getElementById('summary-domain-badge');
+    const summaryExcerptText = document.getElementById('summary-excerpt-text');
+    const summaryFrameWarning = document.getElementById('summary-frame-warning');
+    const summaryDirectBtn = document.getElementById('summary-direct-btn') as HTMLAnchorElement;
+
+    let debounceTimer: any = null;
+    let activeMode: 'iframe' | 'summary' = 'iframe';
+
+    function setViewMode(mode: 'iframe' | 'summary') {
+      activeMode = mode;
+      if (mode === 'iframe') {
+        iframe?.classList.remove('hidden');
+        summaryView?.classList.add('hidden');
+        viewIframeBtn?.classList.add('active');
+        viewSummaryBtn?.classList.remove('active');
+      } else {
+        iframe?.classList.add('hidden');
+        summaryView?.classList.remove('hidden');
+        viewSummaryBtn?.classList.add('active');
+        viewIframeBtn?.classList.remove('active');
+      }
+    }
+
+    if (viewIframeBtn) viewIframeBtn.addEventListener('click', () => setViewMode('iframe'));
+    if (viewSummaryBtn) viewSummaryBtn.addEventListener('click', () => setViewMode('summary'));
 
     function resetInspector() {
       if (secSslText) secSslText.textContent = 'Enter a URL to check SSL';
@@ -234,12 +281,12 @@ const user = await getCurrentUser(Astro.cookies);
       if (browserOpenExt) browserOpenExt.href = '#';
 
       if (iframe) iframe.src = 'about:blank';
-      if (fallbackOverlay) fallbackOverlay.classList.add('hidden');
       if (loadingSpinner) loadingSpinner.classList.add('hidden');
       if (clearBtn) clearBtn.classList.add('hidden');
+      setViewMode('iframe');
     }
 
-    function inspectUrl(rawVal: string) {
+    async function inspectUrl(rawVal: string) {
       const val = rawVal.trim();
       if (!val || val.length < 3) {
         resetInspector();
@@ -257,9 +304,9 @@ const user = await getCurrentUser(Astro.cookies);
         const parsed = new URL(fullUrl);
         const isHttps = parsed.protocol === 'https:';
 
-        // Update Security Dashboard
+        // Update Client-Side Security Dashboard
         if (secDomainText) secDomainText.textContent = parsed.hostname;
-        if (secProtoText) secProtoText.textContent = `${parsed.protocol.toUpperCase()} (${isHttps ? 'Port 443' : 'Port 80'})`;
+        if (secProtoText) secProtoText.textContent = isHttps ? 'HTTPS (Port 443)' : 'HTTP (Port 80)';
 
         if (secSslText && secIconWrap) {
           if (isHttps) {
@@ -279,8 +326,7 @@ const user = await getCurrentUser(Astro.cookies);
         // Update Browser Window
         if (browserAddressUrl) browserAddressUrl.textContent = fullUrl;
         if (browserOpenExt) browserOpenExt.href = fullUrl;
-        if (fallbackDirectLink) fallbackDirectLink.href = fullUrl;
-        if (fallbackDomain) fallbackDomain.textContent = parsed.hostname;
+        if (summaryDirectBtn) summaryDirectBtn.href = fullUrl;
 
         if (browserSslBadge && browserLockIcon) {
           if (isHttps) {
@@ -294,33 +340,52 @@ const user = await getCurrentUser(Astro.cookies);
           }
         }
 
-        // Show loading spinner & set iframe source
-        if (fallbackOverlay) fallbackOverlay.classList.add('hidden');
+        // Show Spinner and attempt load
         if (loadingSpinner) loadingSpinner.classList.remove('hidden');
+        if (iframe) iframe.src = fullUrl;
 
-        if (iframe) {
-          iframe.src = fullUrl;
-        }
+        // Fetch Server Inspection Analysis via /api/inspect-link
+        const res = await fetch(`/api/inspect-link?url=${encodeURIComponent(fullUrl)}`);
+        const data = await res.json();
 
-        // Hide spinner after frame loads or timeout
-        if (iframeCheckTimeout) clearTimeout(iframeCheckTimeout);
-        iframeCheckTimeout = setTimeout(() => {
+        if (loadingSpinner) loadingSpinner.classList.add('hidden');
+
+        if (data && data.success) {
+          if (secProtoText) secProtoText.textContent = `HTTP ${data.status} ${data.statusText}`;
+
+          if (summaryPageTitle) summaryPageTitle.textContent = data.title;
+          if (summaryPageDesc) summaryPageDesc.textContent = data.description;
+          if (summaryDomainBadge) summaryDomainBadge.textContent = data.domain;
+          if (summaryExcerptText) summaryExcerptText.textContent = data.contentExcerpt;
+          if (summaryStatusTag) summaryStatusTag.textContent = `HTTP ${data.status} ${data.statusText}`;
+
+          if (summaryShieldBadge) {
+            summaryShieldBadge.textContent = data.isHttps ? '🔒 HTTPS SSL Verified' : '⚠️ HTTP Unencrypted';
+            summaryShieldBadge.className = data.isHttps ? 'summary-shield-badge secure' : 'summary-shield-badge warning';
+          }
+
+          if (!data.canFrame) {
+            if (summaryFrameWarning) summaryFrameWarning.classList.remove('hidden');
+            setViewMode('summary');
+          } else {
+            if (summaryFrameWarning) summaryFrameWarning.classList.add('hidden');
+            if (activeMode === 'iframe') setViewMode('iframe');
+          }
+        } else {
           if (loadingSpinner) loadingSpinner.classList.add('hidden');
-        }, 1500);
-
+        }
       } catch (err) {
-        if (secSslText) secSslText.textContent = 'Invalid URL Format';
-        if (secDomainText) secDomainText.textContent = 'Invalid Domain';
-        if (secProtoText) secProtoText.textContent = 'Unknown Protocol';
+        if (loadingSpinner) loadingSpinner.classList.add('hidden');
       }
     }
 
-    // Input Events
+    // Input Listener
     if (urlInput) {
-      urlInput.addEventListener('input', () => inspectUrl(urlInput.value));
-      urlInput.addEventListener('change', () => inspectUrl(urlInput.value));
+      urlInput.addEventListener('input', () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => inspectUrl(urlInput.value), 300);
+      });
 
-      // Auto-inspect default value if present
       if (urlInput.value.trim()) {
         inspectUrl(urlInput.value);
       }
@@ -352,19 +417,11 @@ const user = await getCurrentUser(Astro.cookies);
       });
     }
 
-    // Reload Frame Button
+    // Reload Button
     if (reloadIframeBtn && iframe) {
       reloadIframeBtn.addEventListener('click', () => {
-        if (iframe.src && iframe.src !== 'about:blank') {
-          const current = iframe.src;
-          iframe.src = 'about:blank';
-          if (loadingSpinner) loadingSpinner.classList.remove('hidden');
-          setTimeout(() => {
-            iframe.src = current;
-            setTimeout(() => {
-              if (loadingSpinner) loadingSpinner.classList.add('hidden');
-            }, 1000);
-          }, 150);
+        if (urlInput && urlInput.value.trim()) {
+          inspectUrl(urlInput.value);
         }
       });
     }
@@ -665,7 +722,7 @@ const user = await getCurrentUser(Astro.cookies);
 
     .address-bar {
       flex: 1;
-      max-width: 600px;
+      max-width: 540px;
       background: var(--color-bg-input);
       border: 1px solid var(--color-border);
       border-radius: 8px;
@@ -711,7 +768,33 @@ const user = await getCurrentUser(Astro.cookies);
     .browser-tools {
       display: flex;
       align-items: center;
-      gap: 0.4rem;
+      gap: 0.5rem;
+    }
+
+    .view-switcher {
+      display: flex;
+      align-items: center;
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 2px;
+    }
+
+    .switch-btn {
+      border: none;
+      background: transparent;
+      padding: 0.25rem 0.65rem;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .switch-btn.active {
+      background: var(--color-accent);
+      color: #ffffff;
     }
 
     .tool-btn {
@@ -743,7 +826,7 @@ const user = await getCurrentUser(Astro.cookies);
     /* Viewport Area */
     .viewport-area {
       position: relative;
-      height: 540px;
+      height: 560px;
       background: #f8fafc;
     }
 
@@ -754,7 +837,7 @@ const user = await getCurrentUser(Astro.cookies);
     .viewport-loading {
       position: absolute;
       inset: 0;
-      background: color-mix(in srgb, var(--color-bg-surface) 85%, transparent);
+      background: color-mix(in srgb, var(--color-bg-surface) 90%, transparent);
       backdrop-filter: blur(4px);
       z-index: 10;
       display: flex;
@@ -787,77 +870,132 @@ const user = await getCurrentUser(Astro.cookies);
       background: #ffffff;
     }
 
-    .fallback-overlay {
+    /* Summary View */
+    .summary-view {
       position: absolute;
       inset: 0;
-      background: color-mix(in srgb, var(--color-bg-surface) 96%, transparent);
-      z-index: 20;
+      background: var(--color-bg-surface);
+      overflow-y: auto;
+      padding: 2rem;
+    }
+
+    .summary-card {
+      max-width: 720px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .summary-badge-header {
       display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 2rem;
+      gap: 0.6rem;
     }
 
-    .fallback-card {
-      max-width: 480px;
-      text-align: center;
-      background: var(--color-bg-surface);
-      border: 1px solid var(--color-border);
-      padding: 2rem;
-      border-radius: 16px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+    .summary-shield-badge {
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      background: #10b98118;
+      color: #059669;
+      border: 1px solid #10b98135;
     }
 
-    .fallback-shield-icon {
-      font-size: 3rem;
-      margin-bottom: 0.75rem;
+    .summary-shield-badge.warning {
+      background: #f59e0b18;
+      color: #d97706;
+      border-color: #f59e0b35;
     }
 
-    .fallback-card h3 {
-      font-size: 1.25rem;
+    .summary-status-tag {
+      font-size: 0.78rem;
+      font-weight: 700;
+      padding: 0.3rem 0.75rem;
+      border-radius: 20px;
+      background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+      color: var(--color-accent);
+      border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+    }
+
+    .summary-title {
+      font-size: 1.5rem;
       font-weight: 800;
       color: var(--color-text-base);
-      margin-bottom: 0.5rem;
+      line-height: 1.3;
     }
 
-    .fallback-card p {
-      font-size: 0.9rem;
+    .summary-desc {
+      font-size: 1rem;
       color: var(--color-text-muted);
-      line-height: 1.5;
-      margin-bottom: 1.25rem;
+      line-height: 1.55;
     }
 
-    .fallback-meta {
+    .summary-excerpt-box {
+      background: var(--color-bg-input);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+
+    .excerpt-header {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .meta-tag {
-      font-size: 0.75rem;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.6rem;
+      font-size: 0.8rem;
       font-weight: 700;
-      padding: 0.25rem 0.65rem;
-      border-radius: 20px;
+      color: var(--color-text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
-    .meta-tag.green {
-      background: #10b98115;
-      color: #059669;
-      border: 1px solid #10b98130;
+    .domain-tag {
+      background: var(--color-border);
+      color: var(--color-text-base);
+      padding: 0.15rem 0.5rem;
+      border-radius: 6px;
+      text-transform: none;
+      font-family: var(--font-mono, monospace);
     }
 
-    .meta-tag.blue {
-      background: color-mix(in srgb, var(--color-accent) 15%, transparent);
-      color: var(--color-accent);
-      border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+    .excerpt-text {
+      font-size: 0.92rem;
+      color: var(--color-text-base);
+      line-height: 1.6;
     }
 
-    .fallback-btn {
+    .frame-warning-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      background: #f59e0b12;
+      border: 1px solid #f59e0b40;
+      color: var(--color-text-base);
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .frame-warning-banner svg {
+      width: 20px;
+      height: 20px;
+      color: #f59e0b;
+      flex-shrink: 0;
+    }
+
+    .summary-actions {
+      margin-top: 0.5rem;
+    }
+
+    .summary-open-btn {
       width: 100%;
       justify-content: center;
-      padding: 0.75rem 1.25rem;
+      padding: 0.85rem 1.5rem;
+      font-size: 1rem;
+      border-radius: 12px;
     }
 
     .hidden {
