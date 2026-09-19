@@ -7742,3 +7742,198 @@ body.drawer-open {
   background: color-mix(in srgb, var(--color-accent) 15%, transparent);
   color: var(--color-accent);
 }
+
+/* Safe Link Shield Interstitial Guard Card */
+.safe-link-guard-card {
+  max-width: 620px;
+  margin: 2rem auto;
+  padding: 2.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-bg-surface);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+}
+
+.guard-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.guard-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  margin-bottom: 1rem;
+}
+
+.guard-badge svg {
+  width: 15px;
+  height: 15px;
+}
+
+.guard-header h1 {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--color-text-heading);
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+
+.guard-subtitle {
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.guard-domain-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  margin-bottom: 1.5rem;
+}
+
+.domain-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.domain-icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.domain-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.domain-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.domain-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-text-heading);
+  margin-top: 2px;
+}
+
+.full-url-preview {
+  font-size: 12px;
+  color: var(--color-accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.guard-checks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 600px) {
+  .guard-checks-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.check-icon {
+  font-size: 1.25rem;
+}
+
+.check-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.check-text strong {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-heading);
+}
+
+.check-text small {
+  font-size: 10px;
+  color: var(--color-text-muted);
+}
+
+.guard-cta-row {
+  display: flex;
+  justify-content: center;
+}
+
+.continue-btn {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.continue-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Guard View Live Iframe Wrapper */
+.guard-iframe-wrapper {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  background: var(--color-bg-base);
+}
+
+.iframe-viewport-box {
+  height: 440px;
+  width: 100%;
+  background: #ffffff;
+}
+
+.safe-iframe-embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #ffffff;
+}

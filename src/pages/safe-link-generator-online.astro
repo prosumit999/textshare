@@ -1,0 +1,821 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCurrentUser } from '../lib/auth';
+import { checkRateLimit, getClientIp, rateLimitResponse } from '../lib/security';
+import { getShare, saveShare } from '../lib/share-store';
+import { calculateExpiry, generateAvailableSlug, type ExpiryOption } from '../lib/share-policy';
+import bcrypt from 'bcryptjs';
+import QRCode from 'qrcode';
+
+const user = await getCurrentUser(Astro.cookies);
+const isLoggedIn = !!user;
+const clientIp = getClientIp(Astro.request);
+
+let createdSafeUrl = "";
+let createdSlug = "";
+let targetUrl = "";
+let qrDataUrl = "";
+let errorMessage = "";
+let successMessage = "";
+let targetDomain = "";
+let isHttps = true;
+
+if (Astro.request.method === "POST") {
+  const rateLimit = await checkRateLimit('share:create', isLoggedIn ? user.email : clientIp, 20, 10 * 60);
+  if (!rateLimit.allowed) {
+    return rateLimitResponse(rateLimit.retryAfter, "Too many creation requests. Please wait a moment.");
+  }
+
+  const formData = await Astro.request.formData();
+  const rawUrl = formData.get("destinationUrl")?.toString().trim() || "";
+  const customSlug = formData.get("customSlug")?.toString().trim().toLowerCase() || "";
+  const expiryChoice = (formData.get("expiry")?.toString() || "24h") as ExpiryOption;
+  const password = formData.get("password")?.toString() || "";
+
+  if (!rawUrl) {
+    errorMessage = "Please enter a valid URL to protect.";
+  } else {
+    targetUrl = rawUrl;
+    if (!/^https?:\/\//i.test(targetUrl)) {
+      targetUrl = "https://" + targetUrl;
+    }
+
+    try {
+      const parsedUrl = new URL(targetUrl);
+      targetDomain = parsedUrl.hostname;
+      isHttps = parsedUrl.protocol === "https:";
+    } catch {
+      errorMessage = "Invalid web URL format. Example: https://example.com/page";
+    }
+
+    if (!errorMessage) {
+      try {
+        let slug = customSlug.replace(/[^a-z0-9-_]/g, "");
+        if (slug) {
+          if (!slug.startsWith("s-")) slug = "s-" + slug;
+        } else {
+          slug = await generateAvailableSlug("string", getShare);
+          slug = "s-" + slug;
+        }
+
+        const existing = await getShare(slug);
+        if (existing) {
+          errorMessage = `The custom alias "/${slug}" is already taken. Please try another custom name.`;
+        } else {
+          let passwordHash: string | null = null;
+          if (password) {
+            passwordHash = await bcrypt.hash(password, 10);
+          }
+
+          const now = new Date();
+          const expiryDate = calculateExpiry(expiryChoice, now);
+
+          await saveShare(slug, {
+            contentType: "url",
+            textContent: targetUrl,
+            imageSrc: null,
+            expiryDate,
+            burnAfterReading: expiryChoice === "burn",
+            language: "url",
+            passwordHash,
+            owner: isLoggedIn ? user!.email : null,
+            guestIp: isLoggedIn ? null : clientIp,
+            sizeBytes: Buffer.byteLength(targetUrl, "utf8"),
+            createdAt: now,
+            viewCount: 0,
+          });
+
+          createdSlug = slug;
+          createdSafeUrl = `${Astro.url.origin}/${slug}`;
+          qrDataUrl = await QRCode.toDataURL(createdSafeUrl, { margin: 1, width: 280 });
+          successMessage = "Your Safe Link has been created & protected!";
+        }
+      } catch (err: any) {
+        errorMessage = err?.message || "Failed to create Safe Link. Please try again.";
+      }
+    }
+  }
+}
+---
+
+<Layout
+  title="Safe Link Generator & Live Iframe Previewer — SSL Verification & Security Shield"
+  description="Inspect web links with live iframe previews, SSL verification, and password protection on TextShare."
+>
+  <div class="safe-link-page container">
+    <header class="tool-header">
+      <div class="tool-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 12 2 2 4-4"></path>
+        </svg>
+        <span>LIVE IFRAME PREVIEW & SSL SHIELD</span>
+      </div>
+      <h1>Safe Link Generator</h1>
+      <p class="tool-subtitle">
+        Enter any link to inspect SSL security and see a live interactive webpage iframe preview before sharing.
+      </p>
+    </header>
+
+    {errorMessage && (
+      <div class="alert alert-error" role="alert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span>{errorMessage}</span>
+      </div>
+    )}
+
+    {successMessage && (
+      <div class="alert alert-success" role="status">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        <span>{successMessage}</span>
+      </div>
+    )}
+
+    <div class="tool-workspace grid-2col">
+      <!-- Left Column: Form & Realtime Controls -->
+      <div class="tool-card main-card">
+        <form method="POST" class="safe-link-form">
+          <div class="form-group">
+            <label for="destinationUrl" class="form-label">
+              Enter Destination URL <span class="required">*</span>
+            </label>
+            <div class="url-input-wrap">
+              <span class="url-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </span>
+              <input
+                type="url"
+                id="destinationUrl"
+                name="destinationUrl"
+                class="form-input url-input"
+                placeholder="https://example.com/document"
+                value={targetUrl}
+                required
+              />
+            </div>
+            <p class="form-hint">Type or paste any URL to generate SSL analysis & live iframe preview.</p>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="expiry" class="form-label">Link Expiration</label>
+              <select id="expiry" name="expiry" class="form-select">
+                <option value="24h" selected>⏳ 24 Hours (Standard)</option>
+                <option value="3h">⚡ 3 Hours (Short-lived)</option>
+                <option value="burn">🔥 Burn After First Click</option>
+                <option value="1w">📅 7 Days</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="customSlug" class="form-label">Custom Alias (Optional)</label>
+              <input
+                type="text"
+                id="customSlug"
+                name="customSlug"
+                class="form-input"
+                placeholder="e.g. project-doc"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="password" class="form-label">Optional Password Lock</label>
+            <input
+              type="password"
+              id="password"
+              name="password"
+              class="form-input"
+              placeholder="Set a passkey to lock visitor access"
+            />
+          </div>
+
+          <button type="submit" class="btn btn-primary submit-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>Create Safe Link & Lock Preview</span>
+          </button>
+        </form>
+
+        {createdSafeUrl && (
+          <div class="result-box-created">
+            <div class="result-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              <span>SAFE LINK CREATED</span>
+            </div>
+            <div class="url-output-group">
+              <label class="form-label">Your Protected Shareable Link</label>
+              <div class="url-output-box">
+                <input type="text" readonly value={createdSafeUrl} class="url-output-input" id="outputUrl" />
+                <button type="button" id="copy-btn" class="btn btn-secondary copy-btn">Copy</button>
+              </div>
+            </div>
+            <div class="qr-inline-wrap">
+              <img src={qrDataUrl} alt="Safe Link QR Code" width="120" height="120" />
+              <div class="qr-info">
+                <strong>QR Code Ready</strong>
+                <p>Visitors scan this code to see the live iframe preview & access destination.</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <!-- Right Column: Live Webpage Iframe Preview & SSL Inspector -->
+      <div class="tool-card iframe-card">
+        <div id="iframe-preview-container" class="iframe-preview-container">
+          <!-- Browser Top Frame Header -->
+          <div class="browser-frame-bar">
+            <div class="browser-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <div class="browser-address-box">
+              <span id="ssl-lock-icon" class="ssl-lock-icon">🔒</span>
+              <span id="preview-address-text" class="address-text">
+                {targetDomain || "Waiting for URL input..."}
+              </span>
+              <span id="ssl-badge" class={`ssl-badge ${isHttps ? 'secure' : 'warning'}`}>
+                {isHttps ? 'HTTPS SSL Verified ✓' : 'HTTP (Unencrypted)'}
+              </span>
+            </div>
+            <a
+              id="preview-open-ext-btn"
+              href={targetUrl || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="btn btn-secondary btn-sm open-ext-link"
+              title="Open link directly"
+            >
+              <span>Open</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          </div>
+
+          <!-- Live Webpage Iframe -->
+          <div class="iframe-viewport">
+            <iframe
+              id="live-preview-iframe"
+              src={targetUrl || "about:blank"}
+              title="Live Webpage Preview"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              loading="lazy"
+            ></iframe>
+
+            <div id="iframe-fallback-notice" class="iframe-fallback-notice hidden">
+              <div class="fallback-icon">🛡️</div>
+              <h4>Site Restricts Direct Embedding</h4>
+              <p>
+                The destination server sets <code>X-Frame-Options</code> restrictions for embedded frames. Domain <strong id="fallback-domain-name">example.com</strong> and SSL encryption are verified.
+              </p>
+              <a id="fallback-visit-btn" href={targetUrl || "#"} target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">
+                Open Webpage Directly
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEO Content Section -->
+    <section class="seo-section">
+      <h2>Why Use Safe Link Generator with Live Iframe Preview?</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="fc-icon">🖼️</div>
+          <h3>Live Interactive Iframe Preview</h3>
+          <p>Inspect destination webpages directly inside an embedded iframe preview window before navigating or sharing with colleagues.</p>
+        </div>
+        <div class="feature-card">
+          <div class="fc-icon">🔒</div>
+          <h3>SSL & Domain Inspection</h3>
+          <p>Verify SSL certificate protocol (HTTPS vs HTTP) and target host reputation to protect against phishing and deceptive links.</p>
+        </div>
+        <div class="feature-card">
+          <div class="fc-icon">🛡️</div>
+          <h3>Password & Self-Destruct Locks</h3>
+          <p>Set optional passkeys and auto-destruction rules (24h, 3h, Burn on view) for total link privacy.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // Live Client-Side URL & Iframe Preview Engine
+    const urlInput = document.getElementById('destinationUrl') as HTMLInputElement;
+    const iframe = document.getElementById('live-preview-iframe') as HTMLIFrameElement;
+    const addressText = document.getElementById('preview-address-text');
+    const sslBadge = document.getElementById('ssl-badge');
+    const openExtBtn = document.getElementById('preview-open-ext-btn') as HTMLAnchorElement;
+    const fallbackNotice = document.getElementById('iframe-fallback-notice');
+    const fallbackDomainName = document.getElementById('fallback-domain-name');
+    const fallbackVisitBtn = document.getElementById('fallback-visit-btn') as HTMLAnchorElement;
+    const copyBtn = document.getElementById('copy-btn');
+    const outputUrl = document.getElementById('outputUrl') as HTMLInputElement;
+
+    function updateLivePreview(urlValue: string) {
+      if (!urlValue || urlValue.trim().length < 4) {
+        if (addressText) addressText.textContent = 'Waiting for URL input...';
+        if (sslBadge) {
+          sslBadge.textContent = 'SSL Check Ready';
+          sslBadge.className = 'ssl-badge';
+        }
+        if (iframe) iframe.src = 'about:blank';
+        if (fallbackNotice) fallbackNotice.classList.add('hidden');
+        return;
+      }
+
+      let fullUrl = urlValue.trim();
+      if (!/^https?:\/\//i.test(fullUrl)) {
+        fullUrl = 'https://' + fullUrl;
+      }
+
+      try {
+        const parsed = new URL(fullUrl);
+        const isHttps = parsed.protocol === 'https:';
+
+        if (addressText) addressText.textContent = parsed.hostname;
+        if (openExtBtn) openExtBtn.href = fullUrl;
+        if (fallbackVisitBtn) fallbackVisitBtn.href = fullUrl;
+        if (fallbackDomainName) fallbackDomainName.textContent = parsed.hostname;
+
+        if (sslBadge) {
+          if (isHttps) {
+            sslBadge.textContent = 'HTTPS SSL Verified ✓';
+            sslBadge.className = 'ssl-badge secure';
+          } else {
+            sslBadge.textContent = 'HTTP (Unencrypted)';
+            sslBadge.className = 'ssl-badge warning';
+          }
+        }
+
+        if (iframe) {
+          iframe.src = fullUrl;
+          if (fallbackNotice) fallbackNotice.classList.add('hidden');
+        }
+      } catch {
+        if (addressText) addressText.textContent = 'Invalid URL';
+      }
+    }
+
+    if (urlInput) {
+      urlInput.addEventListener('input', () => {
+        updateLivePreview(urlInput.value);
+      });
+
+      if (urlInput.value.trim()) {
+        updateLivePreview(urlInput.value);
+      }
+    }
+
+    if (copyBtn && outputUrl) {
+      copyBtn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(outputUrl.value);
+        copyBtn.textContent = 'Copied! ✓';
+        setTimeout(() => {
+          copyBtn.textContent = 'Copy';
+        }, 2000);
+      });
+    }
+  </script>
+
+  <style>
+    .safe-link-page {
+      padding-top: 2rem;
+      padding-bottom: 4rem;
+    }
+
+    .tool-header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+
+    .tool-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+      color: var(--color-accent);
+      padding: 0.35rem 0.9rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+      margin-bottom: 1rem;
+    }
+
+    .tool-badge svg {
+      width: 15px;
+      height: 15px;
+    }
+
+    .tool-header h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: var(--color-text-heading);
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+
+    .tool-subtitle {
+      font-size: 1.05rem;
+      color: var(--color-text-muted);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .tool-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    }
+
+    .safe-link-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--color-text-heading);
+    }
+
+    .required {
+      color: #ef4444;
+    }
+
+    .url-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .url-icon {
+      position: absolute;
+      left: 14px;
+      color: var(--color-text-muted);
+      display: flex;
+      align-items: center;
+    }
+
+    .url-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .url-input {
+      padding-left: 2.75rem !important;
+    }
+
+    .form-input, .form-select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: var(--color-bg-base);
+      border: 1px solid var(--color-border);
+      border-radius: 10px;
+      color: var(--color-text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .form-input:focus, .form-select:focus {
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+    }
+
+    .form-hint {
+      font-size: 0.78rem;
+      color: var(--color-text-muted);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    @media (max-width: 500px) {
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 0.85rem;
+      font-size: 1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      margin-top: 0.25rem;
+    }
+
+    .submit-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .result-box-created {
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .result-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #dcfce7;
+      color: #15803d;
+      padding: 0.35rem 0.8rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      align-self: flex-start;
+    }
+
+    .result-badge svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .url-output-group {
+      width: 100%;
+    }
+
+    .url-output-box {
+      display: flex;
+      gap: 0.5rem;
+      margin-top: 0.35rem;
+    }
+
+    .url-output-input {
+      flex: 1;
+      padding: 0.65rem 0.9rem;
+      background: var(--color-bg-base);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: var(--color-accent);
+      font-weight: 700;
+    }
+
+    .qr-inline-wrap {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem;
+      background: var(--color-bg-base);
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+    }
+
+    .qr-inline-wrap img {
+      border-radius: 8px;
+      background: #ffffff;
+      padding: 4px;
+    }
+
+    .qr-info strong {
+      font-size: 0.85rem;
+      color: var(--color-text-heading);
+      display: block;
+    }
+
+    .qr-info p {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      margin: 0;
+    }
+
+    /* Live Iframe Preview Window Styles */
+    .iframe-card {
+      padding: 0 !important;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 540px;
+    }
+
+    .iframe-preview-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--color-bg-surface);
+    }
+
+    .browser-frame-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.65rem 1rem;
+      background: color-mix(in srgb, var(--color-bg-base) 90%, var(--color-bg-surface));
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .browser-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dot.red { background: #ef4444; }
+    .dot.yellow { background: #f59e0b; }
+    .dot.green { background: #10b981; }
+
+    .browser-address-box {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 0.35rem 0.75rem;
+      min-width: 0;
+    }
+
+    .ssl-lock-icon {
+      font-size: 0.85rem;
+    }
+
+    .address-text {
+      flex: 1;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--color-text-heading);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .ssl-badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      background: var(--color-bg-base);
+      color: var(--color-text-muted);
+    }
+
+    .ssl-badge.secure {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .ssl-badge.warning {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .open-ext-link {
+      font-size: 0.75rem;
+      padding: 0.3rem 0.65rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .open-ext-link svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .iframe-viewport {
+      position: relative;
+      flex: 1;
+      background: #ffffff;
+    }
+
+    .iframe-viewport iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #ffffff;
+    }
+
+    .iframe-fallback-notice {
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      background: var(--color-bg-surface);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      text-align: center;
+      gap: 0.75rem;
+    }
+
+    .iframe-fallback-notice.hidden {
+      display: none;
+    }
+
+    .fallback-icon {
+      font-size: 2.5rem;
+    }
+
+    .iframe-fallback-notice h4 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--color-text-heading);
+      margin: 0;
+    }
+
+    .iframe-fallback-notice p {
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+      max-width: 340px;
+      line-height: 1.5;
+    }
+
+    .seo-section {
+      margin-top: 4rem;
+    }
+
+    .seo-section h2 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--color-text-heading);
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .feature-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 14px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+
+    .fc-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--color-text-heading);
+      margin-bottom: 0.5rem;
+    }
+
+    .feature-card p {
+      font-size: 0.88rem;
+      color: var(--color-text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</Layout>

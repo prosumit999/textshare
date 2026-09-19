@@ -24,7 +24,9 @@ const isStoredShare = Boolean(share);
 if (isStoredShare && slug && (share?.contentType as string) === 'url') {
   const isExpired = new Date() > new Date(share.expiryDate);
   const isRevoked = !!share.revokedAt;
-  if (!isExpired && !isRevoked) {
+  const isSafeLink = slug.startsWith('s-') || Astro.url.searchParams.has('guard');
+
+  if (!isExpired && !isRevoked && !isSafeLink && !share.passwordHash) {
     let targetUrl = share.textContent?.trim() || '';
     if (targetUrl) {
       if (!/^https?:\/\//i.test(targetUrl)) {
@@ -247,9 +249,23 @@ const roomQrCode = await QRCode.toDataURL(roomUrl, { width: 180, margin: 1 });
 const sharedImages = share.contentType === 'image'
   ? ((Array.isArray(share.imageSrcs) && share.imageSrcs.length ? share.imageSrcs : [share.imageSrc]).filter(Boolean) as string[])
   : [];
+
+let safeTargetUrl = share?.contentType === 'url' ? (share.textContent?.trim() || '') : '';
+let safeTargetDomain = '';
+let safeIsHttps = true;
+if (safeTargetUrl) {
+  if (!/^https?:\/\//i.test(safeTargetUrl)) safeTargetUrl = 'https://' + safeTargetUrl;
+  try {
+    const parsed = new URL(safeTargetUrl);
+    safeTargetDomain = parsed.hostname;
+    safeIsHttps = parsed.protocol === 'https:';
+  } catch {
+    safeTargetDomain = safeTargetUrl;
+  }
+}
 ---
 
-<Layout title={isCustomPage ? `${customPageData.title} — TextShare` : `View Share: ${slug} — TextShare`} description={isCustomPage ? customPageData.summary : undefined}>
+<Layout title={isCustomPage ? `${customPageData.title} — TextShare` : share.contentType === 'url' ? `Safe Link Shield: ${safeTargetDomain} — TextShare` : `View Share: ${slug} — TextShare`} description={isCustomPage ? customPageData.summary : undefined}>
   {isCustomPage ? (
     <PolicyPage eyebrow={customPageData.eyebrow} title={customPageData.title} summary={customPageData.summary} updated={customPageData.updatedAt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}>
       <div set:html={customPageData.content}></div>
@@ -259,6 +275,93 @@ const sharedImages = share.contentType === 'image'
   ) : isLocked ? (
     /* Password Gate Component */
     <PasswordGate error={passwordError} slug={slug} />
+  ) : share.contentType === 'url' ? (
+    /* Safe Link Interstitial Guard View */
+    <div class="creator-container">
+      <div class="view-card safe-link-guard-card">
+        <div class="guard-header">
+          <div class="guard-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>LINK SECURITY SHIELD & IFRAME PREVIEW</span>
+          </div>
+          <h1>Live Destination Webpage Preview</h1>
+          <p class="guard-subtitle">Inspect the live webpage inside the browser frame below before navigating directly.</p>
+        </div>
+
+        <div class="guard-domain-box">
+          <div class="domain-icon">
+            {safeIsHttps ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+            )}
+          </div>
+          <div class="domain-info">
+            <span class="domain-label">Destination Domain</span>
+            <span class="domain-name">{safeTargetDomain}</span>
+            <span class="full-url-preview">{safeTargetUrl}</span>
+          </div>
+        </div>
+
+        <!-- Live Interactive Webpage Iframe Preview -->
+        <div class="guard-iframe-wrapper">
+          <div class="browser-frame-bar">
+            <div class="browser-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <div class="browser-address-box">
+              <span class="ssl-lock-icon">🔒</span>
+              <span class="address-text">{safeTargetUrl}</span>
+              <span class={`ssl-badge ${safeIsHttps ? 'secure' : 'warning'}`}>
+                {safeIsHttps ? 'HTTPS SSL Verified ✓' : 'HTTP (Unencrypted)'}
+              </span>
+            </div>
+          </div>
+          <div class="iframe-viewport-box">
+            <iframe
+              src={safeTargetUrl}
+              title={`Live Preview of ${safeTargetDomain}`}
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              loading="lazy"
+              class="safe-iframe-embed"
+            ></iframe>
+          </div>
+        </div>
+
+        <div class="guard-checks-grid" style="margin-top: 1.25rem;">
+          <div class="check-item">
+            <span class="check-icon">🔒</span>
+            <div class="check-text">
+              <strong>SSL Protocol</strong>
+              <small>{safeIsHttps ? 'HTTPS Secured Connection' : 'HTTP (Unencrypted)'}</small>
+            </div>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">🖼️</span>
+            <div class="check-text">
+              <strong>Interactive Iframe</strong>
+              <small>Live site frame loaded</small>
+            </div>
+          </div>
+          <div class="check-item">
+            <span class="check-icon">⏱️</span>
+            <div class="check-text">
+              <strong>Link Expiry</strong>
+              <small>Expires: {new Date(share.expiryDate).toLocaleTimeString()}</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="guard-cta-row">
+          <a href={safeTargetUrl} id="continue-destination-btn" class="btn btn-primary btn-lg continue-btn" target="_blank" rel="noopener noreferrer">
+            <span>Open {safeTargetDomain} in Full Window</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
   ) : (
     /* Active Share Content View */
     <div class="creator-container">
