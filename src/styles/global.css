@@ -1703,6 +1703,7 @@ a.btn-primary:active {
 
 .url-text {
   flex: 1;
+  min-width: 0;
   padding: var(--space-3);
   font-family: var(--font-mono);
   font-size: 13px;

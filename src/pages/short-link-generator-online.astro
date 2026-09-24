@@ -171,7 +171,7 @@ if (Astro.request.method === "POST") {
               Custom Short Alias (Optional)
             </label>
             <div style="display: flex; align-items: center; gap: 0; border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; background: var(--color-bg-input);">
-              <span style="padding: 0 12px; font-size: 12px; color: var(--color-text-muted); font-weight: 600; background: color-mix(in srgb, var(--color-bg-base) 80%, var(--color-bg-surface)); border-right: 1px solid var(--color-border); height: 42px; display: flex; align-items: center;">
+              <span style="padding: 0 12px; font-size: 12px; color: var(--color-text-muted); font-weight: 600; background: color-mix(in srgb, var(--color-bg-base) 80%, var(--color-bg-surface)); border-right: 1px solid var(--color-border); height: 42px; display: flex; align-items: center; flex-shrink: 0;">
                 {Astro.url.host}/
               </span>
               <input 
@@ -182,7 +182,7 @@ if (Astro.request.method === "POST") {
                 placeholder="my-alias" 
                 pattern="[a-zA-Z0-9-_]+"
                 disabled={!isLoggedIn && isGuestLimitReached}
-                style="border: none; border-radius: 0; height: 42px; font-size: 13px;"
+                style="border: none; border-radius: 0; height: 42px; font-size: 13px; min-width: 0; flex: 1;"
               />
             </div>
           </div>
