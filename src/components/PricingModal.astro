@@ -1,35 +1,82 @@
+---
+import { getCurrentUser } from '../lib/auth';
+
+const currentUser = await getCurrentUser(Astro.cookies);
+---
+
 <dialog id="pricing-modal" class="pricing-modal" aria-labelledby="pricing-modal-title">
   <div class="pricing-modal-card">
     <button class="pricing-modal-close" type="button" aria-label="Close pricing">×</button>
+
     <div class="pricing-modal-brand">
       <div class="pricing-modal-icon" aria-hidden="true">
         <svg viewBox="0 0 24 24"><path d="m12 3 3 6 6 .9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.9 9 9z"></path></svg>
       </div>
-      <div><span>TextShare</span><strong>PRO</strong></div>
+      <div><span>TextShare</span><strong>PLANS & PRICING</strong></div>
     </div>
+
     <div class="pricing-modal-heading">
-      <span class="pricing-modal-kicker">One simple upgrade</span>
-      <h2 id="pricing-modal-title">More control for everything you share.</h2>
-      <p class="pricing-modal-intro">Choose how long links live, protect private content, and share without active-link limits. Burn After First View stays free.</p>
+      <span class="pricing-modal-kicker">Simple & Transparent</span>
+      <h2 id="pricing-modal-title">Choose the right plan for your workflow</h2>
+      <p class="pricing-modal-intro">Sign up for a free account to unlock link saving & dashboard control, or upgrade to PRO for maximum privacy and long retention.</p>
     </div>
-    <ul class="pricing-modal-features">
-      <li><span>✓</span><div><strong>Flexible expiry</strong><small>Choose 1 week, 1 month, or 1 year</small></div></li>
-      <li><span>✓</span><div><strong>Password protection</strong><small>Keep sensitive rooms private</small></div></li>
-      <li><span>✓</span><div><strong>Unlimited shares</strong><small>No one-active-link restriction</small></div></li>
-      <li><span>✓</span><div><strong>Multi-image rooms</strong><small>Up to 5 images for 24 hours</small></div></li>
-      <li><span>✓</span><div><strong>Custom slugs</strong><small>Create memorable six-character links</small></div></li>
-    </ul>
-    <div class="pricing-billing-label"><span>Choose billing</span><small>Cancel anytime</small></div>
-    <div class="pricing-modal-options">
-      <button type="button" class="pricing-option" data-plan="monthly" aria-pressed="false">
-        <span class="pricing-option-radio"></span><span><strong>Monthly</strong><small>Flexible billing</small></span><b>$3<small>/mo</small></b>
-      </button>
-      <button type="button" class="pricing-option recommended selected" data-plan="annual" aria-pressed="true">
-        <span class="pricing-option-radio"></span><span><em>Save 44%</em><strong>Annual</strong><small>Best value</small></span><b>$20<small>/yr</small></b>
-      </button>
+
+    <div class="pricing-plans-grid">
+      <!-- Free Plan (Unlocked after Sign Up) -->
+      <div class="pricing-plan-card pricing-free-box">
+        <div class="pricing-plan-header">
+          <span class="pricing-plan-badge free-badge">Included on Sign Up</span>
+          <h3>Free Account</h3>
+          <div class="pricing-plan-price"><b>$0</b><small>/forever</small></div>
+          <p class="pricing-plan-desc">Essential tools unlocked immediately after registering.</p>
+        </div>
+        <ul class="pricing-modal-features">
+          <li><span>✓</span><div><strong>Save & Keep Multiple Links</strong><small>No 1-active-link guest restriction</small></div></li>
+          <li><span>✓</span><div><strong>Personal Link Dashboard</strong><small>View, manage & revoke active shares</small></div></li>
+          <li><span>✓</span><div><strong>Burn After First View</strong><small>100% Free self-destructing text</small></div></li>
+          <li><span>✓</span><div><strong>Single Image Rooms</strong><small>Secure temporary images for 24h</small></div></li>
+          <li><span>✓</span><div><strong>Vector QR Code Suite</strong><small>URLs, WiFi networks & plain text</small></div></li>
+        </ul>
+        <div class="pricing-plan-action">
+          {!currentUser ? (
+            <a href="/signup" class="btn btn-secondary pricing-signup-btn">Create Free Account <span aria-hidden="true">→</span></a>
+          ) : (
+            <div class="pricing-active-status"><span>✓</span> Your Active Free Plan</div>
+          )}
+        </div>
+      </div>
+
+      <!-- PRO Plan Upgrade -->
+      <div class="pricing-plan-card pricing-pro-box featured">
+        <div class="pricing-plan-header">
+          <span class="pricing-plan-badge pro-badge">Pro Upgrade</span>
+          <h3>TextShare PRO</h3>
+          <div class="pricing-plan-price"><b>$3</b><small>/mo or $20/yr</small></div>
+          <p class="pricing-plan-desc">Maximum privacy, custom slugs & extended retention.</p>
+        </div>
+        <ul class="pricing-modal-features">
+          <li><span>✓</span><div><strong>Flexible Expiry</strong><small>Keep links for 1 week, 1 month, or 1 year</small></div></li>
+          <li><span>✓</span><div><strong>Password Protection</strong><small>Lock sensitive rooms with passcodes</small></div></li>
+          <li><span>✓</span><div><strong>Multi-Image Rooms</strong><small>Upload up to 5 images per room</small></div></li>
+          <li><span>✓</span><div><strong>Custom Short Slugs</strong><small>Memorable 6-character short links</small></div></li>
+          <li><span>✓</span><div><strong>Unlimited Active Shares</strong><small>No active link restrictions</small></div></li>
+        </ul>
+
+        <div class="pricing-billing-label"><span>Select billing cycle</span><small>Cancel anytime</small></div>
+        <div class="pricing-modal-options">
+          <button type="button" class="pricing-option" data-plan="monthly" aria-pressed="false">
+            <span class="pricing-option-radio"></span><span><strong>Monthly</strong><small>Flexible</small></span><b>$3<small>/mo</small></b>
+          </button>
+          <button type="button" class="pricing-option recommended selected" data-plan="annual" aria-pressed="true">
+            <span class="pricing-option-radio"></span><span><em>Save 44%</em><strong>Annual</strong><small>Best value</small></span><b>$20<small>/yr</small></b>
+          </button>
+        </div>
+
+        <button type="button" class="btn btn-primary pricing-modal-cta premium-hook-btn" data-plan="annual"><span>Continue with annual</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
+      </div>
     </div>
-    <button type="button" class="btn btn-primary pricing-modal-cta premium-hook-btn" data-plan="annual"><span>Continue with annual</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
-    <div class="pricing-modal-assurance"><span><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3"></path><rect x="4" y="11" width="16" height="10" rx="2"></rect></svg>Secure checkout</span><span>No hidden fees</span><span>Burn stays free</span></div>
+
+    <div class="pricing-modal-assurance"><span><svg viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3"></path><rect x="4" y="11" width="16" height="10" rx="2"></rect></svg>Secure checkout</span><span>No hidden fees</span><span>Burn stays 100% free</span></div>
     <p class="pricing-modal-legal">By continuing, you agree to the <a href="/terms">Terms</a> and <a href="/refund-policy">Refund Policy</a>.</p>
     <p class="pricing-modal-note" aria-live="polite"></p>
   </div>
