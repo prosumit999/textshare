@@ -108,7 +108,7 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
                   <label for="input-wifi-ssid" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Network Name (SSID) *</label>
                   <input type="text" id="input-wifi-ssid" class="tool-input" placeholder="e.g. MyHomeWiFi" style="height: 42px;" />
                 </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                <div class="qr-two-col-grid" style="margin-bottom: 16px;">
                   <div class="tool-field">
                     <label for="input-wifi-pass" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">WiFi Password</label>
                     <input type="password" id="input-wifi-pass" class="tool-input" placeholder="Network password" style="height: 42px;" />
@@ -116,7 +116,7 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
                   <div class="tool-field">
                     <label for="input-wifi-type" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Encryption Type</label>
                     <div style="position: relative;">
-                      <select id="input-wifi-type" class="tool-select" style="height: 42px; padding-right: 36px; appearance: none; -webkit-appearance: none; -moz-appearance: none; cursor: pointer;">
+                      <select id="input-wifi-type" class="tool-select" style="height: 42px; padding-right: 36px; appearance: none; -webkit-appearance: none; -moz-appearance: none; cursor: pointer; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
                         <option value="WPA">WPA / WPA2 / WPA3</option>
                         <option value="WEP">WEP Encryption</option>
                         <option value="nopass">Open (No Password)</option>
@@ -155,7 +155,7 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
               <span class="profile-section-kicker" style="margin-bottom: 12px; display: block;">CUSTOMIZATION & LOGO</span>
               
               <!-- Color Controls -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div class="qr-two-col-grid" style="margin-bottom: 16px;">
                 <div class="tool-field">
                   <label style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">QR Code Color</label>
                   <div style="display: flex; align-items: center; gap: 10px; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-input);">
@@ -190,11 +190,11 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
               </div>
 
               <!-- QR Pattern & Eye Shape Controls -->
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+              <div class="qr-two-col-grid" style="margin-bottom: 16px;">
                 <div class="tool-field">
                   <label for="qr-pattern-style" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">QR Dots Pattern Style</label>
                   <div style="position: relative;">
-                    <select id="qr-pattern-style" class="tool-input" style="padding: 7px 10px; font-size: 12px; height: 38px;">
+                    <select id="qr-pattern-style" class="tool-input" style="padding: 7px 10px; font-size: 12px; height: 38px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
                       <option value="dots" selected>Circular Dots (Sample Style)</option>
                       <option value="rounded">Smooth Rounded</option>
                       <option value="square">Classic Square</option>
@@ -205,7 +205,7 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
                 <div class="tool-field">
                   <label for="qr-eye-style" style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Corner Eyes Shape</label>
                   <div style="position: relative;">
-                    <select id="qr-eye-style" class="tool-input" style="padding: 7px 10px; font-size: 12px; height: 38px;">
+                    <select id="qr-eye-style" class="tool-input" style="padding: 7px 10px; font-size: 12px; height: 38px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
                       <option value="rounded" selected>Rounded Corners (Sample Style)</option>
                       <option value="square">Classic Square</option>
                     </select>
@@ -218,9 +218,9 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
                 <label style="font-size: 12px; font-weight: 650; color: var(--color-text-base);">Center Logo Image (Optional)</label>
 
                 <!-- Custom Logo Upload Box -->
-                <div class="custom-file-box" style="display: flex; align-items: center; gap: 12px; padding: 8px 14px; border: 1px dashed var(--color-border); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-base) 60%, var(--color-bg-surface)); transition: border-color 0.2s;">
+                <div class="custom-file-box">
                   <input type="file" id="qr-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display: none;" />
-                  <button type="button" class="btn btn-secondary btn-sm" id="btn-browse-logo" style="font-size: 12px; padding: 6px 14px; font-weight: 650; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;">
+                  <button type="button" class="btn btn-secondary btn-sm" id="btn-browse-logo" style="font-size: 12px; padding: 6px 14px; font-weight: 650; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;">
                     <svg class="icon-svg" viewBox="0 0 24 24" style="width: 14px; height: 14px; color: var(--color-accent);"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                     Upload Custom Image
                   </button>
@@ -233,7 +233,7 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
                 </div>
 
                 <!-- Logo Formatting Controls: Size Scale & Shape Crop -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-border);">
+                <div class="qr-two-col-grid" style="margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-border);">
                   <div class="tool-field">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
                       <label for="qr-logo-size" style="font-size: 11px; font-weight: 650; color: var(--color-text-base);">Logo Size & Scale</label>
@@ -245,7 +245,7 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
                   <div class="tool-field">
                     <label for="qr-logo-shape" style="font-size: 11px; font-weight: 650; color: var(--color-text-base);">Logo Crop Shape</label>
                     <div style="position: relative;">
-                      <select id="qr-logo-shape" class="tool-select" style="height: 34px; padding: 4px 28px 4px 8px; font-size: 11px; cursor: pointer;">
+                      <select id="qr-logo-shape" class="tool-select" style="height: 34px; padding: 4px 28px 4px 8px; font-size: 11px; cursor: pointer; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;">
                         <option value="circle" selected>Circle Crop (Sample Style)</option>
                         <option value="rounded">Rounded Square</option>
                         <option value="square">Square Frame</option>
@@ -384,12 +384,71 @@ const currentMeta = metaInfo[currentType] || metaInfo.website;
   </div>
 
   <style>
+    .qr-two-col-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .custom-file-box {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      border: 1px dashed var(--color-border);
+      border-radius: 12px;
+      background: color-mix(in srgb, var(--color-bg-base) 60%, var(--color-bg-surface));
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+      width: 100%;
+    }
+
+    .tool-input,
+    .tool-select,
+    select,
+    input,
+    textarea {
+      box-sizing: border-box;
+      max-width: 100%;
+      width: 100%;
+    }
+
+    select.tool-input,
+    select.tool-select {
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
     @media (max-width: 860px) {
       .qr-studio-grid {
         grid-template-columns: 1fr !important;
       }
       .qr-preview-card {
         position: static !important;
+        margin-top: 24px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .qr-two-col-grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 12px !important;
+      }
+
+      .custom-file-box {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .qr-type-tab {
+        flex: 1 1 calc(50% - 6px);
+        font-size: 12px !important;
+        padding: 8px 6px !important;
+        justify-content: center;
       }
     }
   </style>

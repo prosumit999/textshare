@@ -4582,6 +4582,13 @@ body.drawer-open {
   transition: all 0.2s ease;
 }
 
+@media screen and (max-width: 400px) {
+  .analytics-pill-badge {
+    font-size: 10px;
+    padding: 0px 7px;
+  }
+}
+
 .analytics-control-pill:hover .analytics-pill-badge {
   border-color: var(--color-border-focus);
   color: var(--color-text-base);
@@ -5198,6 +5205,7 @@ body.drawer-open {
 @media (max-width: 620px) {
   .room-topbar {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .room-qr {
@@ -7500,6 +7508,7 @@ body.drawer-open {
     opacity: 0;
     transform: translateY(6px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
