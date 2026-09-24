@@ -24,9 +24,8 @@ const isStoredShare = Boolean(share);
 if (isStoredShare && slug && (share?.contentType as string) === 'url') {
   const isExpired = new Date() > new Date(share.expiryDate);
   const isRevoked = !!share.revokedAt;
-  const isSafeLink = slug.startsWith('s-') || Astro.url.searchParams.has('guard');
 
-  if (!isExpired && !isRevoked && !isSafeLink && !share.passwordHash) {
+  if (!isExpired && !isRevoked && !share.passwordHash) {
     let targetUrl = share.textContent?.trim() || '';
     if (targetUrl) {
       if (!/^https?:\/\//i.test(targetUrl)) {

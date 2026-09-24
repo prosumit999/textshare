@@ -57,7 +57,6 @@ export const defaultPages: PageLink[] = [
 
 export const defaultToolsPages: PageLink[] = [
   { label: 'Text Share', url: '/', enabled: true },
-  { label: 'Safe Link Generator', url: '/safe-link-generator-online', enabled: true },
   { label: 'Temp Image Share', url: '/share-image-online-temporary', enabled: true },
   { label: 'Short Link Generator', url: '/short-link-generator-online', enabled: true },
   { label: 'QR Code Generator', url: '/qr-code-generator/wifi', enabled: true }
