@@ -4167,9 +4167,22 @@ body.drawer-open {
   }
 }
 
-/* Mobile bottom navigation */
-.mobile-bottom-nav {
-  display: none;
+/* Mobile bottom navigation - strictly hidden on desktop */
+.mobile-bottom-nav,
+.mobile-tools-overlay,
+.mobile-tools-dropup {
+  display: none !important;
+}
+
+@media (min-width: 768px) {
+  body {
+    padding-bottom: 0 !important;
+  }
+  .mobile-bottom-nav,
+  .mobile-tools-overlay,
+  .mobile-tools-dropup {
+    display: none !important;
+  }
 }
 
 @media (max-width: 767px) {
@@ -4183,7 +4196,7 @@ body.drawer-open {
     bottom: 0;
     left: 0;
     z-index: 45;
-    display: grid;
+    display: grid !important;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     height: calc(66px + env(safe-area-inset-bottom));
     padding: 7px 8px env(safe-area-inset-bottom);
@@ -4256,6 +4269,7 @@ body.drawer-open {
 
   /* Overlay backdrop for mobile tools dropup */
   .mobile-tools-overlay {
+    display: block;
     position: fixed;
     top: 0;
     right: 0;
@@ -4276,6 +4290,7 @@ body.drawer-open {
 
   /* Mobile tools drop-up container */
   .mobile-tools-dropup {
+    display: block;
     position: fixed;
     right: 12px;
     bottom: calc(76px + env(safe-area-inset-bottom));
